@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Faculty of Medicine",
+    "code": "MED",
+    "description": "Tıp fakültesi",
+    "is_active": "true"
+  },
+  {
+    "name": "Faculty of Law",
+    "code": "LAW",
+    "description": "Hukuk fakültesi",
+    "is_active": "1"
+  },
+  {
+    "name": "Faculty of Education",
+    "code": "EDU",
+    "description": "Eğitim fakültesi",
+    "is_active": "evet"
+  },
+  {
+    "name": "Faculty of Fine Arts",
+    "code": " arts ",
+    "description": "Güzel sanatlar fakültesi",
+    "is_active": "yes"
+  },
+  {
+    "name": "Faculty of Economics",
+    "code": "ECON",
+    "description": "İktisat fakültesi",
+    "is_active": "hayir"
+  }
+]
