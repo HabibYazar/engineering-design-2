@@ -1,0 +1,11 @@
+{
+  "department": null,
+  "total_students": null,
+  "enrolled_students": null,
+  "graduated_students": null,
+  "department_occupancy_rate": null,
+  "scholarship_ratio": null,
+  "international_ratio": null,
+  "sustainability_score": null,
+  "alert_status": null
+}
