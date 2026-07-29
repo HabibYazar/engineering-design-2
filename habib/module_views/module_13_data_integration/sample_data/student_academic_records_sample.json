@@ -1,0 +1,41 @@
+[
+  {
+    "student_number": "S2026001",
+    "academic_year": "2026-2027",
+    "semester": "fall",
+    "registered_course_count": 6,
+    "passed_course_count": 5,
+    "failed_course_count": 1,
+    "earned_credits": 25,
+    "attempted_credits": 30,
+    "semester_gpa": 3.1,
+    "cumulative_gpa": 3.1,
+    "registration_renewed": "evet"
+  },
+  {
+    "student_number": "S2026001",
+    "academic_year": "2026-2027",
+    "semester": "spring",
+    "registered_course_count": 6,
+    "passed_course_count": 6,
+    "failed_course_count": 0,
+    "earned_credits": 30,
+    "attempted_credits": 30,
+    "semester_gpa": 3.55,
+    "cumulative_gpa": 3.33,
+    "registration_renewed": "evet"
+  },
+  {
+    "student_number": "S2026002",
+    "academic_year": "2026-2027",
+    "semester": "fall",
+    "registered_course_count": 5,
+    "passed_course_count": 4,
+    "failed_course_count": 1,
+    "earned_credits": 20,
+    "attempted_credits": 25,
+    "semester_gpa": 2.8,
+    "cumulative_gpa": 2.8,
+    "registration_renewed": "1"
+  }
+]

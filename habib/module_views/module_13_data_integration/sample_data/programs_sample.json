@@ -1,0 +1,32 @@
+[
+  {
+    "department_code": "EE",
+    "name": "Electrical Engineering Bachelor's Program",
+    "code": "EE-BSC",
+    "degree_level": "Bachelor",
+    "duration_years": 4,
+    "quota": 90,
+    "description": "Lisans",
+    "is_active": "true"
+  },
+  {
+    "department_code": "EE",
+    "name": "Electrical Engineering Master's Program",
+    "code": "EE-MSC",
+    "degree_level": "Master",
+    "duration_years": 2,
+    "quota": 25,
+    "description": "Yüksek lisans",
+    "is_active": "yes"
+  },
+  {
+    "department_code": "IE",
+    "name": "Industrial Engineering Bachelor's Program",
+    "code": "IE-BSC",
+    "degree_level": "Bachelor",
+    "duration_years": 4,
+    "quota": 70,
+    "description": "Lisans",
+    "is_active": "1"
+  }
+]

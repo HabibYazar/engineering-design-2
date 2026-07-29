@@ -1,0 +1,23 @@
+[
+  {
+    "faculty_code": "FEA",
+    "name": "Electrical Engineering",
+    "code": "EE",
+    "description": "Elektrik-elektronik",
+    "is_active": "true"
+  },
+  {
+    "faculty_code": "FEA",
+    "name": "Industrial Engineering",
+    "code": "IE",
+    "description": "Endüstri mühendisliği",
+    "is_active": "1"
+  },
+  {
+    "faculty_code": "MED",
+    "name": "Basic Medical Sciences",
+    "code": "BMS",
+    "description": "Temel tıp bilimleri",
+    "is_active": "evet"
+  }
+]

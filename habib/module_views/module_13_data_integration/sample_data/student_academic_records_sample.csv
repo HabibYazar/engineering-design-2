@@ -1,0 +1,4 @@
+student_number,academic_year,semester,registered_course_count,passed_course_count,failed_course_count,earned_credits,attempted_credits,semester_gpa,cumulative_gpa,registration_renewed
+S2026001,2026-2027,fall,6,5,1,25,30,3.1,3.1,evet
+S2026001,2026-2027,spring,6,6,0,30,30,3.55,3.33,evet
+S2026002,2026-2027,fall,5,4,1,20,25,2.8,2.8,1
