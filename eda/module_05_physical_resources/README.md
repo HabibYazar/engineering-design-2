@@ -25,6 +25,7 @@ capacity_service.get_classrooms()
         |
         ▼
 capacity_service.calculate_capacity()
+```
 
 ## Endpoint'ler
 
