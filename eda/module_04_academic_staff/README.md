@@ -15,17 +15,19 @@ services/
 scores_calculator.py Skor hesaplama mantığı
 
 ## Veri Akışı
+```
 seed_data.py (kök) — staffs listesi
-|
-▼
+        |
+        ▼
 scores_calculator.get_staff()
-|
-├── /staff isteği → ham personel listesini döner
-|
-▼
+        |
+        ├── /staff isteği → ham personel listesini döner
+        |
+        ▼
 scores_calculator.calculate_score()
-├── her personel için: skor = yayın×5 + atıf×2
-└── /ranking isteği → {isim, skor} listesini döner
+        ├── her personel için: skor = yayın×5 + atıf×2
+        └── /ranking isteği → {isim, skor} listesini döner
+```
 
 ## Endpoint'ler
 
