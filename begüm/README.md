@@ -33,3 +33,4 @@ Bu klasör, Stratejik Üniversite Yönetimi ve Karar Destek Sistemi projesinin �
 2. **Analiz Katmanı:** Pandas ile toplam öğrenci, hazırlık, yabancı oranı ve doluluk hesaplamaları (`analiz.py`).
 3. **Çıktı & Görselleştirme:** Konsol tablosu ve otomatik kaydedilen yönetim paneli grafiği (`program_doluluk_orani.png`).
 4. **Entegrasyon:** Gelecek aşamada JSON şablonu üzerinden erken uyarı mekanizmasına veri aktarımı.
+![Doluluk Oranı Grafiği](program_doluluk_orani.png)
