@@ -64,24 +64,26 @@ seed_data.py (kök)
 ```
 
 ## 📁 Klasör Yapısı
+```
 eda/
-├── main.py # FastAPI uygulaması (bağımsız çalışır)
-├── seed_data.py # Tüm modüllerin sahte verisi (tek kaynak)
+├── main.py              # FastAPI uygulaması (bağımsız çalışır)
+├── seed_data.py         # Tüm modüllerin sahte verisi (tek kaynak)
 ├── requirements.txt
-├── frontend.html # Arayüz demosu (bağımsız HTML dosyası)
+├── frontend.html        # Arayüz demosu (bağımsız HTML dosyası)
 ├── module_04_academic_staff/
-│ ├── models/ # Staff sınıfı
-│ ├── routes/ # /staff, /ranking endpoint tanımları
-│ └── services/ # Skor hesaplama mantığı
+│   ├── models/           # Staff sınıfı
+│   ├── routes/           # /staff, /ranking endpoint tanımları
+│   └── services/         # Skor hesaplama mantığı
 ├── module_05_physical_resources/
-│ ├── models/ # Classroom sınıfı
-│ ├── routes/
-│ └── services/ # Kapasite hesaplama mantığı
+│   ├── models/           # Classroom sınıfı
+│   ├── routes/
+│   └── services/         # Kapasite hesaplama mantığı
 └── module_14_user_authorization/
-├── models/ # User sınıfı
-├── schemas/ # LoginRequest (Pydantic)
-├── routes/
-└── services/ # Giriş ve kullanıcı listeleme mantığı
+    ├── models/           # User sınıfı
+    ├── schemas/          # LoginRequest (Pydantic)
+    ├── routes/
+    └── services/         # Giriş ve kullanıcı listeleme mantığı
+```
 
 ## 💾 Demo Verisi Hakkında
 
