@@ -77,8 +77,3 @@ print("\n[Bilgi] 'program_doluluk_orani.png' dosyası olarak grafik başarıyla 
 # Grafiği Ekranda Gösterme
 plt.show()
 # Dosyaların tam yolunu buraya yazıyoruz
-path = "C:/Users/Lenovo/Downloads/"
-
-students_df = pd.read_excel(path + 'students_sample.xlsx')
-snapshots_df = pd.read_excel(path + 'program_enrollment_snapshots_sample.xlsx')
-acad_df = pd.read_excel(path + 'student_academic_records_sample.xlsx')
