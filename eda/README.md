@@ -9,3 +9,13 @@ Stratejik Üniversite Yönetimi ve Karar Destek Sistemi projesinin **PDF Bölüm
 | Modül 14 | 14 — User and Authorization Management | Kullanıcı girişi ve rol bazlı yetkilendirme | Çalışıyor |
 
 ## 🚀 Hızlı Başlangıç
+
+Ardından tarayıcıdan: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+Arayüz demosu için `frontend.html` dosyasını sunucu çalışırken çift tıklayıp tarayıcıda aç.
+
+Uygulama şu an **sahte veri (seed_data.py)** ile çalışır, veritabanı bağlantısı yoktur. Veriyi değiştirmek için kök dizindeki `seed_data.py` dosyasını düzenlemek yeterlidir.
+
+## 🔗 Modüllerin Birbirinden Bağımsızlığı
+
+Üç modül de birbirinden bağımsız çalışır, ortak nokta sadece veri kaynağıdır:
