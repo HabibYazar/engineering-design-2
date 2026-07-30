@@ -28,3 +28,8 @@ Bu klasör, Stratejik Üniversite Yönetimi ve Karar Destek Sistemi projesinin �
 
 1. **Konsol Raporu:** Üniversite geneli temel metrikler ve program bazlı doluluk oranları.
 2. **Grafik Çıktısı:** `program_doluluk_orani.png` (Yüksek çözünürlüklü yönetim paneli görseli).
+## 🔄 Modül İş Akışı
+1. **Veri Girişi:** SIS / Örnek Excel verilerinin (`students_sample.xlsx`, `snapshots`) okunması.
+2. **Analiz Katmanı:** Pandas ile toplam öğrenci, hazırlık, yabancı oranı ve doluluk hesaplamaları (`analiz.py`).
+3. **Çıktı & Görselleştirme:** Konsol tablosu ve otomatik kaydedilen yönetim paneli grafiği (`program_doluluk_orani.png`).
+4. **Entegrasyon:** Gelecek aşamada JSON şablonu üzerinden erken uyarı mekanizmasına veri aktarımı.
