@@ -147,6 +147,30 @@
   .output.empty { color: #6b7484; }
   .output.error { color: #e29282; }
 
+  table.result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+  }
+  .result-table thead th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+    padding: 8px 12px;
+    border-bottom: 2px solid rgba(232,217,184,0.25);
+  }
+  .result-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #d9e2ea;
+  }
+  .result-table tbody tr:hover { background: rgba(232,217,184,0.06); }
+  .result-table tbody tr:last-child td { border-bottom: none; }
+
   footer {
     text-align: center;
     font-family: 'IBM Plex Mono', monospace;
@@ -184,19 +208,6 @@
 
   <div class="module">
     <div class="module-head">
-      <h2>Fiziksel Kaynaklar</h2>
-    </div>
-    <div class="module-body">
-      <div class="controls">
-        <button onclick="callApi('GET', '/classrooms', 'out-05')">Derslikler</button>
-        <button onclick="callApi('GET', '/capacity', 'out-05')">Kapasite</button>
-      </div>
-      <div class="output empty" id="out-05">İstek bekleniyor…</div>
-    </div>
-  </div>
-
-  <div class="module">
-    <div class="module-head">
       <h2>Kullanıcı ve Yetkilendirme</h2>
     </div>
     <div class="module-body">
@@ -218,11 +229,31 @@
 <script>
 const BASE_URL = "http://127.0.0.1:8000";
 
+function buildTable(rows) {
+  const columns = Object.keys(rows[0]);
+  const thead = `<thead><tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(row =>
+    `<tr>${columns.map(c => `<td>${row[c] ?? "—"}</td>`).join("")}</tr>`
+  ).join("")}</tbody>`;
+  return `<table class="result-table">${thead}${tbody}</table>`;
+}
+
 function renderOutput(elId, data, isError) {
   const el = document.getElementById(elId);
   el.classList.remove("empty", "error");
-  if (isError) el.classList.add("error");
-  el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+
+  if (isError) {
+    el.classList.add("error");
+    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    return;
+  }
+
+  // Liste halinde ve nesne içeriyorsa tablo çiz, değilse ham JSON göster
+  if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object") {
+    el.innerHTML = buildTable(data);
+  } else {
+    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  }
 }
 
 async function callApi(method, path, elId) {
