@@ -426,6 +426,10 @@ function renderTable(rows) {
 
 /* ─── Veri cekme ─────────────────────────────────────────────────────────── */
 async function get(path) {
+  // Masaustune alinan bagimsiz kopyada veri sayfanin icine gomulur; o kopya
+  // sunucu calismadan da acilir. Canli surumde __EMBEDDED__ tanimsizdir ve
+  // istek normal sekilde API'ye gider.
+  if (window.__EMBEDDED__ && path in window.__EMBEDDED__) return window.__EMBEDDED__[path];
   const res = await fetch(API + path);
   if (!res.ok) throw new Error(path + " → HTTP " + res.status);
   return res.json();
