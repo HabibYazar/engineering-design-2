@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 6 — Strategic Financial Analysis (Demo)</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Part 6 — Strategic Financial Analysis</h1>
+    <div class="subtitle">Strategic University Management &amp; Decision Support System · Pilot unit: Faculty of Engineering and Architecture · demo with mock data</div>
+  </div>
+  <form method="get" action="/" class="year-form">
+    <label>Academic year:
+      <select name="year" onchange="this.form.submit()">$year_options</select>
+    </label>
+    <button>View</button>
+  </form>
+</header>
+
+$flash
+
+<h2>Key financial indicators</h2>
+<div class="tiles">$tiles</div>
+
+<h2>Revenue &amp; expenditure breakdown</h2>
+<div class="charts">
+  <div class="card rev">
+    <h3>Revenue by source</h3>
+    <div class="total">$rev_total</div>
+    <div>$rev_bars</div>
+  </div>
+  <div class="card exp">
+    <h3>Expenditure by category</h3>
+    <div class="total">$exp_total</div>
+    <div>$exp_bars</div>
+  </div>
+</div>
+
+<h2>Financial status by department</h2>
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Department</th><th>Students</th><th>Revenue</th><th>Expenditure</th>
+      <th>Balance</th><th>Cost / student</th><th>Budget realization</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>$dept_rows</tbody>
+</table>
+</div>
+
+<h2>Add / update data</h2>
+<div class="forms">
+  <div class="card">
+    <h3>Book a financial entry</h3>
+    <form method="post" action="/entry">
+      <div class="row">
+        <label>Year <select name="year">$year_options</select></label>
+        <label>Type
+          <select name="kind">
+            <option value="revenue">Revenue</option>
+            <option value="expenditure">Expenditure</option>
+          </select>
+        </label>
+      </div>
+      <label>Category (pick one or type a new one)
+        <input name="category" list="catList" required placeholder="e.g. Donations">
+        <datalist id="catList">$cat_options</datalist>
+      </label>
+      <label>Amount (₺M — negative subtracts)
+        <input name="amount" type="number" step="0.1" required placeholder="e.g. 12.5">
+      </label>
+      <button class="primary">Book entry</button>
+      <div class="hint">New categories automatically get their own bar in the chart.</div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Add / update a department</h3>
+    <form method="post" action="/department">
+      <div class="row">
+        <label>Year <select name="year">$year_options</select></label>
+        <label>Name
+          <input name="name" list="deptList" required placeholder="e.g. Software Eng.">
+          <datalist id="deptList">$dept_options</datalist>
+        </label>
+      </div>
+      <div class="row">
+        <label>Students <input name="students" type="number" min="0" required></label>
+        <label>Budget ₺M <input name="budget" type="number" min="0" step="0.1" required></label>
+      </div>
+      <div class="row">
+        <label>Revenue ₺M <input name="revenue" type="number" min="0" step="0.1" required></label>
+        <label>Expenditure ₺M <input name="expenditure" type="number" min="0" step="0.1" required></label>
+      </div>
+      <button class="primary">Save department</button>
+      <div class="hint">Using an existing name updates that department instead.</div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Manage dataset</h3>
+    <form method="post" action="/stats">
+      <div class="row">
+        <label>Year <select name="year">$year_options</select></label>
+        <label>Students <input name="students" type="number" min="0"></label>
+        <label>Graduates <input name="graduates" type="number" min="0"></label>
+      </div>
+      <button>Update headcounts</button>
+    </form>
+    <form method="post" action="/year" style="margin-top:12px">
+      <label>Open a new academic year
+        <input name="year" placeholder="e.g. 2026–27" required>
+      </label>
+      <button>Add year</button>
+    </form>
+    <form method="post" action="/reset" style="margin-top:12px">
+      <button class="danger">Reset demo data</button>
+      <div class="hint">Restores the seed dataset (useful before presenting).</div>
+    </form>
+  </div>
+</div>
+
+<footer>Demo only — all figures are mock data (₺M = million TRY). Section 6 of the project description (Strategic Financial Analysis). Implemented in Python: the backend renders this page server-side (<code>backend/render.py</code>) and plain HTML forms post back to it (<code>backend/server.py</code>) — no JavaScript.</footer>
+
+</body>
+</html>
