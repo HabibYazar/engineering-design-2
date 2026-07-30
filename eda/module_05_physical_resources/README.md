@@ -49,5 +49,4 @@ Bu modül bağımsız çalışır. Kök dizindeki ortak `seed_data.py`'dan `clas
 2. **Kapsam sınırı** — şu an sadece derslik var; PDF'de laboratuvar, ofis, kütüphane de geçiyor, bunlar ilk demo kapsamı dışında bırakıldı, bir sonraki aşamada eklenecek.
 3. **Doluluk formülünün basitliği** — karmaşık bir algoritma yerine bilinçli olarak sade bir oran hesabı seçildi, çünkü PDF'in istediği şey net bir gösterge, karmaşık bir tahmin modeli değil.
         ├── her derslik için: doluluk % = (dolu / kapasite) × 100
-        └── /capacity isteği → oda, kapasite, dolu, doluluk% listesini döner
-```
+        └── /capacity isteği → oda, kapasite, dolu, doluluk% listesini döner.
