@@ -36,9 +36,31 @@ PDF **Bölüm 3 – Strategic Education and Student Analytics** karşılığı m
 | Şema | `schemas/student_analytics.py` | Pydantic yanıt şemaları |
 | Router | `routers/student_analytics.py` | 7 endpoint |
 
+## Arayüz
+
+`GET /panel` — bu modülün göstergelerini gösteren tek sayfalık panel
+(`static/panel.html`). Veriyi aşağıdaki endpoint'lerden tarayıcıda çeker; ayrı
+sunucu, derleme adımı veya harici kütüphane gerektirmez.
+
+İçeriği:
+
+- **8 gösterge kartı** — toplam öğrenci, doluluk, mezuniyet oranı, ortalama
+  mezuniyet süresi, uluslararası/burslu yüzdeleri, öğrenci kaybı, hazırlık sayısı
+- **Doluluk oranı grafiği** — tek renkli yatay bar. Bar uzunluğu zaten büyüklüğü
+  kodladığı için renk aynı değişkene bağlanmadı (değer-rampası tekrarı olurdu).
+- **Taban puan grafiği** — diverging bar; sıfır çizgisi Türkiye ortalaması,
+  sağa doğru üzerinde (mavi), sola doğru altında (kırmızı).
+- **Gösterge tablosu** — grafiklerin tablo görünümü + kalan tüm Bölüm 3 metrikleri.
+  Durum rozetinde şekil (▲ ● ✓) ve etiket anlamı taşır, renk yalnızca pekiştirir.
+
+Akademik yıl seçici tüm kart ve grafikleri birlikte günceller. Açık/koyu tema
+hem işletim sistemi ayarını hem manuel seçimi destekler (`?theme=dark` ile de
+açılabilir).
+
 ## Endpoint'ler
 
 ```
+GET /panel                                   # arayüz
 GET /api/student-analytics/academic-years
 GET /api/student-analytics/overview?academic_year=2026-2027
 GET /api/student-analytics/programs?academic_year=2026-2027

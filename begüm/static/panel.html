@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modül 3 — Öğrenci Analitiği Paneli</title>
+<style>
+  /* ─── Renk rolleri ────────────────────────────────────────────────────────
+     Değerler dogrulanmis referans paletten alindi. Acik/koyu ayrimi hem isletim
+     sistemi ayarini (prefers-color-scheme) hem de manuel secimi (data-theme)
+     karsilar; manuel secim her iki yonde de kazanir. */
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;   /* kart yuzeyi */
+    --page:           #f9f9f7;   /* sayfa zemini */
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+
+    --series-1:       #2a78d6;   /* tek serili grafiklerin rengi (magnitude) */
+    --diverge-pos:    #2a78d6;   /* taban puan: ortalamanin uzerinde */
+    --diverge-neg:    #e34948;   /* taban puan: ortalamanin altinda */
+    --track:          #eceae4;   /* bar arkaplan izi */
+
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-crit:    #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+
+      --series-1:       #3987e5;
+      --diverge-pos:    #3987e5;
+      --diverge-neg:    #e66767;
+      --track:          #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+
+    --series-1:       #3987e5;
+    --diverge-pos:    #3987e5;
+    --diverge-neg:    #e66767;
+    --track:          #262624;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 20px 64px;
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* ─── Baslik ve filtre satiri ─────────────────────────────────────────── */
+  header { margin-bottom: 20px; }
+  h1 { font-size: 21px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 13.5px; margin: 0; }
+
+  /* Filtreler tek satirda, kapsadigi her seyin ustunde. */
+  .filters {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 18px 0 20px; padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .filters label { font-size: 13px; color: var(--text-secondary); }
+  select, .theme-btn {
+    font: inherit; font-size: 13.5px;
+    padding: 7px 11px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary);
+    cursor: pointer;
+  }
+  .theme-btn { margin-left: auto; }
+  .status-line { font-size: 12.5px; color: var(--text-muted); }
+
+  /* ─── Gosterge kartlari (stat tile) ───────────────────────────────────── */
+  /* 8 kart: genis ekranda 4+4 dengeli kirilir, darda tek sutuna iner. */
+  .kpis {
+    display: grid; gap: 12px; margin-bottom: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(236px, 1fr));
+  }
+  .kpi {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 15px 16px 14px;
+  }
+  .kpi .label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 7px; }
+  /* Buyuk tekil sayilar oransal rakam kullanir; tabular-nums yalnizca hizalanan
+     sutunlarda (tablo, eksen) devrede. */
+  .kpi .value { font-size: 27px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+  .kpi .note { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+  /* ─── Kartlar ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 18px 16px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 3px; }
+  .card .cap { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
+
+  /* ─── Yatay bar grafigi ───────────────────────────────────────────────── */
+  /* Tek seri, tek renk: bar uzunlugu zaten buyuklugu kodluyor, rengi de ayni
+     degiskene baglamak (deger-rampasi) bilgiyi tekrar eder. */
+  .bars { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row {
+    display: grid; grid-template-columns: 92px 1fr 58px;
+    align-items: center; gap: 12px;
+    padding: 2px 0; border-radius: 6px; cursor: default;
+  }
+  .bar-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .bar-name { font-size: 12.5px; color: var(--text-secondary); text-align: right; }
+  .bar-track { position: relative; height: 16px; background: var(--track); border-radius: 3px; }
+  .bar-fill {
+    position: absolute; inset: 0 auto 0 0;      /* tabandan buyur */
+    background: var(--series-1);
+    border-radius: 0 4px 4px 0;                  /* veri ucu yuvarlak, taban kare */
+    min-width: 3px;
+  }
+  .bar-val {
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+    color: var(--text-primary); text-align: right;
+  }
+  .axis {
+    display: grid; grid-template-columns: 92px 1fr 58px; gap: 12px;
+    margin-top: 10px; padding-top: 8px;
+  }
+  .axis-track { position: relative; height: 14px; border-top: 1px solid var(--baseline); }
+  .axis-tick {
+    position: absolute; top: 3px; transform: translateX(-50%);
+    font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+  }
+
+  /* ─── Diverging bar (taban puan farki) ────────────────────────────────── */
+  .div-row {
+    display: grid; grid-template-columns: 92px 1fr 76px;
+    align-items: center; gap: 12px; padding: 2px 0; border-radius: 6px;
+  }
+  .div-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .div-track { position: relative; height: 16px; }
+  .div-zero {                                    /* notr orta cizgi */
+    position: absolute; left: 50%; top: -3px; bottom: -3px;
+    width: 1px; background: var(--baseline);
+  }
+  .div-fill { position: absolute; top: 0; bottom: 0; }
+  .div-fill.pos { left: 50%; background: var(--diverge-pos); border-radius: 0 4px 4px 0; }
+  .div-fill.neg { right: 50%; background: var(--diverge-neg); border-radius: 4px 0 0 4px; }
+  .div-val { font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* ─── Tablo (grafiklerin tablo goruntusu ikizi) ───────────────────────── */
+  /* 14 sutun genis ekranda sigar; dar ekranda kart kendi icinde yatay kayar,
+     sayfa govdesi asla yatay kaymaz. */
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; min-width: 1040px; }
+  th, td {
+    text-align: right; padding: 8px 7px;
+    border-bottom: 1px solid var(--gridline);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  th {
+    font-weight: 500; font-size: 11.5px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--baseline);
+  }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--text-primary) 3%, transparent); }
+
+  /* Durum rozeti: sekil + etiket anlami tasir, renk yalnizca pekistirir. */
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .chip .glyph { font-size: 11px; line-height: 1; }
+  .chip.good .glyph { color: var(--status-good); }
+  .chip.warn .glyph { color: var(--status-warn); }
+  .chip.crit .glyph { color: var(--status-crit); }
+
+  /* ─── Tooltip ─────────────────────────────────────────────────────────── */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity .1s; max-width: 260px;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 11px; font-size: 12.5px; line-height: 1.5;
+    box-shadow: 0 6px 20px rgba(0,0,0,.13);
+  }
+  #tip .t-name { font-weight: 600; margin-bottom: 4px; }
+  #tip .t-row { color: var(--text-secondary); }
+  #tip b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  .msg { padding: 30px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+  .msg code {
+    background: var(--track); padding: 2px 6px; border-radius: 4px;
+    font-size: 12.5px; font-family: ui-monospace, monospace;
+  }
+  /* Yeniden veri cekerken iskelet parlamasi yerine onceki render soluklastirilir. */
+  .loading { opacity: .45; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Öğrenci Analitiği Paneli</h1>
+    <p class="sub">Modül 3 — Stratejik Eğitim ve Öğrenci Analitiği · Mühendislik ve Mimarlık Fakültesi</p>
+  </header>
+
+  <!-- Filtre satiri: kapsadigi tum kart ve grafiklerin ustunde, tek satir -->
+  <div class="filters">
+    <label for="year">Akademik yıl</label>
+    <select id="year"></select>
+    <span class="status-line" id="status"></span>
+    <button class="theme-btn" id="theme" type="button">Koyu tema</button>
+  </div>
+
+  <div id="content" hidden>
+    <section class="kpis" id="kpis"></section>
+
+    <section class="card">
+      <h2>Program doluluk oranları</h2>
+      <p class="cap">Kayıtlı öğrenci sayısının kontenjana oranı. Düşükten yükseğe sıralı.</p>
+      <div class="bars" id="occBars"></div>
+      <div class="axis">
+        <div></div>
+        <div class="axis-track" id="occAxis"></div>
+        <div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Taban puanın Türkiye ortalamasına göre konumu</h2>
+      <p class="cap">Sıfır çizgisi Türkiye ortalaması. Sağa doğru ortalamanın üzerinde, sola doğru altında.</p>
+      <div class="bars" id="scoreBars"></div>
+    </section>
+
+    <section class="card">
+      <h2>Program göstergeleri</h2>
+      <p class="cap">Yukarıdaki grafiklerin tablo görünümü ve PDF Bölüm 3'te istenen diğer göstergeler.</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Program</th><th>Durum</th><th>Kont.</th><th>Kayıt</th><th>Doluluk</th>
+              <th>Öğrenci</th><th>Kayıp</th><th>Yenilem.</th><th>Mezun.</th>
+              <th>Süre</th><th>Uluslar.</th><th>Burslu</th><th>Haz.</th><th>GNO</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="msg" id="msg">Veriler yükleniyor…</div>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+const API = "";
+const $ = (id) => document.getElementById(id);
+
+/* ─── Bicimleme (Turkce: binlik nokta, ondalik virgul) ───────────────────── */
+const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (v) => "%" + nf1.format(v ?? 0);
+
+/* Doluluga gore durum. Sekil + etiket anlami tasir; renk yalnizca pekistirir. */
+function occStatus(rate) {
+  if (rate < 50)  return { cls: "crit", glyph: "▲", text: "Kritik" };
+  if (rate < 80)  return { cls: "warn", glyph: "●", text: "İzlemede" };
+  return { cls: "good", glyph: "✓", text: "Sağlıklı" };
+}
+
+/* ─── Tooltip ────────────────────────────────────────────────────────────── */
+const tip = $("tip");
+function showTip(evt, title, rows) {
+  tip.innerHTML = `<div class="t-name">${title}</div>` +
+    rows.map(([k, v]) => `<div class="t-row">${k}: <b>${v}</b></div>`).join("");
+  tip.style.opacity = "1";
+  moveTip(evt);
+}
+function moveTip(evt) {
+  const pad = 14, r = tip.getBoundingClientRect();
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + r.width > innerWidth - 8)  x = evt.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = evt.clientY - r.height - pad;
+  tip.style.left = x + "px";
+  tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.opacity = "0"; };
+
+/* Tooltip deger okumanin TEK yolu degil - ayni degerler bar ucunda ve
+   tablodadir; klavye odagi da ayni bilgiyi acar. */
+function bindTip(el, title, rows) {
+  el.tabIndex = 0;
+  el.addEventListener("mouseenter", (e) => showTip(e, title, rows));
+  el.addEventListener("mousemove", moveTip);
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("focus", (e) => {
+    const r = el.getBoundingClientRect();
+    showTip({ clientX: r.left + r.width / 2, clientY: r.bottom }, title, rows);
+  });
+  el.addEventListener("blur", hideTip);
+}
+
+/* ─── Gosterge kartlari ──────────────────────────────────────────────────── */
+function renderKpis(ov) {
+  const tiles = [
+    ["Toplam öğrenci",        nf0.format(ov.total_students),              `${nf0.format(ov.active_student_count)} aktif · ${nf0.format(ov.newly_enrolled_student_count)} yeni kayıt`],
+    ["Doluluk oranı",         pct(ov.overall_occupancy_rate),             `${nf0.format(ov.total_enrolled_student_count)} / ${nf0.format(ov.total_quota)} kontenjan`],
+    ["Mezuniyet oranı",       pct(ov.graduation_rate),                    `${nf0.format(ov.graduation_cohort_size)} kişilik kohort üzerinden`],
+    ["Ortalama mezuniyet",    nf2.format(ov.average_time_to_graduation) + " yıl", `${nf0.format(ov.graduated_student_count_total)} mezun`],
+    ["Uluslararası öğrenci",  pct(ov.international_student_percentage),    "toplam öğrenciye oranla"],
+    ["Burslu öğrenci",        pct(ov.scholarship_student_percentage),      "en az %1 burs alanlar"],
+    ["Öğrenci kaybı",         pct(ov.attrition_rate),                     `${nf0.format(ov.dropped_out_student_count)} öğrenci bu yıl ayrıldı`],
+    ["Hazırlık öğrencisi",    nf0.format(ov.preparatory_student_count),   "hazırlık okuyan/okumuş"],
+  ];
+  $("kpis").innerHTML = tiles.map(([l, v, n]) => `
+    <div class="kpi">
+      <div class="label">${l}</div>
+      <div class="value">${v}</div>
+      <div class="note">${n}</div>
+    </div>`).join("");
+}
+
+/* ─── Doluluk bar grafigi ────────────────────────────────────────────────── */
+function renderOccupancy(rows) {
+  const box = $("occBars");
+  box.innerHTML = "";
+  // Olcek 0-100: doluluk dogal olarak kontenjana orandir.
+  const max = Math.max(100, ...rows.map(r => r.occupancy_rate));
+
+  rows.forEach(r => {
+    const el = document.createElement("div");
+    el.className = "bar-row";
+    el.innerHTML = `
+      <div class="bar-name">${r.program_code.replace("-BSC", "")}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(r.occupancy_rate / max * 100).toFixed(2)}%"></div></div>
+      <div class="bar-val">${pct(r.occupancy_rate)}</div>`;
+    bindTip(el, r.program_name, [
+      ["Kontenjan", nf0.format(r.quota)],
+      ["Kayıt olan", nf0.format(r.enrolled_student_count)],
+      ["Doluluk", pct(r.occupancy_rate)],
+      ["Öğrenci kaybı", pct(r.attrition_rate)],
+    ]);
+    box.appendChild(el);
+  });
+
+  // Eksen: seyrek, cozgu cizgisi yerine yalnizca taban + tik etiketleri.
+  $("occAxis").innerHTML = [0, 25, 50, 75, 100]
+    .map(t => `<span class="axis-tick" style="left:${t / max * 100}%">%${t}</span>`).join("");
+}
+
+/* ─── Taban puan diverging grafigi ───────────────────────────────────────── */
+function renderScores(rows) {
+  const box = $("scoreBars");
+  box.innerHTML = "";
+  const max = Math.max(...rows.map(r => Math.abs(r.national_score_gap ?? 0)), 10);
+
+  rows.forEach(r => {
+    const gap = r.national_score_gap ?? 0;
+    const w = Math.abs(gap) / max * 50;          // her kol yarim genislik
+    const pos = gap >= 0;
+    const el = document.createElement("div");
+    el.className = "div-row";
+    el.innerHTML = `
+      <div class="bar-name">${r.program_code.replace("-BSC", "")}</div>
+      <div class="div-track">
+        <div class="div-zero"></div>
+        <div class="div-fill ${pos ? "pos" : "neg"}" style="width:${w.toFixed(2)}%"></div>
+      </div>
+      <div class="div-val">${gap >= 0 ? "+" : "−"}${nf1.format(Math.abs(gap))}</div>`;
+    bindTip(el, r.program_name, [
+      ["Taban puan", nf1.format(r.minimum_admission_score ?? 0)],
+      ["Türkiye ort.", nf1.format(r.national_average_minimum_score ?? 0)],
+      ["Ankara ort.", nf1.format(r.ankara_average_minimum_score ?? 0)],
+      ["Konum", r.competitive_position],
+    ]);
+    box.appendChild(el);
+  });
+}
+
+/* ─── Tablo ──────────────────────────────────────────────────────────────── */
+function renderTable(rows) {
+  $("tbody").innerHTML = rows.map(r => {
+    const s = occStatus(r.occupancy_rate);
+    return `<tr>
+      <td>${r.program_name}</td>
+      <td><span class="chip ${s.cls}"><span class="glyph">${s.glyph}</span>${s.text}</span></td>
+      <td>${nf0.format(r.quota)}</td>
+      <td>${nf0.format(r.enrolled_student_count)}</td>
+      <td>${pct(r.occupancy_rate)}</td>
+      <td>${nf0.format(r.total_students)}</td>
+      <td>${pct(r.attrition_rate)}</td>
+      <td>${pct(r.non_renewal_rate)}</td>
+      <td>${pct(r.graduation_rate)}</td>
+      <td>${nf2.format(r.average_time_to_graduation)}</td>
+      <td>${pct(r.international_student_percentage)}</td>
+      <td>${pct(r.scholarship_student_percentage)}</td>
+      <td>${nf0.format(r.preparatory_student_count)}</td>
+      <td>${nf2.format(r.average_gpa)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ─── Veri cekme ─────────────────────────────────────────────────────────── */
+async function get(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(path + " → HTTP " + res.status);
+  return res.json();
+}
+
+async function load(year) {
+  const content = $("content");
+  content.classList.add("loading");
+  $("status").textContent = "yükleniyor…";
+  try {
+    const [ov, progs, scores] = await Promise.all([
+      get(`/api/student-analytics/overview?academic_year=${year}`),
+      get(`/api/student-analytics/programs?academic_year=${year}`),
+      get(`/api/student-analytics/admission-scores?academic_year=${year}`),
+    ]);
+    renderKpis(ov);
+    renderOccupancy(progs);
+    renderScores(scores);
+    renderTable(progs);
+    $("msg").hidden = true;
+    content.hidden = false;
+    $("status").textContent = `${progs.length} program · ${nf0.format(ov.total_students)} öğrenci`;
+  } catch (err) {
+    $("status").textContent = "";
+    content.hidden = true;
+    $("msg").hidden = false;
+    $("msg").innerHTML = `Veri alınamadı: ${err.message}<br><br>
+      API çalışıyor mu? <code>python main.py</code> ile başlatıp
+      <code>http://127.0.0.1:8000/panel</code> adresini açın.`;
+  } finally {
+    content.classList.remove("loading");
+  }
+}
+
+/* ─── Tema secimi ────────────────────────────────────────────────────────── */
+const themeBtn = $("theme");
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = mode;
+  themeBtn.textContent = mode === "dark" ? "Açık tema" : "Koyu tema";
+  try { localStorage.setItem("panel-theme", mode); } catch (e) {}
+}
+themeBtn.addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme;
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme((cur ? cur === "dark" : sysDark) ? "light" : "dark");
+});
+// Oncelik: URL (?theme=dark) > kayitli secim > isletim sistemi ayari.
+const urlTheme = new URLSearchParams(location.search).get("theme");
+if (urlTheme === "dark" || urlTheme === "light") {
+  applyTheme(urlTheme);
+} else {
+  try {
+    const saved = localStorage.getItem("panel-theme");
+    if (saved) applyTheme(saved);
+    else themeBtn.textContent = matchMedia("(prefers-color-scheme: dark)").matches ? "Açık tema" : "Koyu tema";
+  } catch (e) {}
+}
+
+/* ─── Baslangic ──────────────────────────────────────────────────────────── */
+(async function init() {
+  try {
+    const years = await get("/api/student-analytics/academic-years");
+    const sel = $("year");
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+    sel.value = years[years.length - 1];          // en guncel yil
+    sel.addEventListener("change", () => load(sel.value));
+    await load(sel.value);
+  } catch (err) {
+    $("msg").innerHTML = `API'ye ulaşılamadı: ${err.message}<br><br>
+      <code>python main.py</code> ile sunucuyu başlatıp
+      <code>http://127.0.0.1:8000/panel</code> adresini açın.`;
+  }
+})();
+</script>
+</body>
+</html>

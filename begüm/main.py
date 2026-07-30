@@ -22,6 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
 
 from database import SessionLocal, init_db  # noqa: E402
 from module_03_ogrenci_analitigi.routers.student_analytics import (  # noqa: E402
@@ -74,12 +75,27 @@ app.include_router(sustainability_router)
 app.include_router(early_warning_router)
 
 
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@app.get("/panel", tags=["Arayüz"], include_in_schema=False)
+def panel() -> FileResponse:
+    """Modül 3 öğrenci analitiği panelini döndürür.
+
+    Sayfa tek bir HTML dosyasıdır; veriyi bu servisin kendi endpoint'lerinden
+    tarayıcıda çeker. Ayrı bir sunucuya, derleme adımına veya harici bir
+    kütüphaneye ihtiyaç duymaz.
+    """
+    return FileResponse(STATIC_DIR / "panel.html", media_type="text/html")
+
+
 @app.get("/", tags=["Health"])
 def root() -> dict:
     """Servisin ayakta olduğunu bildirir."""
     return {
         "service": "Modül 3-7-11 — Öğrenci Analitiği, Sürdürülebilirlik, Erken Uyarı",
         "status": "calisiyor",
+        "panel": "/panel",
         "docs": "/docs",
     }
 
@@ -95,6 +111,7 @@ def demo_info() -> dict:
     """Demo akışını ve endpoint listesini döndürür."""
     return {
         "demo_akisi": [
+            "0. GET /panel — Modül 3 öğrenci analitiği arayüzü",
             "1. GET /health — servis ayakta",
             "2. GET /api/student-analytics/overview — üniversite geneli öğrenci göstergeleri",
             "3. GET /api/student-analytics/programs — program bazlı kırılım (drill-down)",
