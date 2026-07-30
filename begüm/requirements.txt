@@ -1,0 +1,14 @@
+# Modul 3, 7, 11 bagimsiz demo bagimliliklari
+#
+#   fastapi     -> main.py ve tum router'lar
+#   uvicorn     -> "python main.py" / "uvicorn main:app --reload"
+#   sqlalchemy  -> models/*, database.py, seed_data.py
+#   pydantic    -> schemas/*
+#
+# Not: pandas/matplotlib yalnizca eski konsol demosunda kullaniliyordu; servis
+# katmani bunlara bagimli degildir.
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
