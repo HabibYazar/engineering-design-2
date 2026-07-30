@@ -1,4 +1,4 @@
-from module_14_user_authorization.seed_data import users
+from seed_data import users 
 
 
 def login(username, password):

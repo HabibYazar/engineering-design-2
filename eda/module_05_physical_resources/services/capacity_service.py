@@ -1,4 +1,4 @@
-from module_05_physical_resources.seed_data import classrooms
+from seed_data import classrooms
 
 
 def get_classrooms():

@@ -1,4 +1,4 @@
-from module_04_academic_staff.seed_data import staffs
+from seed_data import staffs  
 
 
 def get_staff():
