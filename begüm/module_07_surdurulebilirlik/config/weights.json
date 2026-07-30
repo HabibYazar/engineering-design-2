@@ -1,0 +1,37 @@
+{
+  "_aciklama": "PDF Bolum 7'deki 11 surdurulebilirlik kriterinin agirliklari. Toplam 100 olmalidir. PDF'in 'agirliklar kurumun stratejik onceliklerine gore yapilandirilabilir olmalidir' maddesi geregi bu dosyadan degistirilebilir.",
+  "_kaynak": "hesaplanan = Modul 3 verisinden uretilir; dis girdi = diger modullerden beklenir",
+  "weights": {
+    "student_demand": 15,
+    "occupancy_rate": 15,
+    "graduation_rate": 10,
+    "graduate_employability": 10,
+    "academic_staff_quality": 10,
+    "research_performance": 10,
+    "revenue_expenditure_balance": 12,
+    "physical_resource_requirement": 5,
+    "strategic_contribution": 5,
+    "regional_contribution": 4,
+    "reputation_contribution": 4
+  },
+  "criterion_sources": {
+    "student_demand": "hesaplanan (Modul 3 - taban puan + talep trendi)",
+    "occupancy_rate": "hesaplanan (Modul 3 - kontenjan doluluk orani)",
+    "graduation_rate": "hesaplanan (Modul 3 - mezuniyet orani)",
+    "graduate_employability": "dis girdi (mezun istihdam takibi)",
+    "academic_staff_quality": "dis girdi (Modul 4 - akademik kadro analitigi)",
+    "research_performance": "dis girdi (Modul 4 - yayin/atif/proje)",
+    "revenue_expenditure_balance": "dis girdi (Modul 5 - finansal analiz)",
+    "physical_resource_requirement": "dis girdi (Modul 5 - fiziksel kaynak analizi)",
+    "strategic_contribution": "dis girdi (Modul 8 - stratejik plan izleme)",
+    "regional_contribution": "dis girdi (kurumsal degerlendirme)",
+    "reputation_contribution": "dis girdi (kurumsal itibar / marka degeri)"
+  },
+  "classification_thresholds": {
+    "growth_potential_min_score": 75,
+    "strengthening_min_score": 60,
+    "strategic_support_min_contribution": 60,
+    "merger_max_occupancy_ratio": 0.4,
+    "merger_max_student_body": 150
+  }
+}
