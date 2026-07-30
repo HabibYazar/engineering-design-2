@@ -2,6 +2,7 @@
 
 PDF **Bölüm 3 – Strategic Education and Student Analytics** karşılığı modül.
 
+
 ## Ana Sorumluluk
 
 Öğrenci verisinden stratejik göstergeleri üretmek ve bunları hem üniversite geneli
@@ -55,7 +56,9 @@ GET /api/student-analytics/performance-trends
 - **Mezuniyet oranı** = mezun olanlar / beklenen mezuniyet yılı geçmiş kohort
   (hâlâ okuyan öğrenciler paydayı bozmasın diye dışarıda tutulur)
 - **Ortalama mezuniyet süresi** = `actual_graduation_year - enrollment_year` ortalaması
+- 
 
 ## Durum
 
 Çalışıyor — 7 endpoint, HTTP üzerinden doğrulandı.
+
