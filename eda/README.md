@@ -1,3 +1,3 @@
 # Eda
 
-Modül 2 ve 9 için çalışma klasörü.
+Modül 4, 5 ve 14 için çalışma klasörü.
