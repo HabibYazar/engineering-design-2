@@ -21,7 +21,10 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-Ardından tarayıcıdan: **http://127.0.0.1:8000/docs**
+Ardından tarayıcıdan:
+
+- **http://127.0.0.1:8000/panel** — Modül 3 öğrenci analitiği arayüzü
+- **http://127.0.0.1:8000/docs** — tüm modüllerin interaktif API dokümantasyonu
 
 Alternatif çalıştırma yolları:
 
@@ -59,6 +62,7 @@ mezuniyet, taban puan)     hesaplar                     üretir
 
 | Grup | Endpoint |
 | :--- | :--- |
+| Arayüz | `GET /panel` — Modül 3 paneli (tek HTML dosyası) |
 | Health | `GET /` · `GET /health` · `GET /demo-info` |
 | **Modül 3** | `GET /api/student-analytics/academic-years` |
 | | `GET /api/student-analytics/overview` — üniversite geneli (roll-up) |
@@ -83,6 +87,7 @@ mezuniyet, taban puan)     hesaplar                     üretir
 
 | Adım | Endpoint | Gösterilen |
 | :--- | :--- | :--- |
+| 0 | `GET /panel` | **Arayüz** — Modül 3 göstergeleri, doluluk ve taban puan grafikleri |
 | 1 | `GET /health` | Servis ayakta |
 | 2 | `GET /api/student-analytics/overview` | 3.124 öğrenci, %67 doluluk, %13 uluslararası, ort. mezuniyet 4,5 yıl |
 | 3 | `GET /api/student-analytics/programs` | En düşük doluluk MSE %27,5 — en yüksek SWE %98,8 |

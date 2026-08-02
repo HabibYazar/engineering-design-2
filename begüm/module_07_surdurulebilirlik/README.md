@@ -8,6 +8,7 @@ PDF **Bölüm 7 – Academic Program Sustainability Analysis** karşılığı mo
 > kalabilirliğini** ister: öğrenci talebi, doluluk, mezuniyet, gelir-gider dengesi gibi
 > kriterlerle programın sürdürülebilir olup olmadığı. Modül bu doğru kapsamda yeniden
 > yazılmıştır; eski dosya kaldırılmıştır (git geçmişinde mevcuttur).
+> 
 
 ## Ana Sorumluluk
 
@@ -69,6 +70,7 @@ yeniden yapılandırma adayıdır.
 
 ## Endpoint'ler
 
+
 ```
 GET  /api/program-sustainability/weights
 GET  /api/program-sustainability/scores?academic_year=2026-2027
@@ -80,3 +82,4 @@ GET  /api/program-sustainability/categories
 ## Durum
 
 Çalışıyor — 5 endpoint, HTTP üzerinden doğrulandı.
+

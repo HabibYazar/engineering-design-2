@@ -13,6 +13,7 @@
       "recommended_action": "Kontenjan yeniden degerlendirilmeli; tanitim ve tercih danismanligi guclendirilmeli."
     },
     {
+      
       "key": "attrition_rate_increase",
       "name": "Ogrenci kaybi (terk) orani artiyor",
       "pdf_condition": "Student attrition rates increase",

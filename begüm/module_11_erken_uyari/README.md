@@ -7,6 +7,7 @@ PDF **Bölüm 11 – Risk and Early Warning System** karşılığı modül.
 > giden kurum/program düzeyinde alarmlar** ister: bir programın doluluğu eşiğin altına
 > düştüğünde, öğrenci kaybı arttığında, bütçe açığı oluştuğunda. Modül bu seviyede
 > yeniden yazılmıştır; eski script `legacy_konsol_demo/` altına taşınmıştır.
+> 
 
 ## Ana Sorumluluk
 
@@ -67,10 +68,12 @@ PDF'in "risk level and recommended corrective actions" maddesinin karşılığı
 
 ## Endpoint'ler
 
+
 ```
 GET /api/early-warning/alerts?academic_year=2026-2027&severity=kritik&program_code=CENG-BSC
 GET /api/early-warning/summary
 GET /api/early-warning/rules
+
 GET /api/early-warning/rules/pending
 ```
 
