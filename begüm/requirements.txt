@@ -4,6 +4,8 @@
 #   uvicorn     -> "python main.py" / "uvicorn main:app --reload"
 #   sqlalchemy  -> models/*, database.py, seed_data.py
 #   pydantic    -> schemas/*
+#   pytest      -> tests/ (Modul 3/7/11 endpoint testleri)
+#   httpx       -> pytest ile FastAPI TestClient icin gereklidir
 #
 # Not: pandas/matplotlib yalnizca eski konsol demosunda kullaniliyordu; servis
 # katmani bunlara bagimli degildir.
@@ -12,3 +14,5 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+pytest
+httpx

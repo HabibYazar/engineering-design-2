@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Modül 3 — Öğrenci Analitiği Paneli</title>
+<title>Modül 3, 7, 11 — Öğrenci Analitiği, Sürdürülebilirlik, Erken Uyarı Paneli</title>
 <style>
   /* ─── Renk rolleri ────────────────────────────────────────────────────────
      Değerler dogrulanmis referans paletten alindi. Acik/koyu ayrimi hem isletim
@@ -194,6 +194,27 @@
   .chip.warn .glyph { color: var(--status-warn); }
   .chip.crit .glyph { color: var(--status-crit); }
 
+  /* ─── Kategori dagilimi (Modul 7) ─────────────────────────────────────── */
+  .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .cat-chip {
+    font-size: 12px; padding: 6px 11px; border-radius: 999px;
+    background: var(--track); color: var(--text-secondary);
+  }
+  .cat-chip b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  /* ─── Alarm listesi (Modul 11) ────────────────────────────────────────── */
+  .alert-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .alert-list { display: flex; flex-direction: column; }
+  .alert-row {
+    display: grid; grid-template-columns: 96px 1fr; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--gridline);
+  }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-scope { font-size: 12.5px; color: var(--text-secondary); }
+  .alert-msg { font-size: 13px; color: var(--text-primary); margin-bottom: 3px; }
+  .alert-action { font-size: 12px; color: var(--text-muted); }
+  .alert-empty { padding: 8px 0; color: var(--text-secondary); font-size: 13px; }
+
   /* ─── Tooltip ─────────────────────────────────────────────────────────── */
   #tip {
     position: fixed; z-index: 50; pointer-events: none; opacity: 0;
@@ -220,8 +241,8 @@
 <div class="wrap">
 
   <header>
-    <h1>Öğrenci Analitiği Paneli</h1>
-    <p class="sub">Modül 3 — Stratejik Eğitim ve Öğrenci Analitiği · Mühendislik ve Mimarlık Fakültesi</p>
+    <h1>Öğrenci Analitiği, Sürdürülebilirlik ve Erken Uyarı Paneli</h1>
+    <p class="sub">Modül 3 · 7 · 11 — Öğrenci Analitiği, Program Sürdürülebilirliği, Risk ve Erken Uyarı · Mühendislik ve Mimarlık Fakültesi</p>
   </header>
 
   <!-- Filtre satiri: kapsadigi tum kart ve grafiklerin ustunde, tek satir -->
@@ -267,6 +288,29 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>Program sürdürülebilirlik puanları</h2>
+      <p class="cap">
+        Modül 7 — 11 kriterin ağırlıklı ortalaması (0-100). Kriterlerin bir kısmı henüz
+        diğer modüllerden (4, 5, 8) beslenmediği için puan mevcut kriterler üzerinden
+        yeniden normalize edilir; kart altındaki kategori dağılımı buna göre oluşur.
+      </p>
+      <div class="bars" id="sustBars"></div>
+      <div class="axis">
+        <div></div>
+        <div class="axis-track" id="sustAxis"></div>
+        <div></div>
+      </div>
+      <div class="cat-list" id="sustCategories"></div>
+    </section>
+
+    <section class="card">
+      <h2>Erken uyarı alarmları</h2>
+      <p class="cap">Modül 11 — üst yönetime giden alarmlar, önem derecesine göre sıralı.</p>
+      <div class="alert-summary" id="alertSummary"></div>
+      <div class="alert-list" id="alertList"></div>
     </section>
   </div>
 
@@ -424,6 +468,69 @@ function renderTable(rows) {
   }).join("");
 }
 
+/* ─── Surdurulebilirlik bar grafigi (Modul 7) ────────────────────────────── */
+function renderSustainability(scores, categories) {
+  const box = $("sustBars");
+  box.innerHTML = "";
+
+  scores.forEach(r => {
+    const el = document.createElement("div");
+    el.className = "bar-row";
+    el.innerHTML = `
+      <div class="bar-name">${r.program_code.replace("-BSC", "")}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${r.sustainability_score.toFixed(2)}%"></div></div>
+      <div class="bar-val">${nf1.format(r.sustainability_score)}</div>`;
+    bindTip(el, r.program_name, [
+      ["Puan", nf1.format(r.sustainability_score)],
+      ["Kategori", r.category],
+      ["Veri tamlığı", pct(r.data_completeness_percent)],
+    ]);
+    box.appendChild(el);
+  });
+
+  $("sustAxis").innerHTML = [0, 25, 50, 75, 100]
+    .map(t => `<span class="axis-tick" style="left:${t}%">${t}</span>`).join("");
+
+  $("sustCategories").innerHTML = categories.map(c =>
+    `<span class="cat-chip"><b>${c.program_count}</b> · ${c.category}</span>`
+  ).join("");
+}
+
+/* ─── Erken uyari listesi (Modul 11) ─────────────────────────────────────── */
+const SEVERITY_CHIP = {
+  kritik: { cls: "crit", glyph: "▲", text: "Kritik" },
+  yuksek: { cls: "crit", glyph: "●", text: "Yüksek" },
+  orta:   { cls: "warn", glyph: "●", text: "Orta" },
+  dusuk:  { cls: "good", glyph: "○", text: "Düşük" },
+};
+
+function renderAlerts(alerts, summary) {
+  const sevOrder = ["kritik", "yuksek", "orta", "dusuk"];
+  $("alertSummary").innerHTML =
+    `<span class="cat-chip"><b>${nf0.format(summary.total_alerts)}</b> · toplam alarm</span>` +
+    sevOrder
+      .filter(s => summary.by_severity[s])
+      .map(s => `<span class="cat-chip"><b>${nf0.format(summary.by_severity[s])}</b> · ${SEVERITY_CHIP[s].text}</span>`)
+      .join("");
+
+  const list = $("alertList");
+  if (alerts.length === 0) {
+    list.innerHTML = `<div class="alert-empty">Bu akademik yıl için aktif alarm yok.</div>`;
+    return;
+  }
+  list.innerHTML = alerts.map(a => {
+    const s = SEVERITY_CHIP[a.severity] ?? SEVERITY_CHIP.dusuk;
+    return `<div class="alert-row">
+      <span class="chip ${s.cls}"><span class="glyph">${s.glyph}</span>${s.text}</span>
+      <div>
+        <div class="alert-msg">${a.message}</div>
+        <div class="alert-scope">${a.scope_name} · ${a.rule_name}</div>
+        <div class="alert-action">Önerilen aksiyon: ${a.recommended_action}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 /* ─── Veri cekme ─────────────────────────────────────────────────────────── */
 async function get(path) {
   // Masaustune alinan bagimsiz kopyada veri sayfanin icine gomulur; o kopya
@@ -440,18 +547,25 @@ async function load(year) {
   content.classList.add("loading");
   $("status").textContent = "yükleniyor…";
   try {
-    const [ov, progs, scores] = await Promise.all([
+    const [ov, progs, scores, sustScores, sustCategories, alerts, alertSummary] = await Promise.all([
       get(`/api/student-analytics/overview?academic_year=${year}`),
       get(`/api/student-analytics/programs?academic_year=${year}`),
       get(`/api/student-analytics/admission-scores?academic_year=${year}`),
+      get(`/api/program-sustainability/scores?academic_year=${year}`),
+      get(`/api/program-sustainability/categories?academic_year=${year}`),
+      get(`/api/early-warning/alerts?academic_year=${year}`),
+      get(`/api/early-warning/summary?academic_year=${year}`),
     ]);
     renderKpis(ov);
     renderOccupancy(progs);
     renderScores(scores);
     renderTable(progs);
+    renderSustainability(sustScores, sustCategories);
+    renderAlerts(alerts, alertSummary);
     $("msg").hidden = true;
     content.hidden = false;
-    $("status").textContent = `${progs.length} program · ${nf0.format(ov.total_students)} öğrenci`;
+    $("status").textContent =
+      `${progs.length} program · ${nf0.format(ov.total_students)} öğrenci · ${nf0.format(alertSummary.total_alerts)} alarm`;
   } catch (err) {
     $("status").textContent = "";
     content.hidden = true;

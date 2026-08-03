@@ -80,7 +80,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @app.get("/panel", tags=["Arayüz"], include_in_schema=False)
 def panel() -> FileResponse:
-    """Modül 3 öğrenci analitiği panelini döndürür.
+    """Modül 3, 7 ve 11 göstergelerini tek panelde döndürür.
 
     Sayfa tek bir HTML dosyasıdır; veriyi bu servisin kendi endpoint'lerinden
     tarayıcıda çeker. Ayrı bir sunucuya, derleme adımına veya harici bir
