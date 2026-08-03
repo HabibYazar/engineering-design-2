@@ -201,8 +201,34 @@
       <div class="controls">
         <button onclick="callApi('GET', '/staff', 'out-04')">Personel listesi</button>
         <button onclick="callApi('GET', '/ranking', 'out-04')">Performans skoru</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/department', 'out-04')">Bölüme göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/faculty', 'out-04')">Fakülteye göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/title', 'out-04')">Unvana göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/trend', 'out-04')">Yıllık trend</button>
       </div>
       <div class="output empty" id="out-04">İstek bekleniyor…</div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-head">
+      <h2>Fiziksel Kaynaklar</h2>
+    </div>
+    <div class="module-body">
+      <div class="controls">
+        <button onclick="callApi('GET', '/facilities', 'out-05')">Tüm tesisler</button>
+        <button onclick="callApi('GET', '/capacity', 'out-05')">Doluluk oranları</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/by-type', 'out-05')">Türe göre kullanım</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/by-department', 'out-05')">Birime göre dağılım</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/per-person', 'out-05')">Kişi başına alan</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/underutilized', 'out-05')">Az kullanılanlar</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/overcrowded', 'out-05')">Aşırı dolu olanlar</button>
+      </div>
+      <div class="controls">
+        <input id="growthInput" type="number" placeholder="Büyüme %" value="15" style="max-width: 100px;">
+        <button class="secondary" onclick="forecastCapacity()">Kapasite tahmini yap</button>
+      </div>
+      <div class="output empty" id="out-05">İstek bekleniyor…</div>
     </div>
   </div>
 
@@ -213,12 +239,23 @@
     <div class="module-body">
       <div class="controls">
         <input id="loginUser" placeholder="Kullanıcı adı" value="admin">
-        <input id="loginPass" type="password" placeholder="Şifre">
+        <input id="loginPass" type="password" placeholder="Şifre" value="1234">
         <button onclick="login()">Giriş yap</button>
+        <button class="secondary" onclick="checkSession()">Oturumu kontrol et</button>
+        <button class="secondary" onclick="logoutUser()">Çıkış yap</button>
+      </div>
+      <div class="controls">
         <button class="secondary" onclick="callApi('GET', '/users', 'out-14')">Kullanıcılar</button>
         <button class="secondary" onclick="callApi('GET', '/health', 'out-14')">Sistem durumu</button>
       </div>
-      <div class="output empty" id="out-14">İstek bekleniyor…</div>
+      <div class="controls">
+        <input id="newUser" placeholder="Yeni kullanıcı adı">
+        <input id="newPass" placeholder="Şifre">
+        <input id="newRole" placeholder="Rol (örn. Öğretim Üyesi)">
+        <input id="newDept" placeholder="Bölüm (opsiyonel)">
+        <button class="secondary" onclick="createUser()">Kullanıcı ekle</button>
+      </div>
+      <div class="output empty" id="out-14">Oturum yok — giriş yapılmadı</div>
     </div>
   </div>
 
@@ -269,6 +306,8 @@ async function callApi(method, path, elId) {
   }
 }
 
+let currentToken = null;
+
 async function login() {
   const username = document.getElementById("loginUser").value;
   const password = document.getElementById("loginPass").value;
@@ -282,10 +321,78 @@ async function login() {
       body: JSON.stringify({ username, password })
     });
     const data = await res.json();
+    if (data.token) currentToken = data.token;
     renderOutput("out-14", data, !res.ok);
   } catch (err) {
     renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
   }
+}
+
+async function checkSession() {
+  const el = document.getElementById("out-14");
+  if (!currentToken) {
+    renderOutput("out-14", "Önce giriş yapmalısın — henüz aktif bir token yok.", true);
+    return;
+  }
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: currentToken })
+    });
+    const data = await res.json();
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function logoutUser() {
+  const el = document.getElementById("out-14");
+  if (!currentToken) {
+    renderOutput("out-14", "Önce giriş yapmalısın — çıkılacak bir oturum yok.", true);
+    return;
+  }
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: currentToken })
+    });
+    const data = await res.json();
+    currentToken = null;
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function createUser() {
+  const username = document.getElementById("newUser").value;
+  const password = document.getElementById("newPass").value;
+  const role = document.getElementById("newRole").value;
+  const department = document.getElementById("newDept").value || null;
+  const el = document.getElementById("out-14");
+  el.classList.remove("empty", "error");
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, role, department })
+    });
+    const data = await res.json();
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function forecastCapacity() {
+  const growth = document.getElementById("growthInput").value;
+  await callApi("GET", `/capacity/forecast?growth_percent=${growth}`, "out-05");
 }
 
 async function checkStatus() {
