@@ -43,6 +43,10 @@ class SustainabilityResponse(BaseModel):
     )
     category: str
     category_reason: str
+    simplified_category: str = Field(
+        description="ABU PDF'inin yeni, 4 kategorili basit sınıflandırmasına eşlenmiş hali"
+    )
+    simplified_category_reason: str
     criteria: List[CriterionScore]
     missing_criteria: List[str]
     supporting_metrics: SupportingMetrics

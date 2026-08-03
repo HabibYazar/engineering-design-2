@@ -34,6 +34,32 @@ CATEGORY_RESTRUCTURE = "Yeniden yapılandırılması gereken program"
 CATEGORY_MERGE = "Birleştirme/konsolidasyon için uygun program"
 CATEGORY_STRATEGIC = "Stratejik kurumsal destek gerektiren program"
 
+# ABU PDF'inin yeni (basitleştirilmiş) sürümü 11 kriterli ağırlıklı puanlama yerine
+# Mali Analiz bölümünün sonunda 4 kategorili bir sınıflandırma tanımlıyor. Mevcut
+# 11 kriterli sistem daha kapsamlı olduğu için korunuyor; bu eşleme yalnızca aynı
+# sonucu PDF'in yeni terimleriyle de sunmak için eklenen ek bir görünümdür.
+SIMPLE_STRENGTHEN = "Güçlendirilmesi gereken program"
+SIMPLE_EXPAND = "Büyütülebilecek program"
+SIMPLE_REORGANIZE = "Yeniden yapılandırılması gereken program"
+SIMPLE_MERGE = "Birleştirilmesi değerlendirilebilecek program"
+
+_SIMPLE_CATEGORY_MAP = {
+    CATEGORY_GROWTH: (SIMPLE_EXPAND, "Talep ve doluluk güçlü; büyütme adayı."),
+    CATEGORY_STRENGTHEN: (SIMPLE_STRENGTHEN, "Puan orta seviyede; hedefli iyileştirme yeterli."),
+    CATEGORY_RESTRUCTURE: (SIMPLE_REORGANIZE, "Talep ve doluluk zayıf; yeniden yapılandırma gerekiyor."),
+    CATEGORY_MERGE: (SIMPLE_MERGE, "Kontenjan ve öğrenci gövdesi küçük; birleştirme adayı."),
+    CATEGORY_STRATEGIC: (
+        SIMPLE_STRENGTHEN,
+        "Yeni PDF'in 4 kategorisinde 'stratejik destek' ayrımı yok; en yakın karşılığı "
+        "olan 'güçlendirilmesi gereken' kategorisine eşlendi.",
+    ),
+}
+
+
+def _classify_simple(category: str) -> tuple:
+    """5 kategorili sonucu ABU PDF'inin yeni 4 kategorili terimlerine eşler."""
+    return _SIMPLE_CATEGORY_MAP[category]
+
 
 def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
     """Değeri verilen aralığa sıkıştırır."""
@@ -195,6 +221,7 @@ def evaluate_program(
                 )
 
     category, reason = _classify(sustainability_score, metrics, external, thresholds)
+    simplified_category, simplified_reason = _classify_simple(category)
 
     return {
         "program_code": metrics["program_code"],
@@ -204,6 +231,8 @@ def evaluate_program(
         "data_completeness_percent": round(available_weight / total_weight * 100, 2),
         "category": category,
         "category_reason": reason,
+        "simplified_category": simplified_category,
+        "simplified_category_reason": simplified_reason,
         "criteria": criteria,
         "missing_criteria": missing,
         "supporting_metrics": {

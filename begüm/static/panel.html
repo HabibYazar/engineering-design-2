@@ -379,6 +379,7 @@ function renderKpis(ov) {
     ["Burslu öğrenci",        pct(ov.scholarship_student_percentage),      "en az %1 burs alanlar"],
     ["Öğrenci kaybı",         pct(ov.attrition_rate),                     `${nf0.format(ov.dropped_out_student_count)} öğrenci bu yıl ayrıldı`],
     ["Hazırlık öğrencisi",    nf0.format(ov.preparatory_student_count),   "hazırlık okuyan/okumuş"],
+    ["Mezun istihdam oranı",  pct(ov.employment_rate),                    `${nf0.format(ov.employed_graduate_count)} mezun istihdamda`],
   ];
   $("kpis").innerHTML = tiles.map(([l, v, n]) => `
     <div class="kpi">
@@ -439,6 +440,7 @@ function renderScores(rows) {
       ["Taban puan", nf1.format(r.minimum_admission_score ?? 0)],
       ["Türkiye ort.", nf1.format(r.national_average_minimum_score ?? 0)],
       ["Ankara ort.", nf1.format(r.ankara_average_minimum_score ?? 0)],
+      ["Tam burslu taban puan", nf1.format(r.full_scholarship_minimum_admission_score ?? 0)],
       ["Konum", r.competitive_position],
     ]);
     box.appendChild(el);
@@ -482,7 +484,8 @@ function renderSustainability(scores, categories) {
       <div class="bar-val">${nf1.format(r.sustainability_score)}</div>`;
     bindTip(el, r.program_name, [
       ["Puan", nf1.format(r.sustainability_score)],
-      ["Kategori", r.category],
+      ["Kategori (11 kriter)", r.category],
+      ["Kategori (ABU basit)", r.simplified_category],
       ["Veri tamlığı", pct(r.data_completeness_percent)],
     ]);
     box.appendChild(el);

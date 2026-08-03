@@ -59,6 +59,21 @@ def test_categories_cover_all_programs_exactly_once(client):
     assert len(all_codes) == len(set(all_codes))  # her program tam olarak bir kategoride
 
 
+def test_simplified_category_maps_every_program_to_one_of_four_abu_categories(client):
+    """ABU PDF'inin yeni, 4 kategorili basit sınıflandırması (Bölüm 6 formatı)."""
+    resp = client.get(f"/api/program-sustainability/scores?academic_year={ACADEMIC_YEAR}")
+    rows = resp.json()
+    allowed = {
+        "Güçlendirilmesi gereken program",
+        "Büyütülebilecek program",
+        "Yeniden yapılandırılması gereken program",
+        "Birleştirilmesi değerlendirilebilecek program",
+    }
+    for r in rows:
+        assert r["simplified_category"] in allowed
+        assert r["simplified_category_reason"]
+
+
 def test_program_score_unknown_code_returns_404(client):
     resp = client.get(
         f"/api/program-sustainability/scores/DOES-NOT-EXIST?academic_year={ACADEMIC_YEAR}"

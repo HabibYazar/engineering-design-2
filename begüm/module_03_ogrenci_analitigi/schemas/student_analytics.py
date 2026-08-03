@@ -27,6 +27,8 @@ class StudentCompositionMixin(BaseModel):
     average_time_to_graduation: float = Field(
         description="Ortalama mezuniyet süresi (yıl)"
     )
+    employment_rate: float = Field(description="Mezunlar arasında istihdam edilenlerin oranı (%)")
+    employed_graduate_count: int = Field(description="İstihdam edildiği bilinen mezun sayısı")
 
 
 class UniversityOverviewResponse(StudentCompositionMixin):
@@ -75,6 +77,9 @@ class ProgramMetricsResponse(StudentCompositionMixin):
     minimum_admission_score: Optional[float] = None
     national_average_minimum_score: Optional[float] = None
     ankara_average_minimum_score: Optional[float] = None
+    full_scholarship_minimum_admission_score: Optional[float] = Field(
+        default=None, description="Tam burslu öğrenciler için taban puan"
+    )
     national_score_gap: Optional[float] = None
     ankara_score_gap: Optional[float] = None
 
@@ -88,6 +93,9 @@ class AdmissionScoreAnalysisResponse(BaseModel):
     minimum_admission_score: Optional[float] = None
     ankara_average_minimum_score: Optional[float] = None
     national_average_minimum_score: Optional[float] = None
+    full_scholarship_minimum_admission_score: Optional[float] = Field(
+        default=None, description="Tam burslu öğrenciler için taban puan"
+    )
     ankara_score_gap: Optional[float] = None
     national_score_gap: Optional[float] = None
     competitive_position: str

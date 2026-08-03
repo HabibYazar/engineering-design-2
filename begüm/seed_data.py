@@ -147,6 +147,12 @@ NORMAL_DURATION_YEARS = 4
 # Mezuniyetin beklenen yıla göre gecikmesi: 0 yıl %72, 1 yıl %20, 2 yıl %8.
 GRADUATION_DELAY_WEIGHTS = [(0, 0.72), (1, 0.20), (2, 0.08)]
 
+# ABU PDF'inin yeni istediği göstergeler için ek sabitler.
+# Ayrı bir RANDOM_SEED + 1 akışı kullanılır ki mevcut mezuniyet/terk/GNO
+# rastgeleliği (ve dolayısıyla testlerdeki bilinen sayılar) etkilenmesin.
+EMPLOYMENT_RATE = 0.82
+FULL_SCHOLARSHIP_SCORE_BONUS = 15.0
+
 
 def _weighted_choice(rng: random.Random, weighted: List[tuple]) -> int:
     """Ağırlıklı seçenek listesinden bir değer döndürür."""
@@ -288,6 +294,9 @@ def _build_snapshots(
                 minimum_admission_score=profile["min_scores"][start_year],
                 national_average_minimum_score=MARKET_SCORES[start_year]["national"],
                 ankara_average_minimum_score=MARKET_SCORES[start_year]["ankara"],
+                full_scholarship_minimum_admission_score=(
+                    profile["min_scores"][start_year] + FULL_SCHOLARSHIP_SCORE_BONUS
+                ),
                 graduated_student_count=graduated,
                 dropped_out_student_count=dropped,
                 non_renewed_student_count=non_renewed,
@@ -352,9 +361,22 @@ def _build_academic_records(
     return records
 
 
+def _assign_employment(employment_rng: random.Random, students: List[Student]) -> None:
+    """Mezun öğrencilere istihdam durumu atar (PDF: "Graduate employment rate").
+
+    Ayrı bir RNG akışı kullanır ve öğrenci üretiminden SONRA, tüm alanlar
+    belirlendikten sonra çalışır; böylece mevcut mezuniyet/terk/GNO
+    rastgeleliğini (ve testlerdeki bilinen sayıları) etkilemez.
+    """
+    for student in students:
+        if student.current_status == "graduated":
+            student.is_employed = employment_rng.random() < EMPLOYMENT_RATE
+
+
 def seed_all(db: Session) -> dict:
     """Veritabanını demo verisiyle doldurur ve üretilen kayıt sayılarını döndürür."""
     rng = random.Random(RANDOM_SEED)
+    employment_rng = random.Random(RANDOM_SEED + 1)
     counts = {"programs": 0, "students": 0, "snapshots": 0, "academic_records": 0}
 
     for profile in PROGRAM_PROFILES:
@@ -371,6 +393,7 @@ def seed_all(db: Session) -> dict:
         students, events = _build_students_for_program(rng, profile, program)
         snapshots = _build_snapshots(profile, program, students, events)
         records = _build_academic_records(rng, students, events)
+        _assign_employment(employment_rng, students)
 
         db.add_all(students)
         db.add_all(snapshots)

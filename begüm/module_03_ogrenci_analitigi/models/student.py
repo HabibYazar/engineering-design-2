@@ -62,6 +62,12 @@ class Student(Base):
     actual_graduation_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Yalnızca mezun öğrenciler için anlamlıdır (PDF: "Graduate employment rate").
+    # Hâlâ okuyan/terk eden öğrencilerde None kalır — istihdam oranı yalnızca
+    # mezunlar üzerinden hesaplanır.
+    is_employed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

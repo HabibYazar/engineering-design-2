@@ -22,6 +22,28 @@ def test_overview_matches_known_demo_totals(client):
     assert body["total_quota"] == 530
     assert body["total_enrolled_student_count"] == 356
     assert body["overall_occupancy_rate"] == 67.17
+    assert body["employment_rate"] == 81.71
+    assert body["employed_graduate_count"] == 670
+
+
+def test_employment_rate_only_counts_graduates(client):
+    """Yalnızca mezunlar paydadır; hâlâ okuyan/terk eden öğrenciler dışarıda kalır."""
+    resp = client.get(f"/api/student-analytics/overview?academic_year={ACADEMIC_YEAR}")
+    body = resp.json()
+    graduates = body["graduated_student_count_total"]
+    assert body["employed_graduate_count"] <= graduates
+    expected_rate = round(body["employed_graduate_count"] / graduates * 100, 2)
+    assert body["employment_rate"] == expected_rate
+
+
+def test_full_scholarship_admission_score_has_fixed_bonus_over_base_score(client):
+    """seed_data.py: tam burslu taban puanı = taban puan + 15 (FULL_SCHOLARSHIP_SCORE_BONUS)."""
+    resp = client.get(f"/api/student-analytics/admission-scores?academic_year={ACADEMIC_YEAR}")
+    rows = resp.json()
+    for r in rows:
+        assert r["full_scholarship_minimum_admission_score"] == round(
+            r["minimum_admission_score"] + 15.0, 2
+        )
 
 
 def test_overview_unknown_year_returns_404(client):

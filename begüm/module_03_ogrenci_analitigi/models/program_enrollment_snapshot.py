@@ -55,6 +55,12 @@ class ProgramEnrollmentSnapshot(Base):
         Numeric(8, 2), nullable=True
     )
 
+    # Tam burslu öğrencilerin taban puanı genel taban puandan ayrı tutulur
+    # (PDF: "Full-scholarship student admission scores").
+    full_scholarship_minimum_admission_score: Mapped[Optional[float]] = mapped_column(
+        Numeric(8, 2), nullable=True
+    )
+
     graduated_student_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     dropped_out_student_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     non_renewed_student_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

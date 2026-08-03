@@ -117,6 +117,20 @@ def _graduation_stats(students: List[Student], current_year: int) -> Dict[str, f
     }
 
 
+def _employment_stats(students: List[Student]) -> Dict[str, float]:
+    """Mezun istihdam oranını hesaplar (PDF: "Graduate employment rate").
+
+    Yalnızca mezun öğrenciler paydadır; hâlâ okuyanlar veya terk edenler
+    istihdam durumuyla ilgisiz olduğundan dışarıda tutulur.
+    """
+    graduates = [s for s in students if s.current_status == "graduated"]
+    employed = [s for s in graduates if s.is_employed]
+    return {
+        "employment_rate": _rate(len(employed), len(graduates)),
+        "employed_graduate_count": len(employed),
+    }
+
+
 def _student_composition(students: List[Student]) -> Dict[str, float]:
     """Uluslararası, burslu ve hazırlık öğrenci göstergelerini hesaplar."""
     total = len(students)
@@ -178,10 +192,14 @@ def build_program_metrics(
         "minimum_admission_score": _to_float(snapshot.minimum_admission_score),
         "national_average_minimum_score": _to_float(snapshot.national_average_minimum_score),
         "ankara_average_minimum_score": _to_float(snapshot.ankara_average_minimum_score),
+        "full_scholarship_minimum_admission_score": _to_float(
+            snapshot.full_scholarship_minimum_admission_score
+        ),
     }
 
     metrics.update(_graduation_stats(students, year))
     metrics.update(_student_composition(students))
+    metrics.update(_employment_stats(students))
 
     # Taban puanın Ankara ve Türkiye ortalamasına göre farkı (PDF: taban puan analizi).
     score = metrics["minimum_admission_score"]
@@ -269,6 +287,7 @@ def get_university_overview(db: Session, academic_year: str) -> Dict:
     }
     overview.update(_graduation_stats(all_students, year))
     overview.update(_student_composition(all_students))
+    overview.update(_employment_stats(all_students))
     return overview
 
 
@@ -297,6 +316,9 @@ def get_admission_score_analysis(db: Session, academic_year: str) -> List[Dict]:
                 "minimum_admission_score": score,
                 "ankara_average_minimum_score": metrics["ankara_average_minimum_score"],
                 "national_average_minimum_score": metrics["national_average_minimum_score"],
+                "full_scholarship_minimum_admission_score": metrics[
+                    "full_scholarship_minimum_admission_score"
+                ],
                 "ankara_score_gap": ankara_gap,
                 "national_score_gap": national_gap,
                 "competitive_position": position,

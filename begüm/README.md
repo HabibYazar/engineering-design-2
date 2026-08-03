@@ -186,3 +186,37 @@ böylece snapshot tablosu ile öğrenci tablosu birbiriyle çelişmez. Üretim s
   alınır. İstek gövdesinin alan adları Modül 13'ün
   `comparable_university_programs_sample.xlsx` yapısıyla birebir aynıdır; entegrasyonda
   o kaynaktan üretilen veri doğrudan bu uca akabilir.
+
+---
+
+## 🆕 ABU KDS PDF Güncellemesi
+
+Hocanın Ankara Bilim Üniversitesi'ne özel yeni PDF'i, Modül 3 ve 7'ye birkaç ek gösterge
+istiyor. Eklenenler:
+
+- **Mezun istihdam oranı** (`employment_rate`, `employed_graduate_count`) — `overview` ve
+  `programs` uçlarında. Yalnızca mezunlar paydadır (hâlâ okuyan/terk eden öğrenciler dışarıda).
+- **Tam burslu öğrenci taban puanı** (`full_scholarship_minimum_admission_score`) —
+  `admission-scores` ve `programs` uçlarında, genel taban puandan ayrı.
+- **Modül 7'nin basit (4 kategorili) ABU görünümü** (`simplified_category`,
+  `simplified_category_reason`) — `scores` ucunda, mevcut 11 kriterli puanlamanın
+  **yanında** ek bir alan olarak. 11 kriterli sistem daha kapsamlı olduğu için
+  kaldırılmadı; yeni PDF'in "Güçlendirilmesi/Büyütülebilecek/Yeniden yapılandırma/
+  Birleştirme" terimlerine eşlenerek sunuluyor (bkz. `sustainability_service._classify_simple`).
+
+Bilinçli olarak **yapılmayanlar** (kapsam dışı bırakıldı):
+
+- **Yıllara göre YÖK kontenjanları (2020-2026)** — mevcut demo yalnızca 3 akademik yıl
+  (2024-2027) tutuyor; 7 yıla çıkarmak `seed_data.py`'nin veri üretim yapısını baştan
+  değiştirmeyi gerektirir.
+- **Gerçek ABU verisi** (4 bölüm: Bilgisayar/Yazılım/Elektrik-Elektronik/Endüstri,
+  gerçek maaş/burs/kontenjan sayıları) — kurgusal 8 programlı demo veri seti korundu;
+  gerçek veriye geçiş `tests/`'teki 23 testin de yeniden yazılmasını gerektirirdi.
+- **Bölüm 8 — Yapay Zeka Destekli Stratejik Karar Asistanı** — RAG/LLM entegrasyonu
+  gerektiren ayrı, büyük bir modül; bu modülün kapsamı dışında.
+- **Öğrenim ücreti ve uzmanlık alanına göre akademisyen sayısı** (yeni PDF'te Bölüm 3
+  altında listelenmiş) — sırasıyla Mali Analiz (Modül 6) ve Akademik Kadro (Modül 4)
+  modüllerinin kapsamına giriyor.
+- **Modül 11'in kural motoru** — yeni PDF ayrı bir erken uyarı bölümü tanımlamıyor
+  (riski AI asistanına bırakmış), ama mevcut kural motoru PDF'in genel "riskleri erken
+  tespit etme" hedefini zaten karşıladığından **korundu**, kaldırılmadı.
