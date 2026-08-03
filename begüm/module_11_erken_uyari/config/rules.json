@@ -46,7 +46,7 @@
     {
       "key": "admission_score_below_national",
       "name": "Taban puan Turkiye ortalamasinin altinda",
-      "pdf_condition": "Research revenues or student-related revenues decrease (talep kaybi ongorusu)",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (oncu gosterge - taban puan ulusal ortalamanin altinda)",
       "scope": "program",
       "implemented": true,
       "data_source": "Modul 3 - taban puan analizi",
@@ -66,7 +66,7 @@
     {
       "key": "sustainability_score_low",
       "name": "Program surdurulebilirlik puani dusuk",
-      "pdf_condition": "Academic performance indicators decline (program duzeyi)",
+      "pdf_condition": "Turetilmis bilesik gosterge - PDF'in tek bir maddesine karsilik gelmez; Modul 7'nin hesaplanan 3 kriterini (talep, doluluk, mezuniyet orani) tek puanda birlestirir",
       "scope": "program",
       "implemented": true,
       "data_source": "Modul 7 - surdurulebilirlik puani",

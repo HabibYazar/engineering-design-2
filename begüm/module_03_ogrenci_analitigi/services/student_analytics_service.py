@@ -404,3 +404,71 @@ def get_academic_performance_trend(db: Session) -> List[Dict]:
             }
         )
     return results
+
+
+def get_comparative_analysis(
+    db: Session, academic_year: str, comparators: Dict[str, List[Dict]]
+) -> List[Dict]:
+    """Benzer/rakip üniversitelerle program bazlı karşılaştırma üretir.
+
+    PDF Bölüm 3: "Comparative analyses of student enrollment across similar
+    universities and academic departments." Kıyaslama verisi bu modülün
+    kapsamı dışındadır (Modül 13 tarafından sağlanır); burada uydurulmaz,
+    yalnızca çağıran tarafından verilen veriyle karşılaştırma hesaplanır.
+    """
+    own_metrics = {m["program_code"]: m for m in get_program_metrics(db, academic_year)}
+    results: List[Dict] = []
+
+    for program_code, comparator_list in comparators.items():
+        own = own_metrics.get(program_code)
+        if own is None:
+            continue
+
+        occupancy_values = [
+            c["occupancy_rate"] for c in comparator_list if c.get("occupancy_rate") is not None
+        ]
+        score_values = [
+            c["minimum_admission_score"]
+            for c in comparator_list
+            if c.get("minimum_admission_score") is not None
+        ]
+
+        avg_occupancy = (
+            round(sum(occupancy_values) / len(occupancy_values), 2) if occupancy_values else None
+        )
+        avg_score = round(sum(score_values) / len(score_values), 2) if score_values else None
+
+        occupancy_gap = (
+            round(own["occupancy_rate"] - avg_occupancy, 2) if avg_occupancy is not None else None
+        )
+        admission_score = own["minimum_admission_score"]
+        score_gap = (
+            round(admission_score - avg_score, 2)
+            if avg_score is not None and admission_score is not None
+            else None
+        )
+
+        if occupancy_gap is None:
+            position = "veri yok"
+        elif occupancy_gap >= 0:
+            position = "kıyaslama grubunun üzerinde"
+        else:
+            position = "kıyaslama grubunun altında"
+
+        results.append(
+            {
+                "program_code": program_code,
+                "program_name": own["program_name"],
+                "academic_year": academic_year,
+                "own_occupancy_rate": own["occupancy_rate"],
+                "own_minimum_admission_score": admission_score,
+                "comparators": comparator_list,
+                "average_comparator_occupancy_rate": avg_occupancy,
+                "average_comparator_admission_score": avg_score,
+                "occupancy_gap_vs_comparators": occupancy_gap,
+                "admission_score_gap_vs_comparators": score_gap,
+                "competitive_position": position,
+            }
+        )
+
+    return sorted(results, key=lambda r: r["program_code"])

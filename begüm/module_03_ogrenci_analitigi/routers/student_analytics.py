@@ -9,6 +9,8 @@ from database import get_db
 from module_03_ogrenci_analitigi.schemas.student_analytics import (
     AcademicPerformanceTrendResponse,
     AdmissionScoreAnalysisResponse,
+    ComparativeAnalysisRequest,
+    ComparativeAnalysisResult,
     DemandTrendResponse,
     ProgramMetricsResponse,
     UniversityOverviewResponse,
@@ -94,3 +96,19 @@ def get_demand_trends(db: Session = Depends(get_db)):
 def get_performance_trends(db: Session = Depends(get_db)):
     """Programların yıllara göre ortalama dönem GNO trendini döndürür."""
     return service.get_academic_performance_trend(db)
+
+
+@router.post("/comparative", response_model=List[ComparativeAnalysisResult])
+def post_comparative_analysis(
+    payload: ComparativeAnalysisRequest, db: Session = Depends(get_db)
+):
+    """Benzer/rakip üniversitelerle program bazlı karşılaştırma yapar.
+
+    Kıyaslama verisi (Modül 13'ün sağlayacağı) istek gövdesiyle verilir; bu
+    modül veriyi uydurmaz, yalnızca kendi göstergeleriyle kıyaslar.
+    """
+    _validate_academic_year(db, payload.academic_year)
+    comparators = {
+        code: [c.model_dump() for c in items] for code, items in payload.comparators.items()
+    }
+    return service.get_comparative_analysis(db, payload.academic_year, comparators)

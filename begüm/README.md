@@ -58,7 +58,7 @@ mezuniyet, taban puan)     hesaplar                     üretir
 
 ---
 
-## 📡 Endpoint'ler (18 yol / 19 işlem)
+## 📡 Endpoint'ler (19 yol / 20 işlem)
 
 | Grup | Endpoint |
 | :--- | :--- |
@@ -71,6 +71,7 @@ mezuniyet, taban puan)     hesaplar                     üretir
 | | `GET /api/student-analytics/admission-scores` — taban puan / Ankara / Türkiye |
 | | `GET /api/student-analytics/demand-trends` — 3 yıllık talep trendi |
 | | `GET /api/student-analytics/performance-trends` — GNO trendi |
+| | `POST /api/student-analytics/comparative` — benzer üniversitelerle karşılaştırma (dış girdi ile) |
 | **Modül 7** | `GET /api/program-sustainability/weights` — 11 kriter ve ağırlıkları |
 | | `GET /api/program-sustainability/scores` — puan + kategori + veri tamlığı |
 | | `POST /api/program-sustainability/scores` — diğer modüllerin verisiyle yeniden puanla |
@@ -179,3 +180,9 @@ böylece snapshot tablosu ile öğrenci tablosu birbiriyle çelişmez. Üretim s
   sonuca `data_completeness_percent` alanı eklenir.
 - Modül 11'in 15 kuralından 8'i çalışır durumdadır; kalan 7'si diğer modüllerin verisini
   bekler ve `implemented: false` olarak `rules.json` içinde tanımlıdır.
+- PDF Bölüm 3'ün "benzer üniversiteler ve akademik bölümler arası karşılaştırmalı
+  kayıt analizi" maddesi de aynı ilkeyle çözülür: kıyaslama verisi bu modülün
+  kapsamında **uydurulmaz**, `POST /api/student-analytics/comparative` ile dışarıdan
+  alınır. İstek gövdesinin alan adları Modül 13'ün
+  `comparable_university_programs_sample.xlsx` yapısıyla birebir aynıdır; entegrasyonda
+  o kaynaktan üretilen veri doğrudan bu uca akabilir.

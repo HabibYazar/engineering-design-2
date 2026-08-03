@@ -124,6 +124,7 @@ def demo_info() -> dict:
             "10. GET /api/early-warning/alerts — üst yönetime giden alarmlar",
             "11. GET /api/early-warning/summary — alarm özeti",
             "12. GET /api/early-warning/rules/pending — diğer modülleri bekleyen kurallar",
+            "13. POST /api/student-analytics/comparative — benzer üniversitelerle karşılaştırma (dış girdi ile)",
         ],
         "moduller": {
             "modul_03": "Stratejik Eğitim ve Öğrenci Analitiği (PDF Bölüm 3)",

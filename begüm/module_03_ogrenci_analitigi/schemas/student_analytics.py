@@ -4,7 +4,7 @@
 sözleşmeye uygunluğunu doğrular.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -131,3 +131,59 @@ class AcademicPerformanceTrendResponse(BaseModel):
     program_name: str
     series: List[AcademicPerformancePoint]
     gpa_change: float
+
+
+class ComparableUniversityInput(BaseModel):
+    """Bir kıyaslama (benzer/rakip) üniversitenin aynı program için verisi.
+
+    Alan adları Modül 13'ün `comparable_university_programs_sample.xlsx` yapısıyla
+    birebir aynıdır; entegrasyonda o kaynaktan üretilen veri doğrudan buraya akar.
+    """
+
+    university_name: str
+    quota: Optional[int] = None
+    enrolled_student_count: Optional[int] = None
+    occupancy_rate: Optional[float] = None
+    minimum_admission_score: Optional[float] = None
+    is_competitor: bool = False
+
+
+class ComparativeAnalysisRequest(BaseModel):
+    """PDF Bölüm 3'ün 'benzer üniversiteler ve akademik bölümler arası
+    karşılaştırmalı kayıt analizi' maddesi için dış girdi isteği.
+
+    Bu modül kıyaslama verisini uydurmaz (Modül 7'deki external_inputs ile aynı
+    ilke): veri Modül 13 (Veri Entegrasyonu) üzerinden sağlanır, burada yalnızca
+    kendi göstergelerimizle karşılaştırma hesaplanır.
+    """
+
+    academic_year: str = Field(default="2026-2027")
+    comparators: Dict[str, List[ComparableUniversityInput]] = Field(
+        default_factory=dict,
+        description=(
+            "program kodu -> kıyaslama üniversiteleri listesi. "
+            'Örnek: {"CENG-BSC": [{"university_name": "Boğaziçi Üniversitesi", ...}]}'
+        ),
+    )
+
+
+class ComparativeAnalysisResult(BaseModel):
+    """Bir programın benzer üniversitelerle karşılaştırma sonucu."""
+
+    program_code: str
+    program_name: str
+    academic_year: str
+    own_occupancy_rate: float
+    own_minimum_admission_score: Optional[float] = None
+    comparators: List[ComparableUniversityInput]
+    average_comparator_occupancy_rate: Optional[float] = None
+    average_comparator_admission_score: Optional[float] = None
+    occupancy_gap_vs_comparators: Optional[float] = Field(
+        default=None, description="Kendi doluluk oranımız - kıyaslama grubu ortalaması (puan)"
+    )
+    admission_score_gap_vs_comparators: Optional[float] = Field(
+        default=None, description="Kendi taban puanımız - kıyaslama grubu ortalaması"
+    )
+    competitive_position: str = Field(
+        description="kıyaslama grubunun üzerinde | kıyaslama grubunun altında | veri yok"
+    )
