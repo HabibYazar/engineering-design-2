@@ -15,6 +15,11 @@ from app.models.evaluation_dimension import EvaluationDimension
 from app.models.evaluation_framework import EvaluationFramework
 from app.models.evaluation_indicator import EvaluationIndicator
 from app.models.faculty import Faculty
+from app.models.financial_period import (
+    DepartmentBudget,
+    FinancialEntry,
+    FinancialPeriod,
+)
 from app.models.framework_assessment import FrameworkAssessment
 from app.models.import_job import ImportJob
 from app.models.institutional_metric_value import InstitutionalMetricValue
@@ -25,6 +30,7 @@ from app.models.scenario_baseline import ScenarioBaseline
 from app.models.scenario_input import ScenarioInput
 from app.models.scenario_result import ScenarioResult
 from app.models.student import Student
+from app.models.strategic_kpi import KpiFacultyValue, StrategicKpi
 from app.models.student_academic_record import StudentAcademicRecord
 from app.models.system_user import SystemUser
 
@@ -61,4 +67,11 @@ __all__ = [
     "PhysicalFacility",
     # Modül 14 - Kullanıcı ve yetkilendirme (Eda)
     "SystemUser",
+    # Modül 6 - Finansal analiz (Halil)
+    "FinancialPeriod",
+    "FinancialEntry",
+    "DepartmentBudget",
+    # Modül 8 - Performans yönetimi (Halil)
+    "StrategicKpi",
+    "KpiFacultyValue",
 ]

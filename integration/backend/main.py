@@ -16,7 +16,9 @@ from app.routers import (
     early_warning,
     education_analytics,
     faculties,
+    finance,
     health,
+    kpi,
     physical_resources,
     programs,
     ranking_evaluations,
@@ -92,6 +94,12 @@ app.include_router(physical_resources.router)
 
 # Modül 14 - Kullanıcı Yönetimi ve Yetkilendirme (Eda)
 app.include_router(auth.router)
+
+# Modül 6 - Stratejik Finansal Analiz (Halil)
+app.include_router(finance.router)
+
+# Modül 8 - Kurumsal Performans Yönetimi ve İzleme (Halil)
+app.include_router(kpi.router)
 
 
 @app.get("/")
