@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modül 3 — Öğrenci Analitiği Paneli</title>
+<style>
+  /* ─── Renk rolleri ────────────────────────────────────────────────────────
+     Değerler dogrulanmis referans paletten alindi. Acik/koyu ayrimi hem isletim
+     sistemi ayarini (prefers-color-scheme) hem de manuel secimi (data-theme)
+     karsilar; manuel secim her iki yonde de kazanir. */
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;   /* kart yuzeyi */
+    --page:           #f9f9f7;   /* sayfa zemini */
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+
+    --series-1:       #2a78d6;   /* tek serili grafiklerin rengi (magnitude) */
+    --diverge-pos:    #2a78d6;   /* taban puan: ortalamanin uzerinde */
+    --diverge-neg:    #e34948;   /* taban puan: ortalamanin altinda */
+    --track:          #eceae4;   /* bar arkaplan izi */
+
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-crit:    #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+
+      --series-1:       #3987e5;
+      --diverge-pos:    #3987e5;
+      --diverge-neg:    #e66767;
+      --track:          #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+
+    --series-1:       #3987e5;
+    --diverge-pos:    #3987e5;
+    --diverge-neg:    #e66767;
+    --track:          #262624;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 20px 64px;
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* ─── Baslik ve filtre satiri ─────────────────────────────────────────── */
+  header { margin-bottom: 20px; }
+  h1 { font-size: 21px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 13.5px; margin: 0; }
+
+  /* Filtreler tek satirda, kapsadigi her seyin ustunde. */
+  .filters {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 18px 0 20px; padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .filters label { font-size: 13px; color: var(--text-secondary); }
+  select, .theme-btn {
+    font: inherit; font-size: 13.5px;
+    padding: 7px 11px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary);
+    cursor: pointer;
+  }
+  .theme-btn { margin-left: auto; }
+  .status-line { font-size: 12.5px; color: var(--text-muted); }
+
+  /* ─── Gosterge kartlari (stat tile) ───────────────────────────────────── */
+  /* 8 kart: genis ekranda 4+4 dengeli kirilir, darda tek sutuna iner. */
+  .kpis {
+    display: grid; gap: 12px; margin-bottom: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(236px, 1fr));
+  }
+  .kpi {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 15px 16px 14px;
+  }
+  .kpi .label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 7px; }
+  /* Buyuk tekil sayilar oransal rakam kullanir; tabular-nums yalnizca hizalanan
+     sutunlarda (tablo, eksen) devrede. */
+  .kpi .value { font-size: 27px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+  .kpi .note { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+  /* ─── Kartlar ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 18px 16px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 3px; }
+  .card .cap { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
+
+  /* ─── Yatay bar grafigi ───────────────────────────────────────────────── */
+  /* Tek seri, tek renk: bar uzunlugu zaten buyuklugu kodluyor, rengi de ayni
+     degiskene baglamak (deger-rampasi) bilgiyi tekrar eder. */
+  .bars { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row {
+    display: grid; grid-template-columns: 92px 1fr 58px;
+    align-items: center; gap: 12px;
+    padding: 2px 0; border-radius: 6px; cursor: default;
+  }
+  .bar-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .bar-name { font-size: 12.5px; color: var(--text-secondary); text-align: right; }
+  .bar-track { position: relative; height: 16px; background: var(--track); border-radius: 3px; }
+  .bar-fill {
+    position: absolute; inset: 0 auto 0 0;      /* tabandan buyur */
+    background: var(--series-1);
+    border-radius: 0 4px 4px 0;                  /* veri ucu yuvarlak, taban kare */
+    min-width: 3px;
+  }
+  .bar-val {
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+    color: var(--text-primary); text-align: right;
+  }
+  .axis {
+    display: grid; grid-template-columns: 92px 1fr 58px; gap: 12px;
+    margin-top: 10px; padding-top: 8px;
+  }
+  .axis-track { position: relative; height: 14px; border-top: 1px solid var(--baseline); }
+  .axis-tick {
+    position: absolute; top: 3px; transform: translateX(-50%);
+    font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+  }
+
+  /* ─── Diverging bar (taban puan farki) ────────────────────────────────── */
+  .div-row {
+    display: grid; grid-template-columns: 92px 1fr 76px;
+    align-items: center; gap: 12px; padding: 2px 0; border-radius: 6px;
+  }
+  .div-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .div-track { position: relative; height: 16px; }
+  .div-zero {                                    /* notr orta cizgi */
+    position: absolute; left: 50%; top: -3px; bottom: -3px;
+    width: 1px; background: var(--baseline);
+  }
+  .div-fill { position: absolute; top: 0; bottom: 0; }
+  .div-fill.pos { left: 50%; background: var(--diverge-pos); border-radius: 0 4px 4px 0; }
+  .div-fill.neg { right: 50%; background: var(--diverge-neg); border-radius: 4px 0 0 4px; }
+  .div-val { font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* ─── Tablo (grafiklerin tablo goruntusu ikizi) ───────────────────────── */
+  /* 14 sutun genis ekranda sigar; dar ekranda kart kendi icinde yatay kayar,
+     sayfa govdesi asla yatay kaymaz. */
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; min-width: 1040px; }
+  th, td {
+    text-align: right; padding: 8px 7px;
+    border-bottom: 1px solid var(--gridline);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  th {
+    font-weight: 500; font-size: 11.5px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--baseline);
+  }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--text-primary) 3%, transparent); }
+
+  /* Durum rozeti: sekil + etiket anlami tasir, renk yalnizca pekistirir. */
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .chip .glyph { font-size: 11px; line-height: 1; }
+  .chip.good .glyph { color: var(--status-good); }
+  .chip.warn .glyph { color: var(--status-warn); }
+  .chip.crit .glyph { color: var(--status-crit); }
+
+  /* ─── Tooltip ─────────────────────────────────────────────────────────── */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity .1s; max-width: 260px;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 11px; font-size: 12.5px; line-height: 1.5;
+    box-shadow: 0 6px 20px rgba(0,0,0,.13);
+  }
+  #tip .t-name { font-weight: 600; margin-bottom: 4px; }
+  #tip .t-row { color: var(--text-secondary); }
+  #tip b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  .msg { padding: 30px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+  .msg code {
+    background: var(--track); padding: 2px 6px; border-radius: 4px;
+    font-size: 12.5px; font-family: ui-monospace, monospace;
+  }
+  /* Yeniden veri cekerken iskelet parlamasi yerine onceki render soluklastirilir. */
+  .loading { opacity: .45; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Öğrenci Analitiği Paneli</h1>
+    <p class="sub">Modül 3 — Stratejik Eğitim ve Öğrenci Analitiği · Mühendislik ve Mimarlık Fakültesi<br>Çevrimdışı kopya — 30.07.2026 tarihli veri, sunucu gerektirmez</p>
+  </header>
+
+  <!-- Filtre satiri: kapsadigi tum kart ve grafiklerin ustunde, tek satir -->
+  <div class="filters">
+    <label for="year">Akademik yıl</label>
+    <select id="year"></select>
+    <span class="status-line" id="status"></span>
+    <button class="theme-btn" id="theme" type="button">Koyu tema</button>
+  </div>
+
+  <div id="content" hidden>
+    <section class="kpis" id="kpis"></section>
+
+    <section class="card">
+      <h2>Program doluluk oranları</h2>
+      <p class="cap">Kayıtlı öğrenci sayısının kontenjana oranı. Düşükten yükseğe sıralı.</p>
+      <div class="bars" id="occBars"></div>
+      <div class="axis">
+        <div></div>
+        <div class="axis-track" id="occAxis"></div>
+        <div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Taban puanın Türkiye ortalamasına göre konumu</h2>
+      <p class="cap">Sıfır çizgisi Türkiye ortalaması. Sağa doğru ortalamanın üzerinde, sola doğru altında.</p>
+      <div class="bars" id="scoreBars"></div>
+    </section>
+
+    <section class="card">
+      <h2>Program göstergeleri</h2>
+      <p class="cap">Yukarıdaki grafiklerin tablo görünümü ve PDF Bölüm 3'te istenen diğer göstergeler.</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Program</th><th>Durum</th><th>Kont.</th><th>Kayıt</th><th>Doluluk</th>
+              <th>Öğrenci</th><th>Kayıp</th><th>Yenilem.</th><th>Mezun.</th>
+              <th>Süre</th><th>Uluslar.</th><th>Burslu</th><th>Haz.</th><th>GNO</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="msg" id="msg">Veriler yükleniyor…</div>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+const API = "";
+window.__EMBEDDED__ = {"/api/student-analytics/academic-years":["2024-2025","2025-2026","2026-2027"],"/api/student-analytics/overview?academic_year=2024-2025":{"international_student_percentage":13.03,"scholarship_student_percentage":48.66,"preparatory_student_count":1332,"average_gpa":2.75,"graduation_rate":78.52,"graduation_cohort_size":256,"average_time_to_graduation":4.51,"academic_year":"2024-2025","program_count":8,"total_students":3124,"active_student_count":1709,"newly_enrolled_student_count":330,"graduated_student_count_total":820,"graduated_student_count_in_year":138,"student_body_in_year":1905,"total_quota":530,"total_enrolled_student_count":450,"overall_occupancy_rate":84.91,"dropped_out_student_count":115,"non_renewed_student_count":50,"attrition_rate":6.04,"non_renewal_rate":2.62},"/api/student-analytics/programs?academic_year=2024-2025":[{"international_student_percentage":7.69,"scholarship_student_percentage":41.26,"preparatory_student_count":42,"average_gpa":2.37,"graduation_rate":59.09,"graduation_cohort_size":22,"average_time_to_graduation":4.4,"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2024-2025","quota":40,"enrolled_student_count":18,"occupancy_rate":45.0,"total_students":143,"active_student_count":54,"newly_enrolled_student_count":10,"graduated_student_count_total":40,"graduated_student_count_in_year":10,"student_body_in_year":84,"dropped_out_student_count":6,"non_renewed_student_count":10,"attrition_rate":7.14,"non_renewal_rate":11.9,"minimum_admission_score":336.4,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":-52.1,"ankara_score_gap":-68.8},{"international_student_percentage":7.06,"scholarship_student_percentage":28.63,"preparatory_student_count":76,"average_gpa":2.36,"graduation_rate":58.06,"graduation_cohort_size":31,"average_time_to_graduation":4.59,"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2024-2025","quota":60,"enrolled_student_count":34,"occupancy_rate":56.67,"total_students":255,"active_student_count":98,"newly_enrolled_student_count":17,"graduated_student_count_total":61,"graduated_student_count_in_year":8,"student_body_in_year":141,"dropped_out_student_count":19,"non_renewed_student_count":11,"attrition_rate":13.48,"non_renewal_rate":7.8,"minimum_admission_score":341.0,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":-47.5,"ankara_score_gap":-64.2},{"international_student_percentage":7.49,"scholarship_student_percentage":45.22,"preparatory_student_count":142,"average_gpa":2.63,"graduation_rate":78.38,"graduation_cohort_size":37,"average_time_to_graduation":4.43,"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2024-2025","quota":65,"enrolled_student_count":55,"occupancy_rate":84.62,"total_students":387,"active_student_count":189,"newly_enrolled_student_count":34,"graduated_student_count_total":100,"graduated_student_count_in_year":19,"student_body_in_year":226,"dropped_out_student_count":21,"non_renewed_student_count":7,"attrition_rate":9.29,"non_renewal_rate":3.1,"minimum_admission_score":372.3,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":-16.2,"ankara_score_gap":-32.9},{"international_student_percentage":22.22,"scholarship_student_percentage":59.15,"preparatory_student_count":295,"average_gpa":2.61,"graduation_rate":83.33,"graduation_cohort_size":42,"average_time_to_graduation":4.59,"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2024-2025","quota":100,"enrolled_student_count":92,"occupancy_rate":92.0,"total_students":585,"active_student_count":264,"newly_enrolled_student_count":33,"graduated_student_count_total":148,"graduated_student_count_in_year":25,"student_body_in_year":373,"dropped_out_student_count":33,"non_renewed_student_count":4,"attrition_rate":8.85,"non_renewal_rate":1.07,"minimum_admission_score":428.4,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":39.9,"ankara_score_gap":23.2},{"international_student_percentage":13.33,"scholarship_student_percentage":40.3,"preparatory_student_count":105,"average_gpa":2.81,"graduation_rate":83.33,"graduation_cohort_size":36,"average_time_to_graduation":4.37,"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2024-2025","quota":50,"enrolled_student_count":47,"occupancy_rate":94.0,"total_students":330,"active_student_count":198,"newly_enrolled_student_count":42,"graduated_student_count_total":90,"graduated_student_count_in_year":22,"student_body_in_year":195,"dropped_out_student_count":7,"non_renewed_student_count":4,"attrition_rate":3.59,"non_renewal_rate":2.05,"minimum_admission_score":398.6,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":10.1,"ankara_score_gap":-6.6},{"international_student_percentage":17.87,"scholarship_student_percentage":59.93,"preparatory_student_count":298,"average_gpa":3.03,"graduation_rate":84.62,"graduation_cohort_size":26,"average_time_to_graduation":4.6,"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2024-2025","quota":85,"enrolled_student_count":80,"occupancy_rate":94.12,"total_students":554,"active_student_count":370,"newly_enrolled_student_count":81,"graduated_student_count_total":143,"graduated_student_count_in_year":18,"student_body_in_year":341,"dropped_out_student_count":9,"non_renewed_student_count":3,"attrition_rate":2.64,"non_renewal_rate":0.88,"minimum_admission_score":441.0,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":52.5,"ankara_score_gap":35.8},{"international_student_percentage":9.48,"scholarship_student_percentage":41.38,"preparatory_student_count":180,"average_gpa":2.84,"graduation_rate":87.1,"graduation_cohort_size":31,"average_time_to_graduation":4.49,"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2024-2025","quota":70,"enrolled_student_count":66,"occupancy_rate":94.29,"total_students":464,"active_student_count":287,"newly_enrolled_student_count":60,"graduated_student_count_total":121,"graduated_student_count_in_year":17,"student_body_in_year":295,"dropped_out_student_count":10,"non_renewed_student_count":9,"attrition_rate":3.39,"non_renewal_rate":3.05,"minimum_admission_score":402.5,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":14.0,"ankara_score_gap":-2.7},{"international_student_percentage":7.88,"scholarship_student_percentage":51.72,"preparatory_student_count":194,"average_gpa":2.96,"graduation_rate":87.1,"graduation_cohort_size":31,"average_time_to_graduation":4.51,"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2024-2025","quota":60,"enrolled_student_count":58,"occupancy_rate":96.67,"total_students":406,"active_student_count":249,"newly_enrolled_student_count":53,"graduated_student_count_total":117,"graduated_student_count_in_year":19,"student_body_in_year":250,"dropped_out_student_count":10,"non_renewed_student_count":2,"attrition_rate":4.0,"non_renewal_rate":0.8,"minimum_admission_score":415.2,"national_average_minimum_score":388.5,"ankara_average_minimum_score":405.2,"national_score_gap":26.7,"ankara_score_gap":10.0}],"/api/student-analytics/admission-scores?academic_year=2024-2025":[{"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2024-2025","minimum_admission_score":441.0,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":35.8,"national_score_gap":52.5,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2024-2025","minimum_admission_score":428.4,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":23.2,"national_score_gap":39.9,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2024-2025","minimum_admission_score":415.2,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":10.0,"national_score_gap":26.7,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2024-2025","minimum_admission_score":402.5,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":-2.7,"national_score_gap":14.0,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2024-2025","minimum_admission_score":398.6,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":-6.6,"national_score_gap":10.1,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2024-2025","minimum_admission_score":372.3,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":-32.9,"national_score_gap":-16.2,"competitive_position":"her iki ortalamanın altında"},{"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2024-2025","minimum_admission_score":341.0,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":-64.2,"national_score_gap":-47.5,"competitive_position":"her iki ortalamanın altında"},{"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2024-2025","minimum_admission_score":336.4,"ankara_average_minimum_score":405.2,"national_average_minimum_score":388.5,"ankara_score_gap":-68.8,"national_score_gap":-52.1,"competitive_position":"her iki ortalamanın altında"}],"/api/student-analytics/overview?academic_year=2025-2026":{"international_student_percentage":13.03,"scholarship_student_percentage":48.66,"preparatory_student_count":1332,"average_gpa":2.75,"graduation_rate":72.35,"graduation_cohort_size":774,"average_time_to_graduation":4.51,"academic_year":"2025-2026","program_count":8,"total_students":3124,"active_student_count":1709,"newly_enrolled_student_count":330,"graduated_student_count_total":820,"graduated_student_count_in_year":332,"student_body_in_year":1849,"total_quota":530,"total_enrolled_student_count":410,"overall_occupancy_rate":77.36,"dropped_out_student_count":134,"non_renewed_student_count":74,"attrition_rate":7.25,"non_renewal_rate":4.0},"/api/student-analytics/programs?academic_year=2025-2026":[{"international_student_percentage":7.69,"scholarship_student_percentage":41.26,"preparatory_student_count":42,"average_gpa":2.37,"graduation_rate":61.36,"graduation_cohort_size":44,"average_time_to_graduation":4.4,"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2025-2026","quota":40,"enrolled_student_count":15,"occupancy_rate":37.5,"total_students":143,"active_student_count":54,"newly_enrolled_student_count":10,"graduated_student_count_total":40,"graduated_student_count_in_year":9,"student_body_in_year":77,"dropped_out_student_count":13,"non_renewed_student_count":4,"attrition_rate":16.88,"non_renewal_rate":5.19,"minimum_admission_score":329.0,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":-62.3,"ankara_score_gap":-79.4},{"international_student_percentage":7.06,"scholarship_student_percentage":28.63,"preparatory_student_count":76,"average_gpa":2.36,"graduation_rate":51.85,"graduation_cohort_size":81,"average_time_to_graduation":4.59,"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2025-2026","quota":60,"enrolled_student_count":27,"occupancy_rate":45.0,"total_students":255,"active_student_count":98,"newly_enrolled_student_count":17,"graduated_student_count_total":61,"graduated_student_count_in_year":24,"student_body_in_year":122,"dropped_out_student_count":22,"non_renewed_student_count":11,"attrition_rate":18.03,"non_renewal_rate":9.02,"minimum_admission_score":332.5,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":-58.8,"ankara_score_gap":-75.9},{"international_student_percentage":22.22,"scholarship_student_percentage":59.15,"preparatory_student_count":295,"average_gpa":2.61,"graduation_rate":68.42,"graduation_cohort_size":152,"average_time_to_graduation":4.59,"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2025-2026","quota":100,"enrolled_student_count":71,"occupancy_rate":71.0,"total_students":585,"active_student_count":264,"newly_enrolled_student_count":33,"graduated_student_count_total":148,"graduated_student_count_in_year":59,"student_body_in_year":340,"dropped_out_student_count":45,"non_renewed_student_count":26,"attrition_rate":13.24,"non_renewal_rate":7.65,"minimum_admission_score":385.0,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":-6.3,"ankara_score_gap":-23.4},{"international_student_percentage":7.49,"scholarship_student_percentage":45.22,"preparatory_student_count":142,"average_gpa":2.63,"graduation_rate":66.67,"graduation_cohort_size":105,"average_time_to_graduation":4.43,"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2025-2026","quota":65,"enrolled_student_count":48,"occupancy_rate":73.85,"total_students":387,"active_student_count":189,"newly_enrolled_student_count":34,"graduated_student_count_total":100,"graduated_student_count_in_year":41,"student_body_in_year":216,"dropped_out_student_count":17,"non_renewed_student_count":8,"attrition_rate":7.87,"non_renewal_rate":3.7,"minimum_admission_score":364.0,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":-27.3,"ankara_score_gap":-44.4},{"international_student_percentage":13.33,"scholarship_student_percentage":40.3,"preparatory_student_count":105,"average_gpa":2.81,"graduation_rate":76.54,"graduation_cohort_size":81,"average_time_to_graduation":4.37,"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2025-2026","quota":50,"enrolled_student_count":45,"occupancy_rate":90.0,"total_students":330,"active_student_count":198,"newly_enrolled_student_count":42,"graduated_student_count_total":90,"graduated_student_count_in_year":34,"student_body_in_year":197,"dropped_out_student_count":9,"non_renewed_student_count":6,"attrition_rate":4.57,"non_renewal_rate":3.05,"minimum_admission_score":395.2,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":3.9,"ankara_score_gap":-13.2},{"international_student_percentage":9.48,"scholarship_student_percentage":41.38,"preparatory_student_count":180,"average_gpa":2.84,"graduation_rate":75.23,"graduation_cohort_size":109,"average_time_to_graduation":4.49,"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2025-2026","quota":70,"enrolled_student_count":64,"occupancy_rate":91.43,"total_students":464,"active_student_count":287,"newly_enrolled_student_count":60,"graduated_student_count_total":121,"graduated_student_count_in_year":57,"student_body_in_year":287,"dropped_out_student_count":15,"non_renewed_student_count":7,"attrition_rate":5.23,"non_renewal_rate":2.44,"minimum_admission_score":398.1,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":6.8,"ankara_score_gap":-10.3},{"international_student_percentage":7.88,"scholarship_student_percentage":51.72,"preparatory_student_count":194,"average_gpa":2.96,"graduation_rate":84.62,"graduation_cohort_size":91,"average_time_to_graduation":4.51,"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2025-2026","quota":60,"enrolled_student_count":57,"occupancy_rate":95.0,"total_students":406,"active_student_count":249,"newly_enrolled_student_count":53,"graduated_student_count_total":117,"graduated_student_count_in_year":47,"student_body_in_year":253,"dropped_out_student_count":7,"non_renewed_student_count":8,"attrition_rate":2.77,"non_renewal_rate":3.16,"minimum_admission_score":412.4,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":21.1,"ankara_score_gap":4.0},{"international_student_percentage":17.87,"scholarship_student_percentage":59.93,"preparatory_student_count":298,"average_gpa":3.03,"graduation_rate":86.49,"graduation_cohort_size":111,"average_time_to_graduation":4.6,"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2025-2026","quota":85,"enrolled_student_count":83,"occupancy_rate":97.65,"total_students":554,"active_student_count":370,"newly_enrolled_student_count":81,"graduated_student_count_total":143,"graduated_student_count_in_year":61,"student_body_in_year":357,"dropped_out_student_count":6,"non_renewed_student_count":4,"attrition_rate":1.68,"non_renewal_rate":1.12,"minimum_admission_score":448.2,"national_average_minimum_score":391.3,"ankara_average_minimum_score":408.4,"national_score_gap":56.9,"ankara_score_gap":39.8}],"/api/student-analytics/admission-scores?academic_year=2025-2026":[{"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2025-2026","minimum_admission_score":448.2,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":39.8,"national_score_gap":56.9,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2025-2026","minimum_admission_score":412.4,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":4.0,"national_score_gap":21.1,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2025-2026","minimum_admission_score":398.1,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-10.3,"national_score_gap":6.8,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2025-2026","minimum_admission_score":395.2,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-13.2,"national_score_gap":3.9,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2025-2026","minimum_admission_score":385.0,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-23.4,"national_score_gap":-6.3,"competitive_position":"her iki ortalamanın altında"},{"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2025-2026","minimum_admission_score":364.0,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-44.4,"national_score_gap":-27.3,"competitive_position":"her iki ortalamanın altında"},{"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2025-2026","minimum_admission_score":332.5,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-75.9,"national_score_gap":-58.8,"competitive_position":"her iki ortalamanın altında"},{"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2025-2026","minimum_admission_score":329.0,"ankara_average_minimum_score":408.4,"national_average_minimum_score":391.3,"ankara_score_gap":-79.4,"national_score_gap":-62.3,"competitive_position":"her iki ortalamanın altında"}],"/api/student-analytics/overview?academic_year=2026-2027":{"international_student_percentage":13.03,"scholarship_student_percentage":48.66,"preparatory_student_count":1332,"average_gpa":2.75,"graduation_rate":65.65,"graduation_cohort_size":1249,"average_time_to_graduation":4.51,"academic_year":"2026-2027","program_count":8,"total_students":3124,"active_student_count":1709,"newly_enrolled_student_count":330,"graduated_student_count_total":820,"graduated_student_count_in_year":350,"student_body_in_year":1709,"total_quota":530,"total_enrolled_student_count":356,"overall_occupancy_rate":67.17,"dropped_out_student_count":146,"non_renewed_student_count":70,"attrition_rate":8.54,"non_renewal_rate":4.1},"/api/student-analytics/programs?academic_year=2026-2027":[{"international_student_percentage":7.69,"scholarship_student_percentage":41.26,"preparatory_student_count":42,"average_gpa":2.37,"graduation_rate":55.56,"graduation_cohort_size":72,"average_time_to_graduation":4.4,"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2026-2027","quota":40,"enrolled_student_count":11,"occupancy_rate":27.5,"total_students":143,"active_student_count":54,"newly_enrolled_student_count":10,"graduated_student_count_total":40,"graduated_student_count_in_year":21,"student_body_in_year":54,"dropped_out_student_count":13,"non_renewed_student_count":3,"attrition_rate":24.07,"non_renewal_rate":5.56,"minimum_admission_score":321.3,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":-72.8,"ankara_score_gap":-90.3},{"international_student_percentage":7.06,"scholarship_student_percentage":28.63,"preparatory_student_count":76,"average_gpa":2.36,"graduation_rate":50.0,"graduation_cohort_size":122,"average_time_to_graduation":4.59,"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2026-2027","quota":60,"enrolled_student_count":21,"occupancy_rate":35.0,"total_students":255,"active_student_count":98,"newly_enrolled_student_count":17,"graduated_student_count_total":61,"graduated_student_count_in_year":29,"student_body_in_year":98,"dropped_out_student_count":16,"non_renewed_student_count":10,"attrition_rate":16.33,"non_renewal_rate":10.2,"minimum_admission_score":318.7,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":-75.4,"ankara_score_gap":-92.9},{"international_student_percentage":22.22,"scholarship_student_percentage":59.15,"preparatory_student_count":295,"average_gpa":2.61,"graduation_rate":60.66,"graduation_cohort_size":244,"average_time_to_graduation":4.59,"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2026-2027","quota":100,"enrolled_student_count":38,"occupancy_rate":38.0,"total_students":585,"active_student_count":264,"newly_enrolled_student_count":33,"graduated_student_count_total":148,"graduated_student_count_in_year":64,"student_body_in_year":264,"dropped_out_student_count":50,"non_renewed_student_count":24,"attrition_rate":18.94,"non_renewal_rate":9.09,"minimum_admission_score":344.2,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":-49.9,"ankara_score_gap":-67.4},{"international_student_percentage":7.49,"scholarship_student_percentage":45.22,"preparatory_student_count":142,"average_gpa":2.63,"graduation_rate":58.48,"graduation_cohort_size":171,"average_time_to_graduation":4.43,"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2026-2027","quota":65,"enrolled_student_count":41,"occupancy_rate":63.08,"total_students":387,"active_student_count":189,"newly_enrolled_student_count":34,"graduated_student_count_total":100,"graduated_student_count_in_year":40,"student_body_in_year":189,"dropped_out_student_count":28,"non_renewed_student_count":15,"attrition_rate":14.81,"non_renewal_rate":7.94,"minimum_admission_score":357.1,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":-37.0,"ankara_score_gap":-54.5},{"international_student_percentage":9.48,"scholarship_student_percentage":41.38,"preparatory_student_count":180,"average_gpa":2.84,"graduation_rate":67.22,"graduation_cohort_size":180,"average_time_to_graduation":4.49,"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2026-2027","quota":70,"enrolled_student_count":61,"occupancy_rate":87.14,"total_students":464,"active_student_count":287,"newly_enrolled_student_count":60,"graduated_student_count_total":121,"graduated_student_count_in_year":47,"student_body_in_year":287,"dropped_out_student_count":14,"non_renewed_student_count":5,"attrition_rate":4.88,"non_renewal_rate":1.74,"minimum_admission_score":395.4,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":1.3,"ankara_score_gap":-16.2},{"international_student_percentage":13.33,"scholarship_student_percentage":40.3,"preparatory_student_count":105,"average_gpa":2.81,"graduation_rate":69.77,"graduation_cohort_size":129,"average_time_to_graduation":4.37,"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2026-2027","quota":50,"enrolled_student_count":44,"occupancy_rate":88.0,"total_students":330,"active_student_count":198,"newly_enrolled_student_count":42,"graduated_student_count_total":90,"graduated_student_count_in_year":34,"student_body_in_year":198,"dropped_out_student_count":9,"non_renewed_student_count":3,"attrition_rate":4.55,"non_renewal_rate":1.52,"minimum_admission_score":392.0,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":-2.1,"ankara_score_gap":-19.6},{"international_student_percentage":7.88,"scholarship_student_percentage":51.72,"preparatory_student_count":194,"average_gpa":2.96,"graduation_rate":80.14,"graduation_cohort_size":146,"average_time_to_graduation":4.51,"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2026-2027","quota":60,"enrolled_student_count":56,"occupancy_rate":93.33,"total_students":406,"active_student_count":249,"newly_enrolled_student_count":53,"graduated_student_count_total":117,"graduated_student_count_in_year":51,"student_body_in_year":249,"dropped_out_student_count":9,"non_renewed_student_count":5,"attrition_rate":3.61,"non_renewal_rate":2.01,"minimum_admission_score":409.8,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":15.7,"ankara_score_gap":-1.8},{"international_student_percentage":17.87,"scholarship_student_percentage":59.93,"preparatory_student_count":298,"average_gpa":3.03,"graduation_rate":77.3,"graduation_cohort_size":185,"average_time_to_graduation":4.6,"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2026-2027","quota":85,"enrolled_student_count":84,"occupancy_rate":98.82,"total_students":554,"active_student_count":370,"newly_enrolled_student_count":81,"graduated_student_count_total":143,"graduated_student_count_in_year":64,"student_body_in_year":370,"dropped_out_student_count":7,"non_renewed_student_count":5,"attrition_rate":1.89,"non_renewal_rate":1.35,"minimum_admission_score":452.3,"national_average_minimum_score":394.1,"ankara_average_minimum_score":411.6,"national_score_gap":58.2,"ankara_score_gap":40.7}],"/api/student-analytics/admission-scores?academic_year=2026-2027":[{"program_code":"SWE-BSC","program_name":"Yazılım Mühendisliği","academic_year":"2026-2027","minimum_admission_score":452.3,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":40.7,"national_score_gap":58.2,"competitive_position":"her iki ortalamanın üzerinde"},{"program_code":"IE-BSC","program_name":"Endüstri Mühendisliği","academic_year":"2026-2027","minimum_admission_score":409.8,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-1.8,"national_score_gap":15.7,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"EE-BSC","program_name":"Elektrik-Elektronik Mühendisliği","academic_year":"2026-2027","minimum_admission_score":395.4,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-16.2,"national_score_gap":1.3,"competitive_position":"Türkiye ortalamasının üzerinde, Ankara ortalamasının altında"},{"program_code":"ARCH-BSC","program_name":"Mimarlık","academic_year":"2026-2027","minimum_admission_score":392.0,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-19.6,"national_score_gap":-2.1,"competitive_position":"her iki ortalamanın altında"},{"program_code":"ME-BSC","program_name":"Makine Mühendisliği","academic_year":"2026-2027","minimum_admission_score":357.1,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-54.5,"national_score_gap":-37.0,"competitive_position":"her iki ortalamanın altında"},{"program_code":"CENG-BSC","program_name":"Bilgisayar Mühendisliği","academic_year":"2026-2027","minimum_admission_score":344.2,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-67.4,"national_score_gap":-49.9,"competitive_position":"her iki ortalamanın altında"},{"program_code":"MSE-BSC","program_name":"Malzeme Bilimi ve Mühendisliği","academic_year":"2026-2027","minimum_admission_score":321.3,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-90.3,"national_score_gap":-72.8,"competitive_position":"her iki ortalamanın altında"},{"program_code":"CE-BSC","program_name":"İnşaat Mühendisliği","academic_year":"2026-2027","minimum_admission_score":318.7,"ankara_average_minimum_score":411.6,"national_average_minimum_score":394.1,"ankara_score_gap":-92.9,"national_score_gap":-75.4,"competitive_position":"her iki ortalamanın altında"}]};
+const $ = (id) => document.getElementById(id);
+
+/* ─── Bicimleme (Turkce: binlik nokta, ondalik virgul) ───────────────────── */
+const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (v) => "%" + nf1.format(v ?? 0);
+
+/* Doluluga gore durum. Sekil + etiket anlami tasir; renk yalnizca pekistirir. */
+function occStatus(rate) {
+  if (rate < 50)  return { cls: "crit", glyph: "▲", text: "Kritik" };
+  if (rate < 80)  return { cls: "warn", glyph: "●", text: "İzlemede" };
+  return { cls: "good", glyph: "✓", text: "Sağlıklı" };
+}
+
+/* ─── Tooltip ────────────────────────────────────────────────────────────── */
+const tip = $("tip");
+function showTip(evt, title, rows) {
+  tip.innerHTML = `<div class="t-name">${title}</div>` +
+    rows.map(([k, v]) => `<div class="t-row">${k}: <b>${v}</b></div>`).join("");
+  tip.style.opacity = "1";
+  moveTip(evt);
+}
+function moveTip(evt) {
+  const pad = 14, r = tip.getBoundingClientRect();
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + r.width > innerWidth - 8)  x = evt.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = evt.clientY - r.height - pad;
+  tip.style.left = x + "px";
+  tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.opacity = "0"; };
+
+/* Tooltip deger okumanin TEK yolu degil - ayni degerler bar ucunda ve
+   tablodadir; klavye odagi da ayni bilgiyi acar. */
+function bindTip(el, title, rows) {
+  el.tabIndex = 0;
+  el.addEventListener("mouseenter", (e) => showTip(e, title, rows));
+  el.addEventListener("mousemove", moveTip);
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("focus", (e) => {
+    const r = el.getBoundingClientRect();
+    showTip({ clientX: r.left + r.width / 2, clientY: r.bottom }, title, rows);
+  });
+  el.addEventListener("blur", hideTip);
+}
+
+/* ─── Gosterge kartlari ──────────────────────────────────────────────────── */
+function renderKpis(ov) {
+  const tiles = [
+    ["Toplam öğrenci",        nf0.format(ov.total_students),              `${nf0.format(ov.active_student_count)} aktif · ${nf0.format(ov.newly_enrolled_student_count)} yeni kayıt`],
+    ["Doluluk oranı",         pct(ov.overall_occupancy_rate),             `${nf0.format(ov.total_enrolled_student_count)} / ${nf0.format(ov.total_quota)} kontenjan`],
+    ["Mezuniyet oranı",       pct(ov.graduation_rate),                    `${nf0.format(ov.graduation_cohort_size)} kişilik kohort üzerinden`],
+    ["Ortalama mezuniyet",    nf2.format(ov.average_time_to_graduation) + " yıl", `${nf0.format(ov.graduated_student_count_total)} mezun`],
+    ["Uluslararası öğrenci",  pct(ov.international_student_percentage),    "toplam öğrenciye oranla"],
+    ["Burslu öğrenci",        pct(ov.scholarship_student_percentage),      "en az %1 burs alanlar"],
+    ["Öğrenci kaybı",         pct(ov.attrition_rate),                     `${nf0.format(ov.dropped_out_student_count)} öğrenci bu yıl ayrıldı`],
+    ["Hazırlık öğrencisi",    nf0.format(ov.preparatory_student_count),   "hazırlık okuyan/okumuş"],
+  ];
+  $("kpis").innerHTML = tiles.map(([l, v, n]) => `
+    <div class="kpi">
+      <div class="label">${l}</div>
+      <div class="value">${v}</div>
+      <div class="note">${n}</div>
+    </div>`).join("");
+}
+
+/* ─── Doluluk bar grafigi ────────────────────────────────────────────────── */
+function renderOccupancy(rows) {
+  const box = $("occBars");
+  box.innerHTML = "";
+  // Olcek 0-100: doluluk dogal olarak kontenjana orandir.
+  const max = Math.max(100, ...rows.map(r => r.occupancy_rate));
+
+  rows.forEach(r => {
+    const el = document.createElement("div");
+    el.className = "bar-row";
+    el.innerHTML = `
+      <div class="bar-name">${r.program_code.replace("-BSC", "")}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(r.occupancy_rate / max * 100).toFixed(2)}%"></div></div>
+      <div class="bar-val">${pct(r.occupancy_rate)}</div>`;
+    bindTip(el, r.program_name, [
+      ["Kontenjan", nf0.format(r.quota)],
+      ["Kayıt olan", nf0.format(r.enrolled_student_count)],
+      ["Doluluk", pct(r.occupancy_rate)],
+      ["Öğrenci kaybı", pct(r.attrition_rate)],
+    ]);
+    box.appendChild(el);
+  });
+
+  // Eksen: seyrek, cozgu cizgisi yerine yalnizca taban + tik etiketleri.
+  $("occAxis").innerHTML = [0, 25, 50, 75, 100]
+    .map(t => `<span class="axis-tick" style="left:${t / max * 100}%">%${t}</span>`).join("");
+}
+
+/* ─── Taban puan diverging grafigi ───────────────────────────────────────── */
+function renderScores(rows) {
+  const box = $("scoreBars");
+  box.innerHTML = "";
+  const max = Math.max(...rows.map(r => Math.abs(r.national_score_gap ?? 0)), 10);
+
+  rows.forEach(r => {
+    const gap = r.national_score_gap ?? 0;
+    const w = Math.abs(gap) / max * 50;          // her kol yarim genislik
+    const pos = gap >= 0;
+    const el = document.createElement("div");
+    el.className = "div-row";
+    el.innerHTML = `
+      <div class="bar-name">${r.program_code.replace("-BSC", "")}</div>
+      <div class="div-track">
+        <div class="div-zero"></div>
+        <div class="div-fill ${pos ? "pos" : "neg"}" style="width:${w.toFixed(2)}%"></div>
+      </div>
+      <div class="div-val">${gap >= 0 ? "+" : "−"}${nf1.format(Math.abs(gap))}</div>`;
+    bindTip(el, r.program_name, [
+      ["Taban puan", nf1.format(r.minimum_admission_score ?? 0)],
+      ["Türkiye ort.", nf1.format(r.national_average_minimum_score ?? 0)],
+      ["Ankara ort.", nf1.format(r.ankara_average_minimum_score ?? 0)],
+      ["Konum", r.competitive_position],
+    ]);
+    box.appendChild(el);
+  });
+}
+
+/* ─── Tablo ──────────────────────────────────────────────────────────────── */
+function renderTable(rows) {
+  $("tbody").innerHTML = rows.map(r => {
+    const s = occStatus(r.occupancy_rate);
+    return `<tr>
+      <td>${r.program_name}</td>
+      <td><span class="chip ${s.cls}"><span class="glyph">${s.glyph}</span>${s.text}</span></td>
+      <td>${nf0.format(r.quota)}</td>
+      <td>${nf0.format(r.enrolled_student_count)}</td>
+      <td>${pct(r.occupancy_rate)}</td>
+      <td>${nf0.format(r.total_students)}</td>
+      <td>${pct(r.attrition_rate)}</td>
+      <td>${pct(r.non_renewal_rate)}</td>
+      <td>${pct(r.graduation_rate)}</td>
+      <td>${nf2.format(r.average_time_to_graduation)}</td>
+      <td>${pct(r.international_student_percentage)}</td>
+      <td>${pct(r.scholarship_student_percentage)}</td>
+      <td>${nf0.format(r.preparatory_student_count)}</td>
+      <td>${nf2.format(r.average_gpa)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ─── Veri cekme ─────────────────────────────────────────────────────────── */
+async function get(path) {
+  // Masaustune alinan bagimsiz kopyada veri sayfanin icine gomulur; o kopya
+  // sunucu calismadan da acilir. Canli surumde __EMBEDDED__ tanimsizdir ve
+  // istek normal sekilde API'ye gider.
+  if (window.__EMBEDDED__ && path in window.__EMBEDDED__) return window.__EMBEDDED__[path];
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(path + " → HTTP " + res.status);
+  return res.json();
+}
+
+async function load(year) {
+  const content = $("content");
+  content.classList.add("loading");
+  $("status").textContent = "yükleniyor…";
+  try {
+    const [ov, progs, scores] = await Promise.all([
+      get(`/api/student-analytics/overview?academic_year=${year}`),
+      get(`/api/student-analytics/programs?academic_year=${year}`),
+      get(`/api/student-analytics/admission-scores?academic_year=${year}`),
+    ]);
+    renderKpis(ov);
+    renderOccupancy(progs);
+    renderScores(scores);
+    renderTable(progs);
+    $("msg").hidden = true;
+    content.hidden = false;
+    $("status").textContent = `${progs.length} program · ${nf0.format(ov.total_students)} öğrenci`;
+  } catch (err) {
+    $("status").textContent = "";
+    content.hidden = true;
+    $("msg").hidden = false;
+    $("msg").innerHTML = `Veri alınamadı: ${err.message}<br><br>
+      API çalışıyor mu? <code>python main.py</code> ile başlatıp
+      <code>http://127.0.0.1:8000/panel</code> adresini açın.`;
+  } finally {
+    content.classList.remove("loading");
+  }
+}
+
+/* ─── Tema secimi ────────────────────────────────────────────────────────── */
+const themeBtn = $("theme");
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = mode;
+  themeBtn.textContent = mode === "dark" ? "Açık tema" : "Koyu tema";
+  try { localStorage.setItem("panel-theme", mode); } catch (e) {}
+}
+themeBtn.addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme;
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme((cur ? cur === "dark" : sysDark) ? "light" : "dark");
+});
+// Oncelik: URL (?theme=dark) > kayitli secim > isletim sistemi ayari.
+const urlTheme = new URLSearchParams(location.search).get("theme");
+if (urlTheme === "dark" || urlTheme === "light") {
+  applyTheme(urlTheme);
+} else {
+  try {
+    const saved = localStorage.getItem("panel-theme");
+    if (saved) applyTheme(saved);
+    else themeBtn.textContent = matchMedia("(prefers-color-scheme: dark)").matches ? "Açık tema" : "Koyu tema";
+  } catch (e) {}
+}
+
+/* ─── Baslangic ──────────────────────────────────────────────────────────── */
+(async function init() {
+  try {
+    const years = await get("/api/student-analytics/academic-years");
+    const sel = $("year");
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+    sel.value = years[years.length - 1];          // en guncel yil
+    sel.addEventListener("change", () => load(sel.value));
+    await load(sel.value);
+  } catch (err) {
+    $("msg").innerHTML = `API'ye ulaşılamadı: ${err.message}<br><br>
+      <code>python main.py</code> ile sunucuyu başlatıp
+      <code>http://127.0.0.1:8000/panel</code> adresini açın.`;
+  }
+})();
+</script>
+</body>
+</html>

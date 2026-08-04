@@ -1,0 +1,26 @@
+[
+  {
+    "academic_program_code": "SWE-BSC",
+    "academic_year": "2026-2027",
+    "quota": 85,
+    "enrolled_student_count": 84,
+    "minimum_admission_score": 452.3,
+    "national_average_minimum_score": 394.1,
+    "ankara_average_minimum_score": 411.6,
+    "graduated_student_count": 51,
+    "dropped_out_student_count": 3,
+    "non_renewed_student_count": 2
+  },
+  {
+    "academic_program_code": "CENG-BSC",
+    "academic_year": "2026-2027",
+    "quota": 100,
+    "enrolled_student_count": 38,
+    "minimum_admission_score": 344.2,
+    "national_average_minimum_score": 394.1,
+    "ankara_average_minimum_score": 411.6,
+    "graduated_student_count": 38,
+    "dropped_out_student_count": 20,
+    "non_renewed_student_count": 16
+  }
+]

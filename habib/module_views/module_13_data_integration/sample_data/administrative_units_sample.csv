@@ -1,0 +1,4 @@
+name,code,description,is_active
+Student Affairs Office,STDAFF,Öğrenci işleri,true
+International Office,INTL,Uluslararası ofis,evet
+Career Center,CAREER,Kariyer merkezi,0

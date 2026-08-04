@@ -1,0 +1,11 @@
+# Demo veritabani - kod calistirildiginda otomatik uretilir, depoya girmez.
+demo.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# pytest
+.pytest_cache/

@@ -1,0 +1,55 @@
+"""Veritabanı modellerinin toplandığı paket."""
+
+# Modelleri burada import etmemizin iki sebebi var:
+# 1) Base.metadata tabloları tanısın ve create_all ile oluşturabilsin.
+# 2) Diğer dosyalarda "from app.models import Faculty" şeklinde kısa kullanım sağlansın.
+from app.models.academic_program import AcademicProgram
+from app.models.administrative_unit import AdministrativeUnit
+from app.models.benchmark_institution import BenchmarkInstitution
+from app.models.benchmark_metric_value import BenchmarkMetricValue
+from app.models.comparable_university_program import ComparableUniversityProgram
+from app.models.department import Department
+from app.models.dimension_assessment import DimensionAssessment
+from app.models.evaluation_dimension import EvaluationDimension
+from app.models.evaluation_framework import EvaluationFramework
+from app.models.evaluation_indicator import EvaluationIndicator
+from app.models.faculty import Faculty
+from app.models.framework_assessment import FrameworkAssessment
+from app.models.import_job import ImportJob
+from app.models.institutional_metric_value import InstitutionalMetricValue
+from app.models.program_enrollment_snapshot import ProgramEnrollmentSnapshot
+from app.models.scenario import Scenario
+from app.models.scenario_baseline import ScenarioBaseline
+from app.models.scenario_input import ScenarioInput
+from app.models.scenario_result import ScenarioResult
+from app.models.student import Student
+from app.models.student_academic_record import StudentAcademicRecord
+
+__all__ = [
+    # Modül 1 - Üniversite yapısı
+    "Faculty",
+    "Department",
+    "AcademicProgram",
+    "AdministrativeUnit",
+    # Modül 13 - Veri entegrasyonu
+    "ImportJob",
+    # Modül 9 - Senaryo analizi
+    "ScenarioBaseline",
+    "Scenario",
+    "ScenarioInput",
+    "ScenarioResult",
+    # Modül 2 - Öğrenci analitiği
+    "Student",
+    "StudentAcademicRecord",
+    "ProgramEnrollmentSnapshot",
+    "ComparableUniversityProgram",
+    # Modül 10 - THE / QS / YÖK değerlendirme ve izleme
+    "EvaluationFramework",
+    "EvaluationDimension",
+    "EvaluationIndicator",
+    "InstitutionalMetricValue",
+    "FrameworkAssessment",
+    "DimensionAssessment",
+    "BenchmarkInstitution",
+    "BenchmarkMetricValue",
+]

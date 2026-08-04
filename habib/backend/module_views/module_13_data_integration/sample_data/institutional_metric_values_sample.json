@@ -1,0 +1,35 @@
+[
+  {
+    "indicator_code": "the-research-reputation",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 45.5,
+    "numerator": "",
+    "denominator": "",
+    "data_status": "estimated",
+    "source_reference": "Akademik itibar anketi 2026",
+    "notes": "Pilot anket sonucu"
+  },
+  {
+    "indicator_code": "qs-sustainability-score",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 52,
+    "numerator": "",
+    "denominator": "",
+    "data_status": "available",
+    "source_reference": "Surdurulebilirlik Ofisi raporu",
+    "notes": ""
+  },
+  {
+    "indicator_code": "yok-waste-recycling-ratio",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": "",
+    "numerator": 34,
+    "denominator": 100,
+    "data_status": "available",
+    "source_reference": "SKS Daire Baskanligi",
+    "notes": ""
+  }
+]

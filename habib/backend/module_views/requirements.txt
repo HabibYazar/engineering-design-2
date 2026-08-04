@@ -1,0 +1,24 @@
+# module_views bagimsiz demo bagimliliklari
+#
+# Bu liste yalnizca demoda GERCEKTEN import edilen paketleri icerir.
+# Kaynaklari:
+#   fastapi          -> main.py, module_01/routers/*, module_13/routers/data_integration.py
+#   uvicorn          -> main.py (python main.py) ve "uvicorn main:app --reload"
+#   sqlalchemy       -> main.py, module_01/models/*, module_13/models/import_job.py,
+#                       module_01/services/crud_helpers.py,
+#                       module_13/services/import_validators.py, import_service.py
+#   pydantic         -> module_01/schemas/*, module_13/schemas/data_integration.py
+#   python-multipart -> FastAPI UploadFile (multipart/form-data dosya yukleme)
+#   pandas           -> module_13/services/file_parser.py (CSV ve Excel okuma)
+#   openpyxl         -> pandas.read_excel icin .xlsx motoru
+#
+# NOT: Ana backend'in pydantic-settings bagimliligi burada YOKTUR; bagimsiz demo
+# app.core.config kullanmaz, ayarlar main.py icinde tanimlidir.
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+python-multipart
+pandas
+openpyxl

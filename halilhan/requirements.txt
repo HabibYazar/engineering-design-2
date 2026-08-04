@@ -1,0 +1,6 @@
+# Parts 6, 8, 12 — no dependencies.
+#
+# The finance/ and kpi/ backends are built on the Python standard library only
+# (http.server, json, pathlib, threading), and frontend/ is a static page —
+# so there is nothing to install. `pip install -r requirements.txt` is a no-op
+# by design: any Python 3 installation can run these demos as-is.

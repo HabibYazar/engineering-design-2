@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Kontrol Paneli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101b2d;
+    --parchment: #f6f2e6;
+    --panel: #fffdf9;
+    --gold: #a8823f;
+    --gold-soft: #e8d9b8;
+    --teal: #2f5d62;
+    --rust: #b4442e;
+    --text: #1c2530;
+    --text-mute: #5b6472;
+    --line: #ddd3bd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--parchment);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: var(--ink);
+    color: var(--parchment);
+    padding: 28px 5vw 24px;
+  }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(24px, 3.4vw, 34px);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .status-strip {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: #c9d1de;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #6b7484;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.online { background: #5fbf83; box-shadow: 0 0 0 3px rgba(95,191,131,0.22); }
+  .dot.offline { background: var(--rust); box-shadow: 0 0 0 3px rgba(180,68,46,0.22); }
+
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 5vw 80px;
+  }
+
+  .module {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .module-head {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .module-head h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0;
+  }
+  .module-body {
+    padding: 20px 24px 24px;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  input {
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--parchment);
+    color: var(--text);
+    min-width: 160px;
+  }
+  input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  button {
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 9px 16px;
+    border: none;
+    border-radius: 6px;
+    background: var(--ink);
+    color: var(--parchment);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: #26375a; }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  button.secondary:hover { background: var(--gold-soft); border-color: var(--gold); }
+
+  .output {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    background: var(--ink);
+    color: #cfe3d4;
+    padding: 14px 16px;
+    border-radius: 7px;
+    min-height: 42px;
+    max-height: 260px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .output.empty { color: #6b7484; }
+  .output.error { color: #e29282; }
+
+  table.result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+  }
+  .result-table thead th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+    padding: 8px 12px;
+    border-bottom: 2px solid rgba(232,217,184,0.25);
+  }
+  .result-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #d9e2ea;
+  }
+  .result-table tbody tr:hover { background: rgba(232,217,184,0.06); }
+  .result-table tbody tr:last-child td { border-bottom: none; }
+
+  footer {
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-mute);
+    padding-bottom: 40px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Strategic University Management &amp; Decision Support</p>
+  <h1>Sistem Kontrol Paneli — Demo</h1>
+  <div class="status-strip">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Backend durumu kontrol ediliyor…</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="module">
+    <div class="module-head">
+      <h2>Akademik Personel</h2>
+    </div>
+    <div class="module-body">
+      <div class="controls">
+        <button onclick="callApi('GET', '/staff', 'out-04')">Personel listesi</button>
+        <button onclick="callApi('GET', '/ranking', 'out-04')">Performans skoru</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/department', 'out-04')">Bölüme göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/faculty', 'out-04')">Fakülteye göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/compare/title', 'out-04')">Unvana göre karşılaştır</button>
+        <button class="secondary" onclick="callApi('GET', '/staff/trend', 'out-04')">Yıllık trend</button>
+      </div>
+      <div class="output empty" id="out-04">İstek bekleniyor…</div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-head">
+      <h2>Fiziksel Kaynaklar</h2>
+    </div>
+    <div class="module-body">
+      <div class="controls">
+        <button onclick="callApi('GET', '/facilities', 'out-05')">Tüm tesisler</button>
+        <button onclick="callApi('GET', '/capacity', 'out-05')">Doluluk oranları</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/by-type', 'out-05')">Türe göre kullanım</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/by-department', 'out-05')">Birime göre dağılım</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/per-person', 'out-05')">Kişi başına alan</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/underutilized', 'out-05')">Az kullanılanlar</button>
+        <button class="secondary" onclick="callApi('GET', '/capacity/overcrowded', 'out-05')">Aşırı dolu olanlar</button>
+      </div>
+      <div class="controls">
+        <input id="growthInput" type="number" placeholder="Büyüme %" value="15" style="max-width: 100px;">
+        <button class="secondary" onclick="forecastCapacity()">Kapasite tahmini yap</button>
+      </div>
+      <div class="output empty" id="out-05">İstek bekleniyor…</div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-head">
+      <h2>Kullanıcı ve Yetkilendirme</h2>
+    </div>
+    <div class="module-body">
+      <div class="controls">
+        <input id="loginUser" placeholder="Kullanıcı adı" value="admin">
+        <input id="loginPass" type="password" placeholder="Şifre" value="1234">
+        <button onclick="login()">Giriş yap</button>
+        <button class="secondary" onclick="checkSession()">Oturumu kontrol et</button>
+        <button class="secondary" onclick="logoutUser()">Çıkış yap</button>
+      </div>
+      <div class="controls">
+        <button class="secondary" onclick="callApi('GET', '/users', 'out-14')">Kullanıcılar</button>
+        <button class="secondary" onclick="callApi('GET', '/health', 'out-14')">Sistem durumu</button>
+      </div>
+      <div class="controls">
+        <input id="newUser" placeholder="Yeni kullanıcı adı">
+        <input id="newPass" placeholder="Şifre">
+        <input id="newRole" placeholder="Rol (örn. Öğretim Üyesi)">
+        <input id="newDept" placeholder="Bölüm (opsiyonel)">
+        <button class="secondary" onclick="createUser()">Kullanıcı ekle</button>
+      </div>
+      <div class="output empty" id="out-14">Oturum yok — giriş yapılmadı</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>engineering-design-2 · staff-ranking-module · localhost:8000</footer>
+
+<script>
+const BASE_URL = "http://127.0.0.1:8000";
+
+function buildTable(rows) {
+  const columns = Object.keys(rows[0]);
+  const thead = `<thead><tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(row =>
+    `<tr>${columns.map(c => `<td>${row[c] ?? "—"}</td>`).join("")}</tr>`
+  ).join("")}</tbody>`;
+  return `<table class="result-table">${thead}${tbody}</table>`;
+}
+
+function renderOutput(elId, data, isError) {
+  const el = document.getElementById(elId);
+  el.classList.remove("empty", "error");
+
+  if (isError) {
+    el.classList.add("error");
+    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    return;
+  }
+
+  // Liste halinde ve nesne içeriyorsa tablo çiz, değilse ham JSON göster
+  if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object") {
+    el.innerHTML = buildTable(data);
+  } else {
+    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  }
+}
+
+async function callApi(method, path, elId) {
+  const el = document.getElementById(elId);
+  el.classList.remove("empty", "error");
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, { method });
+    const data = await res.json();
+    renderOutput(elId, data, !res.ok);
+  } catch (err) {
+    renderOutput(elId, `Bağlantı hatası: ${err.message}\n\nSunucu çalışıyor mu? (uvicorn main:app --reload)`, true);
+  }
+}
+
+let currentToken = null;
+
+async function login() {
+  const username = document.getElementById("loginUser").value;
+  const password = document.getElementById("loginPass").value;
+  const el = document.getElementById("out-14");
+  el.classList.remove("empty", "error");
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.token) currentToken = data.token;
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function checkSession() {
+  const el = document.getElementById("out-14");
+  if (!currentToken) {
+    renderOutput("out-14", "Önce giriş yapmalısın — henüz aktif bir token yok.", true);
+    return;
+  }
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: currentToken })
+    });
+    const data = await res.json();
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function logoutUser() {
+  const el = document.getElementById("out-14");
+  if (!currentToken) {
+    renderOutput("out-14", "Önce giriş yapmalısın — çıkılacak bir oturum yok.", true);
+    return;
+  }
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: currentToken })
+    });
+    const data = await res.json();
+    currentToken = null;
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function createUser() {
+  const username = document.getElementById("newUser").value;
+  const password = document.getElementById("newPass").value;
+  const role = document.getElementById("newRole").value;
+  const department = document.getElementById("newDept").value || null;
+  const el = document.getElementById("out-14");
+  el.classList.remove("empty", "error");
+  el.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch(`${BASE_URL}/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, role, department })
+    });
+    const data = await res.json();
+    renderOutput("out-14", data, !res.ok);
+  } catch (err) {
+    renderOutput("out-14", `Bağlantı hatası: ${err.message}`, true);
+  }
+}
+
+async function forecastCapacity() {
+  const growth = document.getElementById("growthInput").value;
+  await callApi("GET", `/capacity/forecast?growth_percent=${growth}`, "out-05");
+}
+
+async function checkStatus() {
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  try {
+    const res = await fetch(`${BASE_URL}/health`);
+    if (res.ok) {
+      dot.className = "dot online";
+      text.textContent = `Backend çalışıyor — ${new Date().toLocaleTimeString("tr-TR")} itibarıyla`;
+    } else {
+      throw new Error("Sunucu hata döndürdü");
+    }
+  } catch (err) {
+    dot.className = "dot offline";
+    text.textContent = "Backend'e ulaşılamıyor — sunucu çalışıyor mu?";
+  }
+}
+
+checkStatus();
+</script>
+
+</body>
+</html>

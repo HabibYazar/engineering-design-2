@@ -1,0 +1,3 @@
+name,country,city,institution_type,is_competitor,notes,is_active
+Demo Karadeniz Universitesi,Türkiye,Trabzon,similar,hayir,DEMO VERI: Kurgusal ornek kurumdur.,evet
+Demo Akdeniz Arastirma Universitesi,Türkiye,Antalya,competitor,evet,DEMO VERI: Kurgusal ornek rakip kurumdur.,evet

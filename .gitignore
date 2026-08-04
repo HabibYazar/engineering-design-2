@@ -1,0 +1,16 @@
+# Sanal ortamlar
+.venv/
+venv/
+env/
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Veritabani (demo, seed ile yeniden uretilir)
+*.db
+*.db-journal
+# Ortam degiskenleri (ornek dosya .env.example izlenir)
+.env
+# Editor
+.vscode/
+.idea/

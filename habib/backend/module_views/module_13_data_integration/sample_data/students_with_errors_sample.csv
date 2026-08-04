@@ -1,0 +1,7 @@
+student_number,first_name,last_name,enrollment_year,academic_program_code,current_gpa,current_status
+S9001,Gecerli,Satir,2026,SWE-BSC,3.0,active
+,Numara,Yok,2026,SWE-BSC,,
+S9002,Gecersiz,Program,2026,YOKBOYLE,,
+S9003,Yuksek,Gpa,2026,SWE-BSC,6.5,
+S9004,Gecersiz,Durum,2026,SWE-BSC,,mezun
+S9001,Dosya Ici,Tekrar,2026,SWE-BSC,,

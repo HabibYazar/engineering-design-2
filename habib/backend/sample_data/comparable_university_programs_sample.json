@@ -1,0 +1,35 @@
+[
+  {
+    "university_name": "Boğaziçi Üniversitesi",
+    "program_name": "Computer Engineering",
+    "city": "İstanbul",
+    "academic_year": "2026-2027",
+    "quota": 120,
+    "enrolled_student_count": 120,
+    "occupancy_rate": 100.0,
+    "minimum_admission_score": 512.8,
+    "is_competitor": "evet"
+  },
+  {
+    "university_name": "İTÜ",
+    "program_name": "Computer Engineering",
+    "city": "İstanbul",
+    "academic_year": "2026-2027",
+    "quota": 140,
+    "enrolled_student_count": 138,
+    "occupancy_rate": 98.57,
+    "minimum_admission_score": 495.6,
+    "is_competitor": "evet"
+  },
+  {
+    "university_name": "Eskişehir Teknik Üniversitesi",
+    "program_name": "Software Engineering",
+    "city": "Eskişehir",
+    "academic_year": "2026-2027",
+    "quota": 70,
+    "enrolled_student_count": 48,
+    "occupancy_rate": 68.57,
+    "minimum_admission_score": 372.9,
+    "is_competitor": "hayir"
+  }
+]

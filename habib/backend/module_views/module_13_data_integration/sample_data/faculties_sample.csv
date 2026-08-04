@@ -1,0 +1,6 @@
+name,code,description,is_active
+Faculty of Medicine,MED,Tıp fakültesi,true
+Faculty of Law,LAW,Hukuk fakültesi,1
+Faculty of Education,EDU,Eğitim fakültesi,evet
+Faculty of Fine Arts, arts ,Güzel sanatlar fakültesi,yes
+Faculty of Economics,ECON,İktisat fakültesi,hayir

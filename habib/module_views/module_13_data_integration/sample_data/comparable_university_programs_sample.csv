@@ -1,0 +1,4 @@
+university_name,program_name,city,academic_year,quota,enrolled_student_count,occupancy_rate,minimum_admission_score,is_competitor
+Boğaziçi Üniversitesi,Computer Engineering,İstanbul,2026-2027,120,120,100.0,512.8,evet
+İTÜ,Computer Engineering,İstanbul,2026-2027,140,138,98.57,495.6,evet
+Eskişehir Teknik Üniversitesi,Software Engineering,Eskişehir,2026-2027,70,48,68.57,372.9,hayir

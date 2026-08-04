@@ -1,0 +1,7 @@
+# Python bytecode — regenerated on every run, and embeds local file paths
+__pycache__/
+*.pyc
+
+# Runtime databases — auto-created from the seed files on first start
+finance/backend/data.json
+kpi/backend/kpis.json

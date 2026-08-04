@@ -1,0 +1,158 @@
+{
+  "_aciklama": "PDF Bolum 11'de sayilan erken uyari kosullarinin tamami burada tanimlidir. implemented=true olanlar Modul 3 ve Modul 7 verisiyle calisir; implemented=false olanlar baska modullerin verisini bekler ve /pending-rules ucunda raporlanir. Yeni kural eklemek icin bu dosyaya kayit eklemek yeterlidir.",
+  "severity_order": ["kritik", "yuksek", "orta", "dusuk"],
+  "rules": [
+    {
+      "key": "program_occupancy_low",
+      "name": "Program doluluk orani kritik esigin altinda",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot",
+      "thresholds": { "kritik": 50, "yuksek": 65, "orta": 80 },
+      "recommended_action": "Kontenjan yeniden degerlendirilmeli; tanitim ve tercih danismanligi guclendirilmeli."
+    },
+    {
+      
+      "key": "attrition_rate_increase",
+      "name": "Ogrenci kaybi (terk) orani artiyor",
+      "pdf_condition": "Student attrition rates increase",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot (yil karsilastirmasi)",
+      "thresholds": { "min_rate": 3.0, "kritik": 60, "yuksek": 40, "orta": 20 },
+      "recommended_action": "Akademik danismanlik ve ogrenci destek mekanizmalari devreye alinmali; terk nedenleri anket ile incelenmeli."
+    },
+    {
+      "key": "non_renewal_rate_increase",
+      "name": "Kayit yenilememe orani artiyor",
+      "pdf_condition": "Student attrition rates increase (kayit yenilememe bileseni)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot (yil karsilastirmasi)",
+      "thresholds": { "min_rate": 2.0, "kritik": 60, "yuksek": 40, "orta": 20 },
+      "recommended_action": "Kayit yenilemeyen ogrencilerle iletisime gecilmeli; burs ve odeme kolayligi secenekleri gozden gecirilmeli."
+    },
+    {
+      "key": "academic_performance_decline",
+      "name": "Akademik performans gostergeleri dusuyor",
+      "pdf_condition": "Academic performance indicators decline",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - StudentAcademicRecord (GNO trendi)",
+      "thresholds": { "kritik": -0.25, "yuksek": -0.18, "orta": -0.10 },
+      "recommended_action": "Ders basari analizleri yapilmali; problem sinifi olan derslere ek calisma/PS saati planlanmali."
+    },
+    {
+      "key": "admission_score_below_national",
+      "name": "Taban puan Turkiye ortalamasinin altinda",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (oncu gosterge - taban puan ulusal ortalamanin altinda)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - taban puan analizi",
+      "thresholds": { "kritik": -50, "yuksek": -25, "orta": 0 },
+      "recommended_action": "Programin tercih edilebilirligi incelenmeli; mufredat ve tanitim stratejisi guncellenmeli."
+    },
+    {
+      "key": "demand_sharp_decline",
+      "name": "Ogrenci talebi keskin dususte",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (trend bileseni)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - doluluk trendi",
+      "thresholds": { "kritik": -30, "yuksek": -20, "orta": -10 },
+      "recommended_action": "Talep dususunun nedeni analiz edilmeli; program konumlandirmasi yeniden ele alinmali."
+    },
+    {
+      "key": "sustainability_score_low",
+      "name": "Program surdurulebilirlik puani dusuk",
+      "pdf_condition": "Turetilmis bilesik gosterge - PDF'in tek bir maddesine karsilik gelmez; Modul 7'nin hesaplanan 3 kriterini (talep, doluluk, mezuniyet orani) tek puanda birlestirir",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 7 - surdurulebilirlik puani",
+      "thresholds": { "kritik": 40, "yuksek": 50, "orta": 60 },
+      "recommended_action": "Program Modul 7 kategorisine gore ele alinmali; yeniden yapilandirma veya birlestirme secenekleri degerlendirilmeli."
+    },
+    {
+      "key": "university_occupancy_low",
+      "name": "Universite geneli doluluk orani dusuk",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (kurum duzeyi)",
+      "scope": "university",
+      "implemented": true,
+      "data_source": "Modul 3 - konsolide doluluk",
+      "thresholds": { "kritik": 60, "yuksek": 70, "orta": 80 },
+      "recommended_action": "Kurumsal tanitim stratejisi ve kontenjan planlamasi ust yonetim duzeyinde ele alinmali."
+    },
+
+    {
+      "key": "budget_deficit",
+      "name": "Butce acigi olustu",
+      "pdf_condition": "A budget deficit emerges",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Gelir-gider dengesi incelenmeli."
+    },
+    {
+      "key": "unit_budget_overrun",
+      "name": "Birim harcamalari tahsis edilen butceyi asti",
+      "pdf_condition": "Expenditures of an organizational unit exceed its allocated budget",
+      "scope": "unit",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Birim butce gerceklesme orani incelenmeli."
+    },
+    {
+      "key": "additional_staff_need",
+      "name": "Ek akademik personel ihtiyaci artti",
+      "pdf_condition": "The need for additional academic staff increases",
+      "scope": "program",
+      "implemented": false,
+      "data_source": "Modul 4 - Akademik Kadro Analitigi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Ogrenci/ogretim uyesi orani incelenmeli."
+    },
+    {
+      "key": "capacity_insufficient",
+      "name": "Derslik veya laboratuvar kapasitesi yetersiz",
+      "pdf_condition": "Classroom or laboratory capacity becomes insufficient",
+      "scope": "unit",
+      "implemented": false,
+      "data_source": "Modul 5 - Fiziksel Kaynak ve Kapasite Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Kapasite kullanim oranlari incelenmeli."
+    },
+    {
+      "key": "strategic_objective_delay",
+      "name": "Stratejik hedefler gecikmede",
+      "pdf_condition": "Strategic objectives are delayed",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 8 - Stratejik Plan ve Hedef Izleme (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Hedef gerceklesme oranlari incelenmeli."
+    },
+    {
+      "key": "accreditation_expiry",
+      "name": "Akreditasyon yenileme tarihi yaklasiyor",
+      "pdf_condition": "Accreditation renewal or expiration dates are approaching",
+      "scope": "program",
+      "implemented": false,
+      "data_source": "Kalite guvence / akreditasyon takibi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Akreditasyon dosyasi hazirligi baslatilmali."
+    },
+    {
+      "key": "revenue_decline",
+      "name": "Arastirma veya ogrenci gelirleri azaliyor",
+      "pdf_condition": "Research revenues or student-related revenues decrease",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Gelir kalemleri yil bazinda karsilastirilmali."
+    }
+  ]
+}

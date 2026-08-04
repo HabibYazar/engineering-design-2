@@ -1,0 +1,53 @@
+[
+  {
+    "student_number": "S2026001",
+    "first_name": "Elif",
+    "last_name": "Yıldız",
+    "gender": "female",
+    "nationality": "Türkiye",
+    "is_international": "hayir",
+    "scholarship_rate_percent": 50,
+    "enrollment_year": 2026,
+    "current_status": "newly-enrolled",
+    "preparatory_school": "evet",
+    "academic_program_code": "SWE-BSC",
+    "current_gpa": "",
+    "expected_graduation_year": 2030,
+    "actual_graduation_year": "",
+    "is_active": "true"
+  },
+  {
+    "student_number": "S2026002",
+    "first_name": "Omar",
+    "last_name": "Hassan",
+    "gender": "male",
+    "nationality": "Irak",
+    "is_international": "evet",
+    "scholarship_rate_percent": 100,
+    "enrollment_year": 2026,
+    "current_status": "newly-enrolled",
+    "preparatory_school": "evet",
+    "academic_program_code": "CENG-BSC",
+    "current_gpa": "",
+    "expected_graduation_year": 2030,
+    "actual_graduation_year": "",
+    "is_active": "1"
+  },
+  {
+    "student_number": "S2022050",
+    "first_name": "Burak",
+    "last_name": "Demir",
+    "gender": "male",
+    "nationality": "Türkiye",
+    "is_international": "0",
+    "scholarship_rate_percent": 0,
+    "enrollment_year": 2022,
+    "current_status": "graduated",
+    "preparatory_school": "hayir",
+    "academic_program_code": "SWE-BSC",
+    "current_gpa": 3.42,
+    "expected_graduation_year": 2026,
+    "actual_graduation_year": 2026,
+    "is_active": "yes"
+  }
+]

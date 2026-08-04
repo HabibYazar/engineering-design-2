@@ -1,0 +1,4 @@
+faculty_code,name,code,description,is_active
+FEA,Electrical Engineering,EE,Elektrik-elektronik,true
+FEA,Industrial Engineering,IE,Endüstri mühendisliği,1
+MED,Basic Medical Sciences,BMS,Temel tıp bilimleri,evet
