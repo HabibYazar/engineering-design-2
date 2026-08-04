@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Demo Karadeniz Universitesi",
+    "country": "Türkiye",
+    "city": "Trabzon",
+    "institution_type": "similar",
+    "is_competitor": "hayir",
+    "notes": "DEMO VERI: Kurgusal ornek kurumdur.",
+    "is_active": "evet"
+  },
+  {
+    "name": "Demo Akdeniz Arastirma Universitesi",
+    "country": "Türkiye",
+    "city": "Antalya",
+    "institution_type": "competitor",
+    "is_competitor": "evet",
+    "notes": "DEMO VERI: Kurgusal ornek rakip kurumdur.",
+    "is_active": "evet"
+  }
+]

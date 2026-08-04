@@ -1,0 +1,4 @@
+student_number,first_name,last_name,gender,nationality,is_international,scholarship_rate_percent,enrollment_year,current_status,preparatory_school,academic_program_code,current_gpa,expected_graduation_year,actual_graduation_year,is_active
+S2026001,Elif,Yıldız,female,Türkiye,hayir,50,2026,newly-enrolled,evet,SWE-BSC,,2030,,true
+S2026002,Omar,Hassan,male,Irak,evet,100,2026,newly-enrolled,evet,CENG-BSC,,2030,,1
+S2022050,Burak,Demir,male,Türkiye,0,0,2022,graduated,hayir,SWE-BSC,3.42,2026,2026,yes

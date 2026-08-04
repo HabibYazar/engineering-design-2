@@ -1,0 +1,68 @@
+{
+  "years": {
+    "2024–25": {
+      "students": 2560,
+      "graduates": 495,
+      "revenue": {
+        "Tuition fees": 431,
+        "Research project revenues": 48,
+        "Continuing education programs": 15,
+        "Industry collaboration": 21,
+        "Donations": 5,
+        "Sponsorships": 7,
+        "Other operational": 12
+      },
+      "expenditure": {
+        "Academic staff salaries": 196,
+        "Administrative staff salaries": 61,
+        "Educational expenses": 47,
+        "R&D expenditures": 38,
+        "Scholarship expenditures": 76,
+        "Maintenance & energy": 44,
+        "Technology & laboratory": 31,
+        "Central administrative": 28,
+        "Capital investment": 26
+      },
+      "departments": [
+        { "name": "Computer Engineering", "students": 585, "revenue": 128, "expenditure": 116, "budget": 110 },
+        { "name": "Electrical-Electronics Eng.", "students": 462, "revenue": 97, "expenditure": 95, "budget": 96 },
+        { "name": "Mechanical Engineering", "students": 402, "revenue": 81, "expenditure": 89, "budget": 84 },
+        { "name": "Civil Engineering", "students": 348, "revenue": 66, "expenditure": 82, "budget": 74 },
+        { "name": "Industrial Engineering", "students": 371, "revenue": 79, "expenditure": 76, "budget": 78 },
+        { "name": "Architecture", "students": 392, "revenue": 88, "expenditure": 89, "budget": 86 }
+      ]
+    },
+    "2025–26": {
+      "students": 2700,
+      "graduates": 540,
+      "revenue": {
+        "Tuition fees": 486,
+        "Research project revenues": 62,
+        "Continuing education programs": 18,
+        "Industry collaboration": 27,
+        "Donations": 6,
+        "Sponsorships": 9,
+        "Other operational": 14
+      },
+      "expenditure": {
+        "Academic staff salaries": 214,
+        "Administrative staff salaries": 68,
+        "Educational expenses": 52,
+        "R&D expenditures": 44,
+        "Scholarship expenditures": 88,
+        "Maintenance & energy": 47,
+        "Technology & laboratory": 36,
+        "Central administrative": 31,
+        "Capital investment": 21
+      },
+      "departments": [
+        { "name": "Computer Engineering", "students": 620, "revenue": 152, "expenditure": 128, "budget": 125 },
+        { "name": "Electrical-Electronics Eng.", "students": 480, "revenue": 112, "expenditure": 104, "budget": 108 },
+        { "name": "Mechanical Engineering", "students": 410, "revenue": 92, "expenditure": 96, "budget": 90 },
+        { "name": "Civil Engineering", "students": 350, "revenue": 74, "expenditure": 88, "budget": 78 },
+        { "name": "Industrial Engineering", "students": 390, "revenue": 90, "expenditure": 82, "budget": 84 },
+        { "name": "Architecture", "students": 450, "revenue": 102, "expenditure": 103, "budget": 100 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,34 @@
+[
+  {
+    "benchmark_institution_name": "Demo Karadeniz Universitesi",
+    "indicator_code": "the-citation-impact",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 2.85,
+    "source_reference": "DEMO VERI"
+  },
+  {
+    "benchmark_institution_name": "Demo Karadeniz Universitesi",
+    "indicator_code": "the-publications-per-staff",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 1.95,
+    "source_reference": "DEMO VERI"
+  },
+  {
+    "benchmark_institution_name": "Demo Akdeniz Arastirma Universitesi",
+    "indicator_code": "the-citation-impact",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 5.4,
+    "source_reference": "DEMO VERI"
+  },
+  {
+    "benchmark_institution_name": "Demo Akdeniz Arastirma Universitesi",
+    "indicator_code": "the-publications-per-staff",
+    "academic_year": "2025-2026",
+    "period": "annual",
+    "value": 3.7,
+    "source_reference": "DEMO VERI"
+  }
+]

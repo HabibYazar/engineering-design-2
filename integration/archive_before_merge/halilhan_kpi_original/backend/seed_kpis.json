@@ -1,0 +1,80 @@
+{
+  "faculties": ["Engineering & Arch.", "Econ. & Admin. Sci.", "Arts & Sciences", "Health Sciences"],
+  "kpis": [
+    {
+      "id": 1, "dim": "Education & Teaching Quality", "name": "Course evaluation survey score (/5)", "unit": "",
+      "cur": 4.1, "target": 4.3, "prev": 4.0, "avg": 3.9, "faculties": [4.2, 4.0, 3.8, 4.1],
+      "action": "Maintain current teaching support programs."
+    },
+    {
+      "id": 2, "dim": "Education & Teaching Quality", "name": "Graduation rate (%)", "unit": "%",
+      "cur": 78, "target": 85, "prev": 74, "avg": 76, "faculties": [81, 79, 72, 83],
+      "thresholds": { "on": 95, "risk": 75 },
+      "action": "Expand academic advising for at-risk students in years 1–2."
+    },
+    {
+      "id": 3, "dim": "Research & Development", "name": "Indexed publications per faculty member", "unit": "",
+      "cur": 1.9, "target": 2.5, "prev": 1.7, "avg": 1.6, "faculties": [2.4, 1.5, 1.8, 2.1],
+      "action": "Increase publication incentives; monitor quarterly."
+    },
+    {
+      "id": 4, "dim": "Research & Development", "name": "External research funding (₺M)", "unit": "₺M",
+      "cur": 62, "target": 80, "prev": 48, "avg": 54, "faculties": [28, 9, 12, 13],
+      "action": "Target 6 new TÜBİTAK / EU project applications this cycle."
+    },
+    {
+      "id": 5, "dim": "Financial Sustainability", "name": "Budget realization rate (%)", "unit": "%",
+      "cur": 96, "target": 100, "prev": 91, "avg": 94, "faculties": [97, 99, 89, 98],
+      "action": "No action required; review again at mid-year."
+    },
+    {
+      "id": 6, "dim": "Financial Sustainability", "name": "Research income share of revenue (%)", "unit": "%",
+      "cur": 10, "target": 15, "prev": 8.9, "avg": 9.2, "faculties": [12.4, 5.1, 8.8, 10.3],
+      "thresholds": { "on": 80, "risk": 60 },
+      "action": "Grow industry-funded projects; see the Part 6 financial analysis."
+    },
+    {
+      "id": 7, "dim": "Human Resources", "name": "Faculty positions filled (%)", "unit": "%",
+      "cur": 91, "target": 95, "prev": 88, "avg": 90, "faculties": [93, 92, 87, 92],
+      "action": "Continue ongoing recruitment rounds."
+    },
+    {
+      "id": 8, "dim": "Internationalization", "name": "International student ratio (%)", "unit": "%",
+      "cur": 6.8, "target": 10, "prev": 6.1, "avg": 6.5, "faculties": [7.9, 6.2, 5.4, 7.6],
+      "action": "Launch targeted recruitment in 3 priority countries; add English-taught sections."
+    },
+    {
+      "id": 9, "dim": "Internationalization", "name": "Active international partnerships", "unit": "",
+      "cur": 34, "target": 40, "prev": 29, "avg": 31, "faculties": [14, 7, 6, 7],
+      "thresholds": { "on": 85, "risk": 65 },
+      "action": "6 agreements in negotiation; on schedule."
+    },
+    {
+      "id": 10, "dim": "Community Engagement", "name": "Public outreach events per year", "unit": "",
+      "cur": 58, "target": 50, "prev": 41, "avg": 45, "faculties": [18, 12, 16, 12],
+      "action": "Target exceeded — document as institutional strength."
+    },
+    {
+      "id": 11, "dim": "Student & Graduate Success", "name": "Graduate employment within 12 months (%)", "unit": "%",
+      "cur": 71, "target": 80, "prev": 68, "avg": 69, "faculties": [84, 70, 58, 72],
+      "action": "Extend career-center partnerships beyond engineering programs."
+    },
+    {
+      "id": 12, "dim": "University–Industry Collaboration", "name": "Active industry-funded projects", "unit": "",
+      "cur": 21, "target": 30, "prev": 19, "avg": 18, "faculties": [11, 3, 3, 4],
+      "thresholds": { "on": 90, "risk": 75 },
+      "action": "Assign liaison officers per faculty; revisit IP revenue-sharing terms."
+    },
+    {
+      "id": 13, "dim": "Quality Assurance & Accreditation", "name": "Accredited programs (%)", "unit": "%",
+      "cur": 64, "target": 75, "prev": 60, "avg": 62, "faculties": [78, 55, 52, 71],
+      "action": "3 MÜDEK applications in progress; renewal deadlines tracked in the early-warning system."
+    },
+    {
+      "id": 14, "dim": "Physical & Technological Infrastructure", "name": "Laboratory modernization progress (%)", "unit": "%",
+      "cur": 45, "target": 60, "prev": 30, "avg": 41, "faculties": [52, 35, 41, 50],
+      "thresholds": { "on": 90, "risk": 80 },
+      "action": "Re-prioritize capital budget; two labs behind procurement schedule."
+    }
+  ]
+}

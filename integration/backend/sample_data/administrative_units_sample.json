@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Student Affairs Office",
+    "code": "STDAFF",
+    "description": "Öğrenci işleri",
+    "is_active": "true"
+  },
+  {
+    "name": "International Office",
+    "code": "INTL",
+    "description": "Uluslararası ofis",
+    "is_active": "evet"
+  },
+  {
+    "name": "Career Center",
+    "code": "CAREER",
+    "description": "Kariyer merkezi",
+    "is_active": "0"
+  }
+]

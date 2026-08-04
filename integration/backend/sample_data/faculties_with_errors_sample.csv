@@ -1,0 +1,7 @@
+name,code,description,is_active
+Valid Faculty,VALID1,Sorunsuz satır,true
+,NONAME,name eksik,true
+No Code Faculty,,code eksik,true
+Bad Boolean,BADBOOL,is_active hatali,belki
+Duplicate In File,VALID1,dosya ici tekrar,true
+Already In Db,FEA,veritabaninda var,true

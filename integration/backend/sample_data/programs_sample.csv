@@ -1,0 +1,4 @@
+department_code,name,code,degree_level,duration_years,quota,description,is_active
+EE,Electrical Engineering Bachelor's Program,EE-BSC,Bachelor,4,90,Lisans,true
+EE,Electrical Engineering Master's Program,EE-MSC,Master,2,25,Yüksek lisans,yes
+IE,Industrial Engineering Bachelor's Program,IE-BSC,Bachelor,4,70,Lisans,1
