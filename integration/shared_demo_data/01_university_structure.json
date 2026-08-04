@@ -1,0 +1,70 @@
+{
+  "_aciklama": "Modül 1 — Fakülte, bölüm, akademik program ve idari birim tanımları. Diğer tüm modüller bölüm ve program kodlarını buradan alır.",
+  "_not_FEA_SWE_CENG": "FEA, SWE, CENG, SWE-BSC, CENG-BSC kodları mevcut seed_data.py ile birebir aynıdır. Aynı kodla tekrar eklenmez, var olan kayıt kullanılır; böylece mevcut testler bozulmaz.",
+
+  "faculties": [
+    {
+      "code": "FEA",
+      "name": "Faculty of Engineering and Architecture",
+      "description": "Mühendislik ve mimarlık alanındaki bölümleri barındıran fakülte."
+    },
+    {
+      "code": "FEAS",
+      "name": "Faculty of Economics and Administrative Sciences",
+      "description": "İktisadi ve idari bilimler alanındaki bölümleri barındıran fakülte."
+    },
+    {
+      "code": "FAS",
+      "name": "Faculty of Arts and Sciences",
+      "description": "Temel bilimler ve sosyal bilimler bölümlerini barındıran fakülte."
+    },
+    {
+      "code": "FHS",
+      "name": "Faculty of Health Sciences",
+      "description": "Sağlık bilimleri alanındaki bölümleri barındıran fakülte."
+    }
+  ],
+
+  "departments": [
+    { "code": "SWE",   "faculty_code": "FEA",  "name": "Software Engineering",              "description": "Yazılım mühendisliği bölümü." },
+    { "code": "CENG",  "faculty_code": "FEA",  "name": "Computer Engineering",              "description": "Bilgisayar mühendisliği bölümü." },
+    { "code": "EEE",   "faculty_code": "FEA",  "name": "Electrical-Electronics Engineering","description": "Elektrik-elektronik mühendisliği bölümü." },
+    { "code": "ME",    "faculty_code": "FEA",  "name": "Mechanical Engineering",            "description": "Makine mühendisliği bölümü." },
+    { "code": "CE",    "faculty_code": "FEA",  "name": "Civil Engineering",                 "description": "İnşaat mühendisliği bölümü." },
+    { "code": "IE",    "faculty_code": "FEA",  "name": "Industrial Engineering",            "description": "Endüstri mühendisliği bölümü." },
+    { "code": "ARCH",  "faculty_code": "FEA",  "name": "Architecture",                      "description": "Mimarlık bölümü." },
+    { "code": "BA",    "faculty_code": "FEAS", "name": "Business Administration",           "description": "İşletme bölümü." },
+    { "code": "ECON",  "faculty_code": "FEAS", "name": "Economics",                         "description": "İktisat bölümü." },
+    { "code": "IR",    "faculty_code": "FEAS", "name": "International Relations",           "description": "Uluslararası ilişkiler bölümü." },
+    { "code": "PSY",   "faculty_code": "FAS",  "name": "Psychology",                        "description": "Psikoloji bölümü." },
+    { "code": "NUR",   "faculty_code": "FHS",  "name": "Nursing",                           "description": "Hemşirelik bölümü." }
+  ],
+
+  "academic_programs": [
+    { "code": "SWE-BSC",  "department_code": "SWE",  "name": "Software Engineering Bachelor's Program",               "degree_level": "Bachelor", "duration_years": 4, "quota": 80,  "description": "Yazılım mühendisliği lisans programı." },
+    { "code": "CENG-BSC", "department_code": "CENG", "name": "Computer Engineering Bachelor's Program",               "degree_level": "Bachelor", "duration_years": 4, "quota": 100, "description": "Bilgisayar mühendisliği lisans programı." },
+    { "code": "EEE-BSC",  "department_code": "EEE",  "name": "Electrical-Electronics Engineering Bachelor's Program", "degree_level": "Bachelor", "duration_years": 4, "quota": 90,  "description": "Elektrik-elektronik mühendisliği lisans programı." },
+    { "code": "ME-BSC",   "department_code": "ME",   "name": "Mechanical Engineering Bachelor's Program",             "degree_level": "Bachelor", "duration_years": 4, "quota": 80,  "description": "Makine mühendisliği lisans programı." },
+    { "code": "CE-BSC",   "department_code": "CE",   "name": "Civil Engineering Bachelor's Program",                  "degree_level": "Bachelor", "duration_years": 4, "quota": 70,  "description": "İnşaat mühendisliği lisans programı." },
+    { "code": "IE-BSC",   "department_code": "IE",   "name": "Industrial Engineering Bachelor's Program",             "degree_level": "Bachelor", "duration_years": 4, "quota": 75,  "description": "Endüstri mühendisliği lisans programı." },
+    { "code": "ARCH-BSC", "department_code": "ARCH", "name": "Architecture Bachelor's Program",                       "degree_level": "Bachelor", "duration_years": 4, "quota": 80,  "description": "Mimarlık lisans programı." },
+    { "code": "BA-BSC",   "department_code": "BA",   "name": "Business Administration Bachelor's Program",            "degree_level": "Bachelor", "duration_years": 4, "quota": 120, "description": "İşletme lisans programı." },
+    { "code": "ECON-BSC", "department_code": "ECON", "name": "Economics Bachelor's Program",                          "degree_level": "Bachelor", "duration_years": 4, "quota": 70,  "description": "İktisat lisans programı." },
+    { "code": "IR-BSC",   "department_code": "IR",   "name": "International Relations Bachelor's Program",            "degree_level": "Bachelor", "duration_years": 4, "quota": 60,  "description": "Uluslararası ilişkiler lisans programı." },
+    { "code": "PSY-BSC",  "department_code": "PSY",  "name": "Psychology Bachelor's Program",                         "degree_level": "Bachelor", "duration_years": 4, "quota": 90,  "description": "Psikoloji lisans programı." },
+    { "code": "NUR-BSC",  "department_code": "NUR",  "name": "Nursing Bachelor's Program",                            "degree_level": "Bachelor", "duration_years": 4, "quota": 85,  "description": "Hemşirelik lisans programı." },
+    { "code": "SWE-MSC",  "department_code": "SWE",  "name": "Software Engineering Master's Program",                 "degree_level": "Master",   "duration_years": 2, "quota": 30,  "description": "Yazılım mühendisliği tezli yüksek lisans programı." },
+    { "code": "BA-MSC",   "department_code": "BA",   "name": "Business Administration Master's Program",              "degree_level": "Master",   "duration_years": 2, "quota": 40,  "description": "İşletme tezli yüksek lisans programı." }
+  ],
+
+  "administrative_units": [
+    { "code": "ERASMUS",  "name": "Erasmus Office",                "description": "Uluslararası değişim programlarını yürüten ofis." },
+    { "code": "REG",      "name": "Student Registry Office",       "description": "Öğrenci kayıt ve belge işlemlerini yürüten birim." },
+    { "code": "FIN",      "name": "Financial Affairs Directorate", "description": "Bütçe, gelir ve gider süreçlerini yöneten birim." },
+    { "code": "HR",       "name": "Human Resources Directorate",   "description": "Akademik ve idari personel süreçlerini yöneten birim." },
+    { "code": "IT",       "name": "Information Technologies Directorate", "description": "Bilişim altyapısı ve uygulamalarını yöneten birim." },
+    { "code": "QUALITY",  "name": "Quality Assurance Office",      "description": "Akreditasyon ve kalite güvence süreçlerini yürüten birim." },
+    { "code": "LIB",      "name": "Library and Documentation Directorate", "description": "Kütüphane ve bilgi kaynaklarını yöneten birim." },
+    { "code": "CAREER",   "name": "Career Development Center",     "description": "Mezun istihdamı ve staj süreçlerini yürüten birim." }
+  ]
+}

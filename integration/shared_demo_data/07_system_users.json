@@ -1,0 +1,61 @@
+{
+  "_aciklama": "Modül 14 — Demo kullanıcıları ve rolleri.",
+  "_GUVENLIK_UYARISI": "Buradaki parolalar YALNIZCA yerel demo içindir ve herkese açıktır. Veritabanına düz metin olarak yazılmaz; PBKDF2-HMAC-SHA256 ile saltlanıp özetlenerek saklanır. Bu dosya gerçek bir kuruluma taşınmamalı, sunuma çıkmadan önce parolalar değiştirilmelidir.",
+
+  "users": [
+    {
+      "username": "admin",
+      "full_name": "Sistem Yöneticisi",
+      "password": "demo1234",
+      "role": "Admin",
+      "faculty_code": null,
+      "department_code": null,
+      "_yetki": "Tüm kurum verisi + kullanıcı yönetimi"
+    },
+    {
+      "username": "dekan.muh",
+      "full_name": "Mühendislik ve Mimarlık Dekanı",
+      "password": "demo1234",
+      "role": "Dekan",
+      "faculty_code": "FEA",
+      "department_code": null,
+      "_yetki": "Kendi fakültesinin verisini görür ve düzenler"
+    },
+    {
+      "username": "dekan.iibf",
+      "full_name": "İktisadi ve İdari Bilimler Dekanı",
+      "password": "demo1234",
+      "role": "Dekan",
+      "faculty_code": "FEAS",
+      "department_code": null,
+      "_yetki": "Kendi fakültesinin verisini görür ve düzenler"
+    },
+    {
+      "username": "baskan.ceng",
+      "full_name": "Bilgisayar Mühendisliği Bölüm Başkanı",
+      "password": "demo1234",
+      "role": "Bölüm Başkanı",
+      "faculty_code": "FEA",
+      "department_code": "CENG",
+      "_yetki": "Kendi bölümünün verisini görür ve düzenler"
+    },
+    {
+      "username": "baskan.isl",
+      "full_name": "İşletme Bölüm Başkanı",
+      "password": "demo1234",
+      "role": "Bölüm Başkanı",
+      "faculty_code": "FEAS",
+      "department_code": "BA",
+      "_yetki": "Kendi bölümünün verisini görür ve düzenler"
+    },
+    {
+      "username": "ogretim.uyesi",
+      "full_name": "Örnek Öğretim Üyesi",
+      "password": "demo1234",
+      "role": "Öğretim Üyesi",
+      "faculty_code": "FEA",
+      "department_code": "SWE",
+      "_yetki": "Yalnızca kendi kayıtlarını görüntüler"
+    }
+  ]
+}

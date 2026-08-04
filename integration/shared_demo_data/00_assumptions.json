@@ -1,0 +1,48 @@
+{
+  "_aciklama": "TÜM MODÜLLERİN PAYLAŞTIĞI TEK DOĞRULUK KAYNAĞI. Demoda görünen her sayı bu klasördeki dosyalardan türetilir. Bir sayıyı değiştirmek istiyorsanız burayı değiştirin; kod içine gömülü ikinci bir kopya yoktur.",
+
+  "kurum": {
+    "ad": "Ankara Teknoloji Üniversitesi",
+    "tur": "Vakıf üniversitesi",
+    "sehir": "Ankara",
+    "kurulus_yili": 2004,
+    "not": "Kurgusal bir kurumdur. Gerçek bir üniversitenin verisi değildir."
+  },
+
+  "olcek": {
+    "fakulte_sayisi": 4,
+    "bolum_sayisi": 12,
+    "program_sayisi": 14,
+    "hedef_ogrenci_sayisi": 4000,
+    "akademik_personel_sayisi": 180,
+    "fiziksel_mekan_sayisi": 42,
+    "sistem_kullanicisi_sayisi": 6,
+    "izlenen_kpi_sayisi": 14
+  },
+
+  "akademik_yillar": {
+    "tumu": ["2022-2023", "2023-2024", "2024-2025", "2025-2026", "2026-2027"],
+    "guncel": "2025-2026",
+    "planlama": "2026-2027",
+    "not": "Modül 3, 7 ve 11 varsayılan olarak 'guncel' yılı kullanır. Mali dönemler ve KPI'lar da bu yıl için tanımlıdır."
+  },
+
+  "para_birimi": {
+    "kod": "TRY",
+    "mali_tablolarda_birim": "milyon TL",
+    "ogrenci_basina_oranlarda_birim": "bin TL",
+    "not": "Tüm tutarlar Decimal olarak saklanır; float yuvarlaması kullanılmaz."
+  },
+
+  "deterministik_uretim": {
+    "random_seed": 20260804,
+    "not": "Öğrenci ve personel kayıtları bu tohumla üretilir. Seed script'i kaç kez çalıştırılırsa çalıştırılsın aynı veri oluşur; demo sırasında sayılar değişmez."
+  },
+
+  "veri_durustlugu_kurallari": [
+    "Ölçümü girilmemiş bir gösterge sıfır olarak değil, 'veri yok' olarak raporlanır.",
+    "Payda sıfır olduğunda oran hesaplanmaz; uydurma değer üretilmez.",
+    "Bütçesi tanımlanmamış bölüm için gerçekleşme oranı boş bırakılır.",
+    "Bu veri seti kurgusaldır ve gerçek bir kurumun verisi olarak sunulamaz."
+  ]
+}
