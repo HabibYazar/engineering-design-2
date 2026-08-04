@@ -1,20 +1,58 @@
-# SENG 449 — Strategic University Management & DSS (my parts: 6, 8, 12)
+# SENG 449 — Strategic University Management & Decision Support System
 
-Feature demos for three parts of the *Strategic University Management and
-Decision Support System* project, numbered per the section numbering of
-`information/Eng-DesignProject.pdf`. The parts are **separate, standalone**
-demos — they are not integrated with each other. All data is mock data.
+My contributions to the group project, in two work packages:
+
+| # | Work package | Folder(s) | What it is |
+|---|---|---|---|
+| 1 | **Module demos** — sections 6, 8, 12 | `finance/` `kpi/` `frontend/` | Three standalone working demos of my assigned modules |
+| 2 | **Full-system frontend design** | `full-frontend/` | One unified interface covering *every* group member's module |
+
+All data everywhere is mock data.
+
+**Requirements:** Python 3 (standard library only — nothing to `pip install`)
+and any modern browser.
+
+---
+
+# Work package 2 — Full-system frontend (`full-frontend/`)
+
+A **single-page application** designing the interface for the whole Decision
+Support System: executive dashboard, AI assistant, student / staff / physical /
+financial analytics, program sustainability, KPIs, THE·QS·YÖK monitoring,
+scenario cockpit, early warning, core data management, data import and user
+roles — 15 screens behind a mock login.
+
+Non-functional by design: it makes no backend calls, because connecting it to
+the team's APIs is a later group work package.
+
+**Run:**
+
+```
+python -m http.server 8010 --directory full-frontend
+```
+
+Then open **http://localhost:8010** (or just double-click
+`full-frontend/index.html`). Sign in with any username and pick a role.
+
+Highlights: live what-if sliders in the Scenario Cockpit, an AI assistant that
+explains *why* behind its answers (plus a ✨ chat bubble on every screen),
+drill-down/roll-up tables, night mode (🌙 in the sidebar), and a responsive
+☰ drawer layout for phones. Details in
+[`full-frontend/README.md`](full-frontend/README.md).
+
+---
+
+# Work package 1 — Module demos
+
+Numbered per the section numbering of `information/Eng-DesignProject.pdf`.
+These three are **separate and standalone** — deliberately not integrated with
+each other.
 
 | Part | Section | Folder | Tech |
 |------|---------|--------|------|
 | 6 | Strategic Financial Analysis | `finance/` | Python web app (frontend + backend) |
 | 8 | University Performance Management & Monitoring | `kpi/` | Python web app (frontend + backend) |
 | 12 | Executive Dashboard | `frontend/` | frontend-only page |
-
-## Requirements
-
-- **Python 3** (any recent version — standard library only, nothing to `pip install`)
-- Any modern browser
 
 ## Part 6 — Strategic Financial Analysis (`finance/`)
 
@@ -75,8 +113,7 @@ faculty, critical risks & early warnings, strong/weak indicators, and a
 **drill-down / roll-up** table (click a faculty row to open its departments,
 click again to close).
 
-**Run:** no server needed — just open `frontend/index.html` in a browser
-(double-click it).
+**Run:** no server needed — just open `frontend/index.html` in a browser.
 
 ## How parts 6 and 8 are built
 
@@ -89,4 +126,5 @@ Pure-Python web apps with a small MVC split, no JavaScript and no dependencies:
 Data lives in a seed JSON file (`seed_*.json`) that is copied to a runtime
 database file on first start; every form submission is validated and persisted,
 and each app also exposes its dataset as JSON (`/api/data`, `/api/kpis`).
-See `finance/README.md` and `kpi/README.md` for full details and route tables.
+See [`finance/README.md`](finance/README.md) and [`kpi/README.md`](kpi/README.md)
+for full details and route tables.
