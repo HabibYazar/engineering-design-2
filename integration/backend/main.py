@@ -1,14 +1,17 @@
 """Uygulamanın giriş noktası: FastAPI nesnesinin oluşturulduğu dosya."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database import init_db
 from app.routers import (
     academic_staff,
+    assistant,
     administrative_units,
     auth,
     data_integration,
@@ -101,14 +104,50 @@ app.include_router(finance.router)
 # Modül 8 - Kurumsal Performans Yönetimi ve İzleme (Halil)
 app.include_router(kpi.router)
 
+# Akıllı Asistan altyapısı.
+# NOT: Bu router hiçbir dil modeline bağlı DEĞİLDİR ve cevap üretmez.
+# Yalnızca bir soru için gereken kurumsal veriyi toplar ve altyapının
+# durumunu bildirir. Ayrıntı: docs/ASSISTANT_ARCHITECTURE.md
+app.include_router(assistant.router)
 
-@app.get("/")
-def read_root() -> Dict[str, Any]:
+
+@app.get("/api", include_in_schema=False)
+def api_root() -> Dict[str, Any]:
     """Backend'in çalıştığını doğrulayan karşılama mesajı döndürür."""
-    # Tarayıcıdan hızlıca kontrol edebilmek için basit bir kök endpoint.
     return {
         "message": "Backend is running",
         "application": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "docs_url": "/docs",
+        "ui_url": "/",
     }
+
+
+# --------------------------------------------------------------------------
+# Web arayüzü
+# --------------------------------------------------------------------------
+# Arayüz backend ile aynı sunucudan servis edilir. Ayrı bir web sunucusu
+# gerekmediği için CORS yapılandırmasına da ihtiyaç kalmıyor ve tek komutla
+# çalışan bir demo elde ediliyor.
+#
+# Mount en sona konuldu: StaticFiles kök yolu ("/") kapsadığı için daha önce
+# bağlanırsa /api ve /docs isteklerini de yakalar ve 404 döndürürdü.
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+if FRONTEND_DIR.is_dir():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(FRONTEND_DIR), html=True),
+        name="frontend",
+    )
+else:
+    # Arayüz klasörü yoksa uygulama yine de çalışmalı; sessizce kaybolmak
+    # yerine kök adreste durumu açıklıyoruz.
+    @app.get("/", include_in_schema=False)
+    def missing_frontend() -> Dict[str, Any]:
+        """Arayüz klasörü bulunamadığında bilgilendirme döndürür."""
+        return {
+            "message": "Backend calisiyor ancak arayuz klasoru bulunamadi.",
+            "expected_path": str(FRONTEND_DIR),
+            "docs_url": "/docs",
+        }
