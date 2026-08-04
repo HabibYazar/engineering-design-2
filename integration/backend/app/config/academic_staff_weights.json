@@ -1,0 +1,16 @@
+{
+  "_comment": "Modül 4 akademik personel performans puanı ağırlıkları. Kaynak: eda/config/weightConfig.json. Ağırlıklar kodda değil burada tutuluyor ki puanlama politikası değiştiğinde uygulama yeniden yazılmasın.",
+  "weights": {
+    "publication_count": 5,
+    "citation_count": 2,
+    "teaching_load_hours": 1,
+    "advising_count": 3,
+    "project_count": 4,
+    "patent_count": 6,
+    "community_engagement_score": 2
+  },
+  "score_thresholds": {
+    "high_performance": 150,
+    "expected_performance": 80
+  }
+}

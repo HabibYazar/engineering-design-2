@@ -8,13 +8,16 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.database import init_db
 from app.routers import (
+    academic_staff,
     administrative_units,
+    auth,
     data_integration,
     departments,
     early_warning,
     education_analytics,
     faculties,
     health,
+    physical_resources,
     programs,
     ranking_evaluations,
     scenarios,
@@ -78,6 +81,17 @@ app.include_router(sustainability.router)
 
 # Modül 11 - Erken Uyarı Sistemi (Begüm)
 app.include_router(early_warning.router)
+
+# Modül 4 - Akademik Personel Performansı (Eda)
+app.include_router(academic_staff.router)
+
+# Modül 5 - Fiziksel Kaynak ve Kapasite Yönetimi (Eda)
+# NOT: Orijinal kodda /capacity iki ayrı router'da tanımlıydı ve biri
+# gölgede kalıyordu; entegrasyonda tek router'da toplandı.
+app.include_router(physical_resources.router)
+
+# Modül 14 - Kullanıcı Yönetimi ve Yetkilendirme (Eda)
+app.include_router(auth.router)
 
 
 @app.get("/")

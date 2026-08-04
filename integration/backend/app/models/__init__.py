@@ -4,6 +4,7 @@
 # 1) Base.metadata tabloları tanısın ve create_all ile oluşturabilsin.
 # 2) Diğer dosyalarda "from app.models import Faculty" şeklinde kısa kullanım sağlansın.
 from app.models.academic_program import AcademicProgram
+from app.models.academic_staff import AcademicStaff
 from app.models.administrative_unit import AdministrativeUnit
 from app.models.benchmark_institution import BenchmarkInstitution
 from app.models.benchmark_metric_value import BenchmarkMetricValue
@@ -17,6 +18,7 @@ from app.models.faculty import Faculty
 from app.models.framework_assessment import FrameworkAssessment
 from app.models.import_job import ImportJob
 from app.models.institutional_metric_value import InstitutionalMetricValue
+from app.models.physical_facility import PhysicalFacility
 from app.models.program_enrollment_snapshot import ProgramEnrollmentSnapshot
 from app.models.scenario import Scenario
 from app.models.scenario_baseline import ScenarioBaseline
@@ -24,6 +26,7 @@ from app.models.scenario_input import ScenarioInput
 from app.models.scenario_result import ScenarioResult
 from app.models.student import Student
 from app.models.student_academic_record import StudentAcademicRecord
+from app.models.system_user import SystemUser
 
 __all__ = [
     # Modül 1 - Üniversite yapısı
@@ -52,4 +55,10 @@ __all__ = [
     "DimensionAssessment",
     "BenchmarkInstitution",
     "BenchmarkMetricValue",
+    # Modül 4 - Akademik personel (Eda)
+    "AcademicStaff",
+    # Modül 5 - Fiziksel kaynaklar (Eda)
+    "PhysicalFacility",
+    # Modül 14 - Kullanıcı ve yetkilendirme (Eda)
+    "SystemUser",
 ]
