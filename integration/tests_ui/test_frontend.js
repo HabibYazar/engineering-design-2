@@ -1,0 +1,223 @@
+/**
+ * Arayüz entegrasyon testi.
+ *
+ * Ne yapar: gerçek backend'i ayağa kaldırılmış varsayar, index.html'i jsdom
+ * içinde ÇALIŞTIRIR ve 14 ekranın hepsini gezerek her birinin gerçek veriyle
+ * dolduğunu doğrular. Ekran görüntüsü almadan da "ekran boş mu, hata kutusu
+ * var mı, hâlâ yükleniyor mu" sorularını cevaplar.
+ *
+ * Çalıştırma:
+ *   1) Backend'i başlatın:  cd integration/backend && python -m uvicorn main:app --port 8099
+ *   2) Bağımlılık:          npm install jsdom
+ *   3) Test:                node integration/tests_ui/test_frontend.js
+ *
+ * Çıkış kodu 0 = tüm kontroller geçti.
+ */
+
+const path = require("path");
+
+const BASE = process.env.UI_TEST_BASE || "http://127.0.0.1:8099";
+// Ekranların yüklenmesi sabit bir süre beklenerek değil, "yükleme göstergesi
+// kalmayana kadar" beklenerek ölçülür. Sabit süre yavaş makinede yanlış
+// hata verir, hızlı makinede boşuna bekletir.
+const VIEW_TIMEOUT_MS = Number(process.env.UI_TEST_TIMEOUT || 12000);
+
+let JSDOM;
+try {
+  ({ JSDOM } = require("jsdom"));
+} catch {
+  try {
+    ({ JSDOM } = require(path.join("/tmp/node_modules", "jsdom")));
+  } catch {
+    console.error("jsdom bulunamadi. Kurulum: npm install jsdom");
+    process.exit(2);
+  }
+}
+
+// Ekran adı -> o ekranda mutlaka görünmesi gereken metin.
+// Sadece "boş değil" demek yetmez; doğru modülün verisinin geldiğini de
+// doğrulamak gerekiyor.
+const VIEWS = [
+  ["dashboard", /Toplam öğrenci/],
+  ["assistant", /dil modeli/i],
+  ["students", /Doluluk|doluluk/],
+  ["staff", /Ağırlıklı puan|performans/i],
+  ["physical", /Derslik|Laboratuvar/],
+  ["finance", /₺/],
+  ["sustainability", /sürdürülebilirlik|Skor/i],
+  ["kpi", /gösterge/i],
+  ["rankings", /ÜRETMEZ/],
+  ["scenarios", /baseline|Senaryo/i],
+  ["alerts", /uyarı/i],
+  ["structure", /Fakülte|fakülte/],
+  ["data-import", /Önizleme|önizle/i],
+  ["users", /Rol|rol/],
+];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+let pass = 0;
+let fail = 0;
+const failures = [];
+
+function check(label, condition, detail = "") {
+  if (condition) {
+    pass++;
+    console.log("  OK   " + label);
+  } else {
+    fail++;
+    failures.push(label);
+    console.log("  HATA " + label + (detail ? "\n         " + detail : ""));
+  }
+}
+
+(async () => {
+  console.log("Arayuz entegrasyon testi — " + BASE + "\n");
+
+  let html;
+  try {
+    html = await (await fetch(BASE + "/")).text();
+  } catch {
+    console.error(
+      "Backend'e ulasilamadi: " + BASE + "\n" +
+      "Once sunucuyu baslatin: cd integration/backend && python -m uvicorn main:app --port 8099"
+    );
+    process.exit(2);
+  }
+
+  const dom = new JSDOM(html, {
+    url: BASE + "/#/login",
+    runScripts: "dangerously",
+    resources: "usable",
+    pretendToBeVisual: true,
+  });
+  const w = dom.window;
+  // jsdom'da fetch yok; Node'un fetch'ini bagliyoruz.
+  w.fetch = (url, opts) => fetch(url.startsWith("http") ? url : BASE + url, opts);
+
+  const jsErrors = [];
+  w.console.error = (...a) => jsErrors.push(a.join(" "));
+  w.addEventListener("error", (e) => jsErrors.push("window.error: " + e.message));
+
+  await new Promise((r) => w.addEventListener("load", r));
+  await sleep(600);
+
+  const $ = (s) => w.document.querySelector(s);
+  const viewText = () => ($("#view") || {}).textContent || "";
+
+  // ---------------- giriş ----------------
+  console.log("--- Kimlik dogrulama ---");
+  check("giris formu cizildi", !!$("#loginForm"));
+
+  $("#loginUser").value = "admin";
+  $("#loginPass").value = "kesinlikleyanlis";
+  $("#loginForm").dispatchEvent(new w.Event("submit", { cancelable: true, bubbles: true }));
+  await sleep(1000);
+  check(
+    "yanlis parola hata kutusu gosteriyor (sessizce basarisiz olmuyor)",
+    !!$("#loginError .state.error"),
+    ($("#loginError") || {}).innerHTML
+  );
+  check("oturum acilmadi", !w.sessionStorage.getItem("atu-token"));
+
+  $("#loginUser").value = "admin";
+  $("#loginPass").value = "demo1234";
+  $("#loginForm").dispatchEvent(new w.Event("submit", { cancelable: true, bubbles: true }));
+  await sleep(1400);
+  check("gercek API ile giris basarili", !!w.sessionStorage.getItem("atu-token"));
+  check("uygulama kabugu cizildi", !!$("#sidebar"));
+  check(
+    "14 menu ogesi var",
+    w.document.querySelectorAll("#sidebar a[data-route]").length === 14,
+    "bulunan: " + w.document.querySelectorAll("#sidebar a[data-route]").length
+  );
+  await sleep(500);
+  check(
+    "ust barda API durumu 'bagli'",
+    (($("#apiStatus") || {}).textContent || "").includes("bağlı"),
+    ($("#apiStatus") || {}).textContent
+  );
+
+  // Ekrana geçer ve tüm yükleme göstergeleri kaybolana kadar bekler.
+  // Süreyi de döndürür; hangi ekranın yavaş olduğu raporlanabilsin diye.
+  async function openView(name) {
+    w.location.hash = "#/" + name;
+    w.dispatchEvent(new w.Event("hashchange"));
+    const started = Date.now();
+    // İlk çizim + init'in yükleme göstergelerini basması için kısa bir an.
+    await sleep(150);
+    while (Date.now() - started < VIEW_TIMEOUT_MS) {
+      const view = $("#view");
+      if (view && view.querySelectorAll(".state.loading").length === 0) break;
+      await sleep(150);
+    }
+    return Date.now() - started;
+  }
+
+  // ---------------- ekranlar ----------------
+  console.log("\n--- 14 ekran ---");
+  for (const [name, expected] of VIEWS) {
+    const elapsed = await openView(name);
+
+    const view = $("#view");
+    const errorBoxes = view.querySelectorAll(".state.error");
+    const loaders = view.querySelectorAll(".state.loading");
+    const text = view.textContent.trim();
+
+    check(
+      `${name.padEnd(14)} ${String(elapsed).padStart(5)} ms · ${String(text.length).padStart(5)} karakter`,
+      errorBoxes.length === 0 && loaders.length === 0 && expected.test(text),
+      errorBoxes.length
+        ? "hata kutusu: " + errorBoxes[0].textContent.replace(/\s+/g, " ").slice(0, 140)
+        : loaders.length
+        ? loaders.length + " bolum zaman asimina ugradi"
+        : "beklenen icerik bulunamadi: " + expected
+    );
+  }
+
+  // ---------------- durustluk kontrolleri ----------------
+  console.log("\n--- Veri durustlugu ---");
+  const go = async (n) => {
+    await openView(n);
+    return viewText();
+  };
+
+  let t = await go("dashboard");
+  check("panoda ortak veri setinin ogrenci sayisi (4.000) gorunuyor", t.includes("4.000"));
+  check("kullaniciya ham JSON gosterilmiyor", !t.includes('{"') && !t.includes('":'));
+  check("'mock' / 'prototype' ifadesi kalmamis", !/mock|prototype|placeholder/i.test(t));
+
+  t = await go("users");
+  check("parola alanlari arayuze sizmiyor", !/password_hash|password_salt/i.test(t));
+
+  t = await go("assistant");
+  check("asistan: dil modeli bagli olmadigini soyluyor", /dil modeli/i.test(t));
+  check("asistan: uydurma cevap uretmiyor", !/İşte cevabınız|Cevap:/i.test(t));
+
+  t = await go("rankings");
+  check("Modul 10: gercek siralama uretmedigi uyarisi var", /ÜRETMEZ/.test(t));
+
+  // Senaryo simulasyonu
+  await openView("scenarios");
+  $("#scPreview").click();
+  await sleep(2000);
+  const result = $("#scResult").textContent;
+  check(
+    "senaryo simulasyonu gercek sonuc uretti",
+    /risk/.test(result) && /\d/.test(result) && !/Henüz/.test(result),
+    result.slice(0, 120)
+  );
+  check("simulasyonun onizleme oldugu belirtiliyor", /önizleme/.test(result));
+
+  console.log("\n--- JavaScript hatalari ---");
+  check("konsolda JS hatasi yok", jsErrors.length === 0, jsErrors.slice(0, 3).join(" | "));
+
+  console.log("\n" + "=".repeat(60));
+  console.log(`SONUC: ${pass} basarili, ${fail} hatali`);
+  if (fail) {
+    console.log("Basarisiz kontroller:");
+    failures.forEach((f) => console.log("  - " + f));
+  }
+  console.log("=".repeat(60));
+  process.exit(fail ? 1 : 0);
+})();

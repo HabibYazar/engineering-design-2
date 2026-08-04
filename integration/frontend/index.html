@@ -1,20 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABU Strategic Management &amp; DSS</title>
-<link rel="stylesheet" href="assets/style.css?v=3">
+<title>ATÜ — Stratejik Yönetim ve Karar Destek Sistemi</title>
+<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/integration.css?v=5">
 </head>
 <body>
-<!-- Single-page application: the shell and every view are rendered by JS.
-     assets/app.js   - router, session, shell, shared render helpers
-     assets/views-*  - the screens, registered into the VIEWS registry
-     (?v= busts browser caches after design updates) -->
-<script src="assets/app.js?v=3"></script>
-<script src="assets/views-overview.js?v=3"></script>
-<script src="assets/views-analytics.js?v=3"></script>
-<script src="assets/views-planning.js?v=3"></script>
-<script src="assets/views-system.js?v=3"></script>
+<!-- Tek sayfa uygulaması: kabuk ve tüm ekranlar JavaScript ile çizilir.
+     Yükleme sırası önemlidir:
+       api.js      - backend istemcisi, biçimlendirme, hata/yükleme durumları
+       app.js      - yönlendirici, oturum, kabuk, ortak çizim yardımcıları
+       views-*.js  - ekranlar; VIEWS kaydına kendilerini eklerler
+     Harici kütüphane veya CDN kullanılmaz, derleme adımı yoktur.
+     (?v= parametresi tarayıcı önbelleğini tazeler) -->
+<script src="assets/api.js?v=5"></script>
+<script src="assets/app.js?v=5"></script>
+<script src="assets/views-overview.js?v=5"></script>
+<script src="assets/views-analytics.js?v=5"></script>
+<script src="assets/views-planning.js?v=5"></script>
+<script src="assets/views-system.js?v=5"></script>
 </body>
 </html>

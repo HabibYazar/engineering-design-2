@@ -210,7 +210,19 @@ function renderApp(name, view) {
   const el = $("view");
   el.classList.remove("enter");
   el.innerHTML = view.html();
-  // Ekranlarin init() fonksiyonu veri cekmek icin async olabilir;\n  // hata yakalanmazsa sessizce kaybolmasin diye burada raporlaniyor.\n  try {\n    const result = view.init && view.init();\n    if (result && typeof result.catch === 'function') {\n      result.catch(err => ui.toast('Ekran yuklenirken hata: ' + (err.userMessage || err.message), 'error'));\n    }\n  } catch (err) {\n    ui.toast('Ekran yuklenirken hata: ' + (err.userMessage || err.message), 'error');\n  }
+  // Ekranların init() fonksiyonu veri çekmek için async olabilir.
+  // Hata yakalanmazsa ekran sessizce boş kalırdı; bu yüzden hem senkron
+  // hem de asenkron hatalar burada bildirime dönüştürülüyor.
+  try {
+    const result = view.init && view.init();
+    if (result && typeof result.catch === "function") {
+      result.catch((err) =>
+        ui.toast("Ekran yüklenirken hata: " + (err.userMessage || err.message), "error")
+      );
+    }
+  } catch (err) {
+    ui.toast("Ekran yüklenirken hata: " + (err.userMessage || err.message), "error");
+  }
   requestAnimationFrame(() => el.classList.add("enter"));
   el.scrollTop = 0;
 }

@@ -1,0 +1,204 @@
+/* Entegrasyon sırasında eklenen bileşenlerin stilleri.
+   Halil'in style.css dosyası değiştirilmedi; yeni ihtiyaçlar (yükleniyor
+   durumu, hata kutusu, bildirim, filtre çubuğu, ağaç görünümü) buraya
+   eklendi. Böylece orijinal tasarım dosyası korunuyor ve entegrasyonda
+   nelerin eklendiği tek bakışta görülüyor. */
+
+/* ---------------- durum kutuları ---------------- */
+
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  margin: 8px 0;
+  border-left: 4px solid var(--border, #d8dee9);
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+}
+
+.state b { font-size: 0.92rem; }
+.state .msg { color: var(--muted); }
+.state .hint { font-size: 0.78rem; color: var(--muted); }
+.state code {
+  background: rgba(127, 127, 127, 0.16);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.state.loading {
+  flex-direction: row;
+  align-items: center;
+  color: var(--muted);
+  border-left-color: var(--primary);
+}
+
+.state.error {
+  border-left-color: var(--critical, #c0392b);
+  background: rgba(192, 57, 43, 0.08);
+  color: var(--critical, #c0392b);
+}
+.state.error .msg { color: inherit; opacity: 0.9; }
+
+.state.warn {
+  border-left-color: var(--accent, #e08c00);
+  background: rgba(224, 140, 0, 0.09);
+}
+
+.state.empty {
+  border-left-color: var(--border, #d8dee9);
+  color: var(--muted);
+}
+
+/* Yükleniyor göstergesi. Tek bir dönen halka; harici kütüphane yok. */
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(127, 127, 127, 0.3);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------------- bildirimler ---------------- */
+
+.toast-area {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.toast {
+  padding: 12px 15px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  font-size: 0.84rem;
+  background: var(--surface, #fff);
+  animation: slide-in 0.18s ease-out;
+}
+
+.toast-success { border-left-color: #0ca30c; }
+.toast-error   { border-left-color: var(--critical, #c0392b); }
+.toast-info    { border-left-color: var(--primary); }
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---------------- filtre çubuğu ---------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.filters .f { margin: 0; min-width: 170px; }
+.filters button { align-self: flex-end; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.form-grid .f.wide { grid-column: 1 / -1; }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+button.small { padding: 4px 10px; font-size: 0.74rem; }
+
+/* ---------------- anahtar/değer listesi ---------------- */
+
+.kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 20px;
+  margin: 10px 0;
+}
+
+.kv-item { display: flex; flex-direction: column; gap: 2px; }
+
+.kv-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------------- ağaç görünümü ---------------- */
+
+.tree-group {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.2));
+}
+.tree-group:last-child { border-bottom: none; }
+
+.tree-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tree-head code,
+td code,
+.state code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.76rem;
+}
+
+/* ---------------- uyarı listesi ---------------- */
+
+ul.plain.alerts > li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.15));
+}
+ul.plain.alerts > li:last-child { border-bottom: none; }
+
+.note.action {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.muted { color: var(--muted); }
+
+/* Modül etiketleri (başlıkların yanındaki küçük rozetler) */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  background: rgba(127, 127, 127, 0.16);
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+/* ---------------- üst bardaki API durumu ---------------- */
+
+.term.ok  { color: #0ca30c; }
+.term.bad { color: var(--critical, #c0392b); }
+
+/* ---------------- giriş ekranı hata kutusu ---------------- */
+
+.login-card .state { width: 100%; box-sizing: border-box; }
+.login-card .hint b { color: var(--text, inherit); }
