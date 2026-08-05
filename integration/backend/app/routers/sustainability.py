@@ -43,6 +43,10 @@ def get_weights():
         "classification_thresholds": config["classification_thresholds"],
         "total_weight": sum(config["weights"].values()),
         "computed_criteria": sorted(service.COMPUTED_CRITERIA),
+        # Arayüzün teknik alan adı göstermemesi için etiket sözlükleri.
+        "criterion_labels": config.get("criterion_labels", {}),
+        "criterion_descriptions": config.get("criterion_descriptions", {}),
+        "criterion_groups": config.get("criterion_groups", {}),
     }
 
 

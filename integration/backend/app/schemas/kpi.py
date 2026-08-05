@@ -119,16 +119,29 @@ class StrategicKpiResponse(BaseModel):
     unit: Optional[str] = Field(default=None, examples=["puan"])
     academic_year: str = Field(examples=["2025-2026"])
 
-    current_value: Decimal = Field(examples=[Decimal("4.10")])
+    # Ölçüm bulunamayan göstergelerde null döner. SIFIR DEĞİL: sıfır "ölçtük,
+    # sonuç sıfır çıktı" demektir; null "ölçüm yapılmadı" demektir.
+    current_value: Optional[Decimal] = Field(default=None, examples=[Decimal("4.10")])
+    has_data: bool = Field(
+        default=True,
+        description="Göstergenin ölçümü var mı? False ise değer ve başarı oranı null döner.",
+        examples=[True],
+    )
     target_value: Decimal = Field(examples=[Decimal("4.30")])
     previous_value: Optional[Decimal] = Field(default=None, examples=[Decimal("4.00")])
     university_average: Optional[Decimal] = Field(default=None, examples=[Decimal("3.90")])
 
-    achievement_percent: Decimal = Field(
-        description="Mevcut değerin hedefe oranı.", examples=[Decimal("95.35")]
+    achievement_percent: Optional[Decimal] = Field(
+        default=None,
+        description="Mevcut değerin hedefe oranı. Ölçüm yoksa hesaplanmaz.",
+        examples=[Decimal("95.35")],
     )
     status: str = Field(
-        description="hedefte / gecikmeli / riskli", examples=["hedefte"]
+        description=(
+            "hedefte / gecikmeli / riskli / veri eksik. 'veri eksik' bir performans "
+            "sorunu değil, ölçüm eksiğidir ve kurum ortalamasına dahil edilmez."
+        ),
+        examples=["hedefte"],
     )
     on_track_threshold: Decimal = Field(examples=[Decimal("90")])
     at_risk_threshold: Decimal = Field(examples=[Decimal("70")])
@@ -175,22 +188,47 @@ class KpiDimensionSummary(BaseModel):
 
     dimension: str = Field(examples=["Eğitim ve Öğretim Kalitesi"])
     kpi_count: int = Field(examples=[3])
-    average_achievement_percent: Decimal = Field(examples=[Decimal("92.40")])
+    average_achievement_percent: Optional[Decimal] = Field(
+        default=None,
+        description="Ölçülen göstergelerin ortalaması. Hiç ölçüm yoksa null.",
+        examples=[Decimal("92.40")],
+    )
     on_track_count: int = Field(examples=[2])
     delayed_count: int = Field(examples=[1])
     at_risk_count: int = Field(examples=[0])
+    no_data_count: int = Field(
+        default=0, description="Ölçümü bulunmayan gösterge sayısı", examples=[0]
+    )
 
 
 class KpiScorecard(BaseModel):
     """Modül 8 karne özeti."""
 
     academic_year: str = Field(examples=["2025-2026"])
-    total_kpis: int = Field(examples=[14])
+    total_kpis: int = Field(examples=[16])
+    measured_kpi_count: int = Field(
+        default=0, description="Ölçümü bulunan gösterge sayısı", examples=[16]
+    )
+    no_data_count: int = Field(
+        default=0, description="Ölçümü bulunmayan gösterge sayısı", examples=[0]
+    )
     on_track_count: int = Field(examples=[6])
     delayed_count: int = Field(examples=[5])
     at_risk_count: int = Field(examples=[3])
-    overall_achievement_percent: Decimal = Field(examples=[Decimal("88.70")])
+    overall_achievement_percent: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Yalnızca ÖLÇÜLEN göstergelerin ortalaması. Ölçümü olmayan göstergeler "
+            "sıfır kabul edilip ortalamaya katılmaz; bu, veri toplanmamış bir alanı "
+            "başarısız göstermek olurdu."
+        ),
+        examples=[Decimal("88.70")],
+    )
     overall_status: str = Field(examples=["gecikmeli"])
+    average_basis_note: str = Field(
+        default="",
+        description="Ortalamanın kaç gösterge üzerinden hesaplandığının açıklaması",
+    )
     by_dimension: List[KpiDimensionSummary]
 
 

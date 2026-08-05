@@ -78,6 +78,26 @@ def attention_list(
 
 
 @router.get(
+    "/missing-data",
+    response_model=List[StrategicKpiResponse],
+    summary="Ölçümü bulunmayan göstergeler",
+)
+def missing_data_list(
+    academic_year: Optional[str] = Query(default=None, examples=["2025-2026"]),
+    db: Session = Depends(get_db),
+) -> List[StrategicKpiResponse]:
+    """Veri eksikliği bir performans sorunu değil, ölçüm eksiğidir.
+
+    Bu göstergeler müdahale listesine girmez ve kurum ortalamasına dahil
+    edilmez; ayrı olarak burada raporlanır.
+    """
+    return [
+        StrategicKpiResponse(**row)
+        for row in service.missing_data_list(db, academic_year)
+    ]
+
+
+@router.get(
     "",
     response_model=List[StrategicKpiResponse],
     summary="KPI listesi",
@@ -86,7 +106,7 @@ def list_kpis(
     academic_year: Optional[str] = Query(default=None, examples=["2025-2026"]),
     dimension: Optional[str] = Query(default=None),
     kpi_status: Optional[str] = Query(
-        default=None, description="hedefte / gecikmeli / riskli"
+        default=None, description="hedefte / gecikmeli / riskli / veri eksik"
     ),
     include_inactive: bool = Query(default=False),
     db: Session = Depends(get_db),
@@ -111,7 +131,7 @@ def create_kpi(
 ) -> StrategicKpiResponse:
     """Aynı yıl aynı isim varsa 409, eşikler ters girilmişse 422 döner."""
     kpi = service.create_kpi(db, payload)
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi.id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi.id), db))
 
 
 @router.get(
@@ -121,7 +141,7 @@ def create_kpi(
 )
 def get_kpi(kpi_id: int, db: Session = Depends(get_db)) -> StrategicKpiResponse:
     """KPI bulunamazsa 404 döner."""
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id), db))
 
 
 @router.patch(
@@ -134,7 +154,7 @@ def update_kpi(
 ) -> StrategicKpiResponse:
     """Eşikler yönetim tarafından yapılandırılabilir olduğu için burada değişir."""
     service.update_kpi(db, kpi_id, payload)
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id), db))
 
 
 @router.post(
@@ -147,7 +167,7 @@ def record_measurement(
 ) -> StrategicKpiResponse:
     """Durum otomatik olarak yeniden hesaplanır."""
     service.record_measurement(db, kpi_id, payload)
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id), db))
 
 
 @router.put(
@@ -163,7 +183,7 @@ def set_faculty_value(
 ) -> StrategicKpiResponse:
     """Fakülte bulunamazsa 404 döner."""
     service.set_faculty_value(db, kpi_id, faculty_id, value)
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id), db))
 
 
 @router.delete(
@@ -174,4 +194,4 @@ def set_faculty_value(
 def deactivate_kpi(kpi_id: int, db: Session = Depends(get_db)) -> StrategicKpiResponse:
     """Kayıt silinmez; ölçüm geçmişi korunsun diye pasifleştirilir."""
     service.deactivate_kpi(db, kpi_id)
-    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id)))
+    return StrategicKpiResponse(**service.evaluate(service.get_kpi(db, kpi_id), db))

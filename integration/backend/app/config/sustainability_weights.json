@@ -15,17 +15,17 @@
     "reputation_contribution": 4
   },
   "criterion_sources": {
-    "student_demand": "hesaplanan (Modul 3 - taban puan + talep trendi)",
-    "occupancy_rate": "hesaplanan (Modul 3 - kontenjan doluluk orani)",
-    "graduation_rate": "hesaplanan (Modul 3 - mezuniyet orani)",
-    "graduate_employability": "dis girdi (mezun istihdam takibi)",
-    "academic_staff_quality": "dis girdi (Modul 4 - akademik kadro analitigi)",
-    "research_performance": "dis girdi (Modul 4 - yayin/atif/proje)",
-    "revenue_expenditure_balance": "dis girdi (Modul 5 - finansal analiz)",
-    "physical_resource_requirement": "dis girdi (Modul 5 - fiziksel kaynak analizi)",
-    "strategic_contribution": "dis girdi (Modul 8 - stratejik plan izleme)",
-    "regional_contribution": "dis girdi (kurumsal degerlendirme)",
-    "reputation_contribution": "dis girdi (kurumsal itibar / marka degeri)"
+    "student_demand": "Öğrenci kayıtları — taban puan ve talep eğilimi",
+    "occupancy_rate": "Öğrenci kayıtları — kontenjan ve yerleşme",
+    "graduation_rate": "Öğrenci kayıtları — mezuniyet oranları",
+    "graduate_employability": "Mezun takip verisi",
+    "academic_staff_quality": "Akademik personel kayıtları",
+    "research_performance": "Akademik personel kayıtları — yayın, atıf ve proje",
+    "revenue_expenditure_balance": "Mali dönem verileri",
+    "physical_resource_requirement": "Fiziksel mekân envanteri",
+    "strategic_contribution": "Stratejik plan verileri",
+    "regional_contribution": "Bölgesel katkı kayıtları",
+    "reputation_contribution": "Kurumsal itibar değerlendirmesi"
   },
   "classification_thresholds": {
     "growth_potential_min_score": 75,
@@ -33,5 +33,51 @@
     "strategic_support_min_contribution": 60,
     "merger_max_occupancy_ratio": 0.4,
     "merger_max_student_body": 150
-  }
+  },
+  "criterion_labels": {
+    "student_demand": "Öğrenci talebi",
+    "occupancy_rate": "Kontenjan doluluk oranı",
+    "graduation_rate": "Mezuniyet oranı",
+    "graduate_employability": "Mezun istihdamı",
+    "academic_staff_quality": "Akademik kadro yeterliliği",
+    "research_performance": "Araştırma performansı",
+    "revenue_expenditure_balance": "Gelir-gider dengesi",
+    "physical_resource_requirement": "Fiziksel kaynak yeterliliği",
+    "strategic_contribution": "Stratejik hedeflere katkı",
+    "regional_contribution": "Bölgesel katkı",
+    "reputation_contribution": "Kurumsal itibar katkısı"
+  },
+  "criterion_descriptions": {
+    "student_demand": "Programa olan başvuru ilgisi ve taban puanın eğilimi.",
+    "occupancy_rate": "Açılan kontenjanın ne kadarının dolduğu.",
+    "graduation_rate": "Kayıtlı öğrencilerin mezun olma oranı.",
+    "graduate_employability": "Mezunların iş bulma başarısı.",
+    "academic_staff_quality": "Öğretim kadrosunun unvan yapısı ve yeterliliği.",
+    "research_performance": "Öğretim üyelerinin yayın, atıf ve proje üretimi.",
+    "revenue_expenditure_balance": "Programın kendi gelirini karşılama durumu.",
+    "physical_resource_requirement": "Derslik ve laboratuvar ihtiyacının karşılanma düzeyi.",
+    "strategic_contribution": "Kurumun stratejik hedeflerine sağladığı katkı.",
+    "regional_contribution": "Bölge ekonomisine ve toplumuna katkı.",
+    "reputation_contribution": "Kurumun bilinirliğine ve itibarına katkı."
+  },
+  "criterion_groups": {
+    "Öğrenci ve eğitim": [
+      "student_demand",
+      "occupancy_rate",
+      "graduation_rate",
+      "graduate_employability"
+    ],
+    "Kaynak ve mali yapı": [
+      "academic_staff_quality",
+      "revenue_expenditure_balance",
+      "physical_resource_requirement"
+    ],
+    "Stratejik katkı": [
+      "research_performance",
+      "strategic_contribution",
+      "regional_contribution",
+      "reputation_contribution"
+    ]
+  },
+  "_etiket_notu": "criterion_labels, criterion_descriptions ve criterion_groups yalnızca arayüz gösterimi içindir. Ağırlıklar ve hesaplama mantığı değiştirilmemiştir."
 }

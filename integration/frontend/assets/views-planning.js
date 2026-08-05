@@ -14,6 +14,15 @@
    Senaryo Analizi
    ================================================================== */
 
+// Backend risk seviyelerinin kullanıcıya gösterilecek Türkçe karşılıkları.
+// Ekranda "critical" gibi teknik değerler görünmemeli.
+const RISK_LEVEL_LABELS = {
+  low: "düşük",
+  medium: "orta",
+  high: "yüksek",
+  critical: "kritik",
+};
+
 VIEWS["scenarios"] = {
   title: "Senaryo Analizi",
   subtitle: "What-if simülasyonu · değişikliğin mali, akademik ve kapasite etkileri",
@@ -256,7 +265,7 @@ async function runScenarioPreview() {
         <div class="card">
           <h3>Senaryo sonucu — ${fmt.esc(spec.label)}</h3>
           <div class="state ${level === "low" ? "empty" : "warn"}">
-            ${chip(levelClass, "risk seviyesi: " + level)}
+            ${chip(levelClass, "Genel risk: " + (RISK_LEVEL_LABELS[level] || level))}
             ${fmt.esc(r.recommendation || "")}
           </div>
           <h4>En çok değişen göstergeler</h4>
@@ -268,27 +277,40 @@ async function runScenarioPreview() {
           </div>
         </div>
 
-        ${groupTable(cmp.financial, "Mali etki",
-          "Gelir, gider, denge ve öğrenci başına maliyet üzerindeki etki. Tüm tutarlar " + cur + ".")}
-        ${groupTable(cmp.academic, "Akademik etki",
-          "Öğrenci ve personel sayıları ile öğretim üyesi başına düşen öğrenci.")}
-        ${groupTable(cmp.capacity, "Kapasite etkisi",
-          "Eş zamanlı talep, tüm öğrencilerin aynı anda derslikte olmadığı varsayımıyla hesaplanır.")}
+        ${ux.details(
+          "Mali etkinin tüm kalemleri",
+          groupTable(cmp.financial, "Mali etki",
+            "Gelir, gider, denge ve öğrenci başına maliyet üzerindeki etki. Tüm tutarlar " + cur + "."),
+          { hint: cmp.financial.length + " kalem" }
+        )}
+        ${ux.details(
+          "Akademik etkinin tüm kalemleri",
+          groupTable(cmp.academic, "Akademik etki",
+            "Öğrenci ve personel sayıları ile öğretim üyesi başına düşen öğrenci."),
+          { hint: cmp.academic.length + " kalem" }
+        )}
+        ${ux.details(
+          "Kapasite etkisinin tüm kalemleri",
+          groupTable(cmp.capacity, "Kapasite etkisi",
+            "Eş zamanlı talep, tüm öğrencilerin aynı anda derslikte olmadığı varsayımıyla hesaplanır."),
+          { hint: cmp.capacity.length + " kalem" }
+        )}
 
         ${
           r.risks.length
-            ? `<div class="card"><h3>Tespit edilen riskler (${r.risks.length})</h3>
-                <ul class="plain">${r.risks
-                  .map(
-                    (x) =>
-                      `<li>${chip(
-                        x.level === "critical" ? "critical"
-                        : x.level === "high" ? "warning" : "info",
-                        x.level
-                      )}${fmt.esc(x.message || x.description || "")}</li>`
-                  )
-                  .join("")}</ul></div>`
-            : `<div class="card"><h3>Riskler</h3>${ui.empty(
+            ? `<div class="card"><h3>Dikkat edilmesi gerekenler</h3>
+                ${ux.limitedList(
+                  r.risks,
+                  3,
+                  (x) =>
+                    `<li>${chip(
+                      x.level === "critical" ? "critical"
+                      : x.level === "high" ? "warning" : "info",
+                      RISK_LEVEL_LABELS[x.level] || x.level
+                    )}${fmt.esc(x.message || x.description || "")}</li>`,
+                  "Diğer uyarıları göster"
+                )}</div>`
+            : `<div class="card"><h3>Dikkat edilmesi gerekenler</h3>${ui.empty(
                 "Bu senaryoda hiçbir risk kuralı tetiklenmedi."
               )}</div>`
         }`;
@@ -331,17 +353,18 @@ VIEWS["alerts"] = {
 
     <div class="grid cols-2">
       <div class="card">
-        <h3>Tanımlı kurallar</h3>
+        <h3>Uyarı kuralları</h3>
         <div class="note">
-          Kurallar <code>app/config/early_warning_rules.json</code> dosyasından okunur.
+          Sistemin hangi durumda uyarı ürettiğini gösterir. Kurallar yönetici
+          tarafından güncellenebilir.
         </div>
         <div id="alRules"></div>
       </div>
       <div class="card">
-        <h3>Henüz çalıştırılamayan kurallar</h3>
+        <h3>Veri beklendiği için çalışmayan kurallar</h3>
         <div class="note">
-          Bu kurallar tanımlı ancak gerekli veri girilmediği için değerlendirilemiyor.
-          Sonuç üretiyormuş gibi göstermek yerine burada açıkça listeleniyor.
+          Bu kurallar tanımlı, ancak gerekli ölçüm henüz girilmediği için
+          değerlendirilemiyor. Sonuç üretiyormuş gibi gösterilmez.
         </div>
         <div id="alPending"></div>
       </div>

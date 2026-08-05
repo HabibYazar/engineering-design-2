@@ -78,10 +78,16 @@ class SustainabilityRequest(BaseModel):
 
 
 class WeightConfigResponse(BaseModel):
-    """Aktif ağırlık yapılandırması."""
+    """Aktif ağırlık yapılandırması ve arayüz etiketleri."""
 
     weights: Dict[str, float]
     criterion_sources: Dict[str, str]
     classification_thresholds: Dict[str, float]
     total_weight: float
     computed_criteria: List[str]
+
+    # Arayüz gösterimi için. Teknik alan adları (student_demand gibi)
+    # kullanıcıya gösterilmez; bu sözlükler üzerinden Türkçeleştirilir.
+    criterion_labels: Dict[str, str] = {}
+    criterion_descriptions: Dict[str, str] = {}
+    criterion_groups: Dict[str, List[str]] = {}

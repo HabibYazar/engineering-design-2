@@ -31,10 +31,18 @@ router = APIRouter(prefix="/api/academic-staff", tags=["Modül 4 — Akademik Pe
 )
 def get_overview(
     academic_year: Optional[str] = Query(default=None, examples=["2025-2026"]),
+    faculty_id: Optional[int] = Query(
+        default=None, ge=1, description="Verilirse özet o fakülteye daraltılır"
+    ),
+    department_id: Optional[int] = Query(
+        default=None, ge=1, description="Verilirse özet o bölüme daraltılır"
+    ),
     db: Session = Depends(get_db),
 ) -> StaffOverview:
     """Personel sayısı, toplam üretim ve unvan dağılımını özetler."""
-    return StaffOverview(**service.staff_overview(db, academic_year))
+    return StaffOverview(
+        **service.staff_overview(db, academic_year, faculty_id, department_id)
+    )
 
 
 @router.get(

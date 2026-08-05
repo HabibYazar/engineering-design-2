@@ -11,11 +11,13 @@ VIEWS["students"] = {
   subtitle: "Kayıt, doluluk, mezuniyet ve talep göstergeleri",
   html: () => `
     <div class="card">
-      <div class="filters">
-        <label class="f">Akademik yıl <select id="stYear"></select></label>
-        <label class="f">Fakülte <select id="stFaculty"><option value="">Tümü</option></select></label>
-        <button class="ghost" id="stApply">Uygula</button>
+      <h3>Kapsam seçin</h3>
+      <div class="note">
+        Fakülte seçtikten sonra bölüm, bölüm seçtikten sonra program
+        seçebilirsiniz. Seçim yapmadan “Sonuçları Göster” derseniz üniversite
+        geneli sonuçlar gelir.
       </div>
+      <div id="stFilter"></div>
     </div>
 
     <div id="stTiles"></div>
@@ -46,21 +48,28 @@ VIEWS["students"] = {
     </div>`,
 
   async init() {
-    await fillYearSelect("stYear");
-    await fillSelect("stFaculty", await ref.faculties());
-    document.getElementById("stApply").addEventListener("click", () => refreshStudents());
-    refreshStudents();
+    const years = await ref.academicYears().catch(() => [CURRENT_YEAR]);
+    ST_FILTER = new OrgFilter("stFilter", {
+      withYear: true,
+      years,
+      defaultYear: years.includes(CURRENT_YEAR) ? CURRENT_YEAR : years[years.length - 1],
+      level: "department",
+      onApply: (scope) => refreshStudents(scope),
+    });
+    await ST_FILTER.render();
+    // Üniversite geneli varsayılan görünüm olarak bir kez yüklenir.
+    refreshStudents(ST_FILTER.value());
   },
 };
 
-function studentFilters() {
-  const year = document.getElementById("stYear")?.value || undefined;
-  const faculty = document.getElementById("stFaculty")?.value || undefined;
-  return { academic_year: year, faculty_id: faculty };
-}
+let ST_FILTER = null;
 
-function refreshStudents() {
-  const f = studentFilters();
+function refreshStudents(scope) {
+  const f = {
+    academic_year: scope.year,
+    faculty_id: scope.facultyId || undefined,
+    department_id: scope.departmentId || undefined,
+  };
 
   load(
     "stTiles",
@@ -192,14 +201,18 @@ VIEWS["staff"] = {
   subtitle: "Yayın, atıf, ders yükü ve ağırlıklı performans puanı",
   html: () => `
     <div class="card">
-      <div class="filters">
-        <label class="f">Akademik yıl <select id="stfYear"><option value="">Tümü</option></select></label>
-        <label class="f">Karşılaştırma <select id="stfGroup">
+      <h3>Kapsam seçin</h3>
+      <div class="note">
+        Fakülte ve bölüm seçerek kadroyu daraltabilir, seçim yapmadan
+        üniversite genelini görebilirsiniz.
+      </div>
+      <div id="stfFilter"></div>
+      <div class="filters" style="margin-top:12px">
+        <label class="f">Karşılaştırma kırılımı <select id="stfGroup">
           <option value="department">Bölüme göre</option>
           <option value="faculty">Fakülteye göre</option>
           <option value="title">Unvana göre</option>
         </select></label>
-        <button class="ghost" id="stfApply">Uygula</button>
       </div>
     </div>
 
@@ -221,31 +234,56 @@ VIEWS["staff"] = {
     <div class="card">
       <h3>Performans sıralaması</h3>
       <div class="note">
-        Ağırlıklı puan = yayın×5 + atıf×2 + ders yükü×1 + danışmanlık×3 +
-        proje×4 + patent×6 + topluma katkı×2. Ağırlıklar
-        <code>app/config/academic_staff_weights.json</code> dosyasından okunur.
+        Akademik üretim; yayın, atıf, ders yükü, danışmanlık, proje, patent ve
+        topluma katkı kalemlerinin ağırlıklı toplamı olarak puanlanır.
       </div>
       <div id="stfRanking"></div>
+      ${ux.details(
+        "Puanlama nasıl yapılıyor?",
+        `<table class="table"><thead><tr><th>Kalem</th><th>Ağırlık</th></tr></thead>
+         <tbody>
+           <tr><td>Patent</td><td>6</td></tr>
+           <tr><td>Yayın</td><td>5</td></tr>
+           <tr><td>Proje</td><td>4</td></tr>
+           <tr><td>Danışmanlık</td><td>3</td></tr>
+           <tr><td>Atıf</td><td>2</td></tr>
+           <tr><td>Topluma katkı</td><td>2</td></tr>
+           <tr><td>Ders yükü</td><td>1</td></tr>
+         </tbody></table>
+         <div class="note">Ağırlıklar yönetici tarafından güncellenebilir.</div>`,
+        { hint: "Ağırlık tablosu" }
+      )}
     </div>`,
 
   async init() {
-    const years = await api.get("/api/academic-staff/trend").catch(() => []);
-    const sel = document.getElementById("stfYear");
-    sel.innerHTML =
-      `<option value="">Tümü</option>` +
-      years.map((y) => `<option>${fmt.esc(y.academic_year)}</option>`).join("");
-    document.getElementById("stfApply").addEventListener("click", () => refreshStaff());
-    refreshStaff();
+    const trend = await api.get("/api/academic-staff/trend").catch(() => []);
+    const years = trend.map((y) => y.academic_year);
+    STF_FILTER = new OrgFilter("stfFilter", {
+      withYear: years.length > 0,
+      years,
+      defaultYear: years[years.length - 1] || null,
+      level: "department",
+      onApply: (scope) => refreshStaff(scope),
+    });
+    await STF_FILTER.render();
+    document
+      .getElementById("stfGroup")
+      .addEventListener("change", () => refreshStaff(STF_FILTER.value()));
+    refreshStaff(STF_FILTER.value());
   },
 };
 
-function refreshStaff() {
-  const year = document.getElementById("stfYear")?.value || undefined;
+let STF_FILTER = null;
+
+function refreshStaff(scope) {
+  const year = scope.year || undefined;
+  const facultyId = scope.facultyId || undefined;
+  const departmentId = scope.departmentId || undefined;
   const group = document.getElementById("stfGroup")?.value || "department";
 
   load(
     "stfTiles",
-    () => api.get("/api/academic-staff/overview", { academic_year: year }),
+    () => api.get("/api/academic-staff/overview", { academic_year: year, faculty_id: facultyId, department_id: departmentId }),
     (o, el) => {
       el.className = "tiles";
       el.innerHTML = tileHtml([
@@ -291,7 +329,7 @@ function refreshStaff() {
 
   load(
     "stfTitles",
-    () => api.get("/api/academic-staff/overview", { academic_year: year }),
+    () => api.get("/api/academic-staff/overview", { academic_year: year, faculty_id: facultyId, department_id: departmentId }),
     (o, el) => {
       el.id = "stfTitleBars";
       hbars(
@@ -304,12 +342,12 @@ function refreshStaff() {
 
   load(
     "stfRanking",
-    () => api.get("/api/academic-staff/ranking", { academic_year: year }),
+    () => api.get("/api/academic-staff/ranking", { academic_year: year, faculty_id: facultyId, department_id: departmentId }),
     (rows, el) => {
       if (!rows.length) return void (el.innerHTML = ui.empty("Personel kaydı yok."));
       el.innerHTML = table(
-        ["#", "Ad Soyad", "Unvan", "Bölüm", "Yayın×5", "Atıf×2", "Patent×6", "Toplam", "Bant"],
-        rows.slice(0, 40).map((r) => {
+        ["#", "Ad Soyad", "Unvan", "Bölüm", "Toplam puan", "Bant"],
+        rows.slice(0, 10).map((r) => {
           const level =
             r.performance_band === "yüksek performans"
               ? "good"
@@ -321,18 +359,45 @@ function refreshStaff() {
             fmt.esc(r.full_name),
             fmt.esc(r.title),
             fmt.esc(r.department_name),
-            fmt.dec(r.score_breakdown.publication_count, 0),
-            fmt.dec(r.score_breakdown.citation_count, 0),
-            fmt.dec(r.score_breakdown.patent_count, 0),
             `<b>${fmt.dec(r.total_score, 1)}</b>`,
             chip(level, r.performance_band),
           ];
         })
       );
-      if (rows.length > 40) {
+      // Uzun liste ana ekranı doldurmasın: kalanı açılır bölümde.
+      if (rows.length > 10) {
         el.insertAdjacentHTML(
           "beforeend",
-          `<div class="note">İlk 40 kayıt gösteriliyor · toplam ${rows.length} personel.</div>`
+          ux.details(
+            "Sıralamanın tamamını göster",
+            table(
+              ["#", "Ad Soyad", "Unvan", "Bölüm", "Toplam puan", "Bant"],
+              rows.slice(10).map((r) => [
+                r.rank,
+                fmt.esc(r.full_name),
+                fmt.esc(r.title),
+                fmt.esc(r.department_name),
+                `<b>${fmt.dec(r.total_score, 1)}</b>`,
+                chip(
+                  r.performance_band === "yüksek performans" ? "good"
+                  : r.performance_band === "beklenen performans" ? "info" : "warning",
+                  r.performance_band
+                ),
+              ])
+            ),
+            { hint: `${rows.length - 10} kayıt daha` }
+          ) +
+            ux.details(
+              "Puan nasıl hesaplanıyor?",
+              `<p class="note">
+                 Ağırlıklı puan = yayın×5 + atıf×2 + ders yükü×1 + danışmanlık×3
+                 + proje×4 + patent×6 + topluma katkı×2
+               </p>
+               <p class="note muted">
+                 Ağırlıklar kurumsal puanlama politikasından gelir ve veriden
+                 bağımsız olarak yönetilir.
+               </p>`
+            )
         );
       }
     }
@@ -363,11 +428,13 @@ VIEWS["physical"] = {
 
     <div class="grid cols-2">
       <div class="card">
-        <h3>Aşırı dolu mekânlar <span class="tag">%90 üstü</span></h3>
+        <h3>Acil kapasite ihtiyacı</h3>
+        <div class="note">Doluluk oranı %90'ın üzerinde olan mekânlar.</div>
         <div id="phOver"></div>
       </div>
       <div class="card">
-        <h3>Atıl kapasiteli mekânlar <span class="tag">%50 altı</span></h3>
+        <h3>Değerlendirilmemiş kapasite</h3>
+        <div class="note">Doluluk oranı %50'nin altında kalan mekânlar.</div>
         <div id="phUnder"></div>
       </div>
     </div>
@@ -384,14 +451,7 @@ VIEWS["physical"] = {
       <div id="phForecast"></div>
     </div>
 
-    <div class="card">
-      <h3>Kişi başına düşen kapasite</h3>
-      <div class="note">
-        Öğrenci ve personel sayıları veritabanındaki aktif kayıtlardan sayılır;
-        sabit varsayım kullanılmaz.
-      </div>
-      <div id="phPerPerson"></div>
-    </div>`,
+    <div id="phPerPersonWrap"></div>`,
 
   async init() {
     load(
@@ -454,20 +514,32 @@ VIEWS["physical"] = {
       }
     );
 
+    // Uzun mekân listeleri ana ekranı doldurmasın: ilk 5 satır görünür,
+    // kalanı açılır bölümde. Veri gizlenmez, ertelenir.
+    const facilityRows = (rows) =>
+      rows.map((r) => [
+        fmt.esc(r.name),
+        fmt.esc(TYPE_LABELS[r.facility_type] || r.facility_type),
+        fmt.esc(r.department_name || "Ortak kullanım"),
+        fmt.int(r.capacity),
+        fmt.int(r.occupied),
+        fmt.pct(r.occupancy_percent),
+      ]);
+    const facilityHeaders = ["Mekân", "Tür", "Birim", "Kapasite", "Dolu", "Doluluk"];
+
     const facilityTable = (rows, el, emptyMsg) => {
       if (!rows.length) return void (el.innerHTML = ui.empty(emptyMsg));
-      el.innerHTML = table(
-        ["Kod", "Mekân", "Tür", "Birim", "Kapasite", "Dolu", "Doluluk"],
-        rows.map((r) => [
-          `<code>${fmt.esc(r.code)}</code>`,
-          fmt.esc(r.name),
-          fmt.esc(TYPE_LABELS[r.facility_type] || r.facility_type),
-          fmt.esc(r.department_name || "Ortak"),
-          fmt.int(r.capacity),
-          fmt.int(r.occupied),
-          fmt.pct(r.occupancy_percent),
-        ])
-      );
+      el.innerHTML = table(facilityHeaders, facilityRows(rows.slice(0, 5)));
+      if (rows.length > 5) {
+        el.insertAdjacentHTML(
+          "beforeend",
+          ux.details(
+            "Tümünü göster",
+            table(facilityHeaders, facilityRows(rows.slice(5))),
+            { hint: `${rows.length - 5} mekân daha` }
+          )
+        );
+      }
     };
 
     load(
@@ -506,6 +578,11 @@ VIEWS["physical"] = {
     document.getElementById("phRun").addEventListener("click", runForecast);
     runForecast();
 
+    document.getElementById("phPerPersonWrap").innerHTML = ux.details(
+      "Kişi başına düşen kapasite",
+      `<div id="phPerPerson">${ux.skeleton(2)}</div>`,
+      { hint: "Öğrenci ve personel başına alan" }
+    );
     load(
       "phPerPerson",
       () => api.get("/api/physical-resources/capacity/per-person"),
@@ -762,303 +839,6 @@ function refreshFinance() {
     }
   );
 }
-
-/* ==================================================================
-   Program Sürdürülebilirliği — Modül 7 (Begüm)
-   ================================================================== */
-
-VIEWS["sustainability"] = {
-  title: "Program Sürdürülebilirliği",
-  subtitle: "Çok kriterli program değerlendirmesi",
-  html: () => `
-    <div class="card">
-      <div class="filters">
-        <label class="f">Akademik yıl <select id="susYear"></select></label>
-        <button class="ghost" id="susApply">Uygula</button>
-      </div>
-    </div>
-
-    <div class="grid cols-3-2">
-      <div class="card">
-        <h3>Kategori dağılımı</h3>
-        <div id="susCategories"></div>
-      </div>
-      <div class="card">
-        <h3>Değerlendirme ağırlıkları</h3>
-        <div class="note">
-          Ağırlıklar <code>app/config/sustainability_weights.json</code> dosyasından
-          okunur; kodda gömülü değildir.
-        </div>
-        <div id="susWeights"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Program skorları</h3>
-      <div class="note">
-        Veri tamlığı sütunu, skorun ne kadar veriye dayandığını gösterir.
-        Düşük tamlıkta skor temkinli yorumlanmalıdır.
-      </div>
-      <div id="susScores"></div>
-    </div>`,
-
-  async init() {
-    await fillYearSelect("susYear");
-    document.getElementById("susApply").addEventListener("click", () => refreshSustainability());
-    refreshSustainability();
-  },
-};
-
-function refreshSustainability() {
-  const year = document.getElementById("susYear").value;
-
-  load(
-    "susCategories",
-    () => api.get("/api/program-sustainability/categories", { academic_year: year }),
-    (rows, el) => {
-      if (!rows.length) return void (el.innerHTML = ui.empty("Kategori verisi yok."));
-      el.id = "susCatBars";
-      hbars(
-        "susCatBars",
-        rows.map((r) => [
-          r.category || r.simplified_category,
-          Number(r.program_count ?? r.count) || 0,
-        ]),
-        { fmt: (v) => fmt.int(v) + " program" }
-      );
-    }
-  );
-
-  load(
-    "susWeights",
-    () => api.get("/api/program-sustainability/weights"),
-    (w, el) => {
-      const rows = Object.entries(w.weights || {});
-      el.innerHTML = table(
-        ["Kriter", "Ağırlık", "Veri kaynağı"],
-        rows.map(([k, v]) => [
-          fmt.esc(k),
-          fmt.dec(v, 2),
-          fmt.esc((w.criterion_sources || {})[k] || "—"),
-        ])
-      ) + `<div class="note">Toplam ağırlık: ${fmt.dec(w.total_weight, 2)}</div>`;
-    }
-  );
-
-  load(
-    "susScores",
-    () => api.get("/api/program-sustainability/scores", { academic_year: year }),
-    (rows, el) => {
-      if (!rows.length) return void (el.innerHTML = ui.empty("Program skoru üretilemedi."));
-      el.innerHTML = table(
-        ["Program", "Skor", "Veri tamlığı", "Kategori", "Eksik kriterler"],
-        rows.map((r) => {
-          const score = Number(r.sustainability_score);
-          const level = score < 40 ? "critical" : score < 65 ? "warning" : "good";
-          return [
-            `<b>${fmt.esc(r.program_code)}</b><br><span class="muted">${fmt.esc(r.program_name)}</span>`,
-            chip(level, fmt.dec(r.sustainability_score, 1)),
-            fmt.pct(r.data_completeness_percent),
-            fmt.esc(r.category),
-            (r.missing_criteria || []).length
-              ? `<span class="muted">${fmt.esc((r.missing_criteria || []).join(", "))}</span>`
-              : fmt.empty,
-          ];
-        })
-      );
-    }
-  );
-}
-
-/* ==================================================================
-   Performans ve KPI — Modül 8 (Halil)
-   ================================================================== */
-
-VIEWS["kpi"] = {
-  title: "Performans ve KPI",
-  subtitle: "Stratejik gösterge izleme · her göstergenin formülü ve kaynağı belirtilir",
-  html: () => `
-    <div id="kpiTiles"></div>
-
-    <div class="grid cols-2">
-      <div class="card">
-        <h3>Stratejik boyutlara göre başarı</h3>
-        <div class="note">En zayıf boyuttan başlayarak sıralanır.</div>
-        <div id="kpiDims"></div>
-      </div>
-      <div class="card">
-        <h3>Fakülte karşılaştırması</h3>
-        <div class="note">Yalnızca o fakülte için ölçüm girilmiş göstergeler hesaba katılır.</div>
-        <div id="kpiFaculties"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Müdahale gerektiren göstergeler</h3>
-      <div class="note">Riskli ve gecikmeli KPI'lar, düzeltici eylem önerileriyle birlikte.</div>
-      <div id="kpiAttention"></div>
-    </div>
-
-    <div class="card">
-      <h3>Tüm göstergeler</h3>
-      <div class="filters">
-        <label class="f">Durum <select id="kpiStatus">
-          <option value="">Tümü</option>
-          <option value="hedefte">Hedefte</option>
-          <option value="gecikmeli">Gecikmeli</option>
-          <option value="riskli">Riskli</option>
-        </select></label>
-        <button class="ghost" id="kpiApply">Filtrele</button>
-      </div>
-      <div id="kpiAll"></div>
-    </div>`,
-
-  async init() {
-    load(
-      "kpiTiles",
-      () => api.get("/api/kpi/scorecard", { academic_year: CURRENT_YEAR }),
-      (k, el) => {
-        el.className = "tiles";
-        el.innerHTML = tileHtml([
-          ["İzlenen gösterge", fmt.int(k.total_kpis)],
-          ["Hedefte", fmt.int(k.on_track_count)],
-          ["Gecikmeli", fmt.int(k.delayed_count)],
-          ["Riskli", fmt.int(k.at_risk_count)],
-          ["Genel başarı", fmt.pct(k.overall_achievement_percent),
-            k.overall_status, k.overall_status === "hedefte" ? "up" : "down"],
-          ["Stratejik boyut", fmt.int(k.by_dimension.length)],
-        ]);
-      }
-    );
-
-    load(
-      "kpiDims",
-      () => api.get("/api/kpi/scorecard", { academic_year: CURRENT_YEAR }),
-      (k, el) => {
-        el.innerHTML = `<div id="kpiDimBars"></div>` +
-          table(
-            ["Boyut", "Gösterge", "Ort. başarı", "Hedefte", "Gecikmeli", "Riskli"],
-            k.by_dimension.map((d) => [
-              fmt.esc(d.dimension),
-              fmt.int(d.kpi_count),
-              fmt.pct(d.average_achievement_percent),
-              fmt.int(d.on_track_count),
-              fmt.int(d.delayed_count),
-              fmt.int(d.at_risk_count),
-            ])
-          );
-        hbars(
-          "kpiDimBars",
-          k.by_dimension.map((d) => {
-            const v = Number(d.average_achievement_percent);
-            return [d.dimension, v, v < 70 ? "var(--critical, #c0392b)" : v < 90 ? "var(--accent)" : "var(--primary)"];
-          }),
-          {
-            max: 120,
-            fmt: (v) => fmt.pct(v),
-            valueLabel: "Hedefe ulaşma oranı (%)",
-            legend: [["Riskli (%70 altı)", "var(--critical, #c0392b)"],
-                     ["Gecikmeli (%70–90)", "var(--accent)"],
-                     ["Hedefte (%90 üstü)", "var(--primary)"]],
-          }
-        );
-      }
-    );
-
-    load(
-      "kpiFaculties",
-      () => api.get("/api/kpi/faculty-comparison", { academic_year: CURRENT_YEAR }),
-      (rows, el) => {
-        if (!rows.length) return void (el.innerHTML = ui.empty("Fakülte kırılımı girilmemiş."));
-        el.innerHTML = `<div id="kpiFacBars"></div>` +
-          table(
-            ["Fakülte", "Ölçülen gösterge", "Ort. başarı", "Ortalamanın üstünde"],
-            rows.map((r) => [
-              fmt.esc(r.faculty_name),
-              fmt.int(r.measured_kpi_count),
-              fmt.pct(r.average_achievement_percent),
-              fmt.int(r.kpis_above_university_average),
-            ])
-          );
-        hbars(
-          "kpiFacBars",
-          rows.map((r) => [r.faculty_name, Number(r.average_achievement_percent) || 0]),
-          { max: 120, fmt: (v) => fmt.pct(v) }
-        );
-      }
-    );
-
-    load(
-      "kpiAttention",
-      () => api.get("/api/kpi/attention", { academic_year: CURRENT_YEAR }),
-      (rows, el) => {
-        if (!rows.length) return void (el.innerHTML = ui.empty("Tüm göstergeler hedefte."));
-        el.innerHTML =
-          `<ul class="plain">` +
-          rows
-            .map(
-              (r) => `<li>
-                ${chip(r.status === "riskli" ? "critical" : "warning", fmt.pct(r.achievement_percent))}
-                <b>${fmt.esc(r.name)}</b>
-                <span class="push" style="font-size:.72rem">${fmt.esc(r.dimension)}</span>
-                <div class="note">${fmt.esc(r.description || "")}</div>
-                <div class="note">Mevcut <b>${fmt.dec(r.current_value, 2)} ${fmt.esc(r.unit || "")}</b> ·
-                  hedef ${fmt.dec(r.target_value, 2)} ·
-                  ${fmt.esc(r.direction_label || "")}</div>
-                <div class="note muted"><b>Formül:</b> ${fmt.esc(r.formula || "—")} ·
-                  <b>Kaynak:</b> ${fmt.esc(r.data_source || "—")}</div>
-                ${r.corrective_action ? `<div class="note action">▸ ${fmt.esc(r.corrective_action)}</div>` : ""}
-              </li>`
-            )
-            .join("") +
-          `</ul>`;
-      }
-    );
-
-    const refreshAll = () =>
-      load(
-        "kpiAll",
-        () =>
-          api.get("/api/kpi", {
-            academic_year: CURRENT_YEAR,
-            kpi_status: document.getElementById("kpiStatus").value || undefined,
-          }),
-        (rows, el) => {
-          if (!rows.length) return void (el.innerHTML = ui.empty("Bu filtrede gösterge yok."));
-          // Her göstergenin künyesi birlikte gösterilir: ne ölçtüğü, nasıl
-          // hesaplandığı, nereden geldiği ve yükselmesinin iyi mi kötü mü
-          // olduğu. Bunlar olmadan "52.2" gibi çıplak bir sayı kalıyordu.
-          el.innerHTML = table(
-            ["Gösterge", "Boyut", "Mevcut", "Hedef", "Geçen dönem", "Başarı", "Yön", "Durum"],
-            rows.map((r) => {
-              const unit = r.unit ? ` <span class="muted">${fmt.esc(r.unit)}</span>` : "";
-              const better = r.higher_is_better ? "▲ yükselmesi iyi" : "▼ düşmesi iyi";
-              const sourceTag = r.value_source === "derived"
-                ? chip("info", "sistemden hesaplanıyor") : "";
-              return [
-                `<b>${fmt.esc(r.name)}</b> ${sourceTag}
-                 <br><span class="muted">${fmt.esc(r.description || "")}</span>
-                 <br><span class="muted"><b>Formül:</b> ${fmt.esc(r.formula || "—")}</span>
-                 <br><span class="muted"><b>Kaynak:</b> ${fmt.esc(r.data_source || "—")}</span>`,
-                fmt.esc(r.dimension),
-                `<b>${fmt.dec(r.current_value, 2)}</b>${unit}`,
-                fmt.dec(r.target_value, 2),
-                r.previous_value === null ? fmt.empty : fmt.dec(r.previous_value, 2),
-                fmt.pct(r.achievement_percent),
-                `<span class="muted">${better}</span><br>${fmt.esc(r.direction_label || "")}`,
-                chip(
-                  r.status === "hedefte" ? "good" : r.status === "gecikmeli" ? "warning" : "critical",
-                  r.status
-                ),
-              ];
-            })
-          );
-        }
-      );
-    document.getElementById("kpiApply").addEventListener("click", refreshAll);
-    refreshAll();
-  },
-};
 
 /* ==================================================================
    THE · QS · YÖK Değerlendirme — Modül 10 (Habib)

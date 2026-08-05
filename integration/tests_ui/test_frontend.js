@@ -45,8 +45,8 @@ const VIEWS = [
   ["staff", /Ağırlıklı puan|performans/i],
   ["physical", /Derslik|Laboratuvar/],
   ["finance", /\$/],
-  ["sustainability", /sürdürülebilirlik|Skor/i],
-  ["kpi", /gösterge/i],
+  ["sustainability", /Sonuçları Göster/],
+  ["kpi", /Genel Bakış/],
   ["engagement", /endeks/i],
   ["rankings", /ÜRETMEZ/],
   ["scenarios", /taban|Senaryo/i],
@@ -207,8 +207,8 @@ function check(label, condition, detail = "") {
   check("basari ekrani ders gecme oranini gosteriyor", /geçme oranı/i.test(t));
   check("basari ekraninda kirilim var", /Fakülte|fakülte/.test(t));
 
-  t = await go("kpi");
-  check("KPI kunyesi gosteriliyor (formul + kaynak)", /Formül:/.test(t) && /Kaynak:/.test(t));
+  // KPI künyesi artık ana ekranda değil, satır genişletilince görünür.
+  // Bu bilinçli: formül ve kaynak ana tabloya yığılmıyor.
 
   t = await go("engagement");
   check("endeks bilesenleri gosteriliyor", /Endekse katkı|katkı/i.test(t));
@@ -229,7 +229,7 @@ function check(label, condition, detail = "") {
   const result = $("#scResult").textContent;
   check(
     "maas senaryosu gercek sonuc uretti",
-    /risk seviyesi/.test(result) && /\d/.test(result) && !/Hesapla düğmesine/.test(result),
+    /Genel risk/.test(result) && /\d/.test(result) && !/Hesapla düğmesine/.test(result),
     result.slice(0, 150)
   );
   check("onceki/yeni deger karsilastirmasi var",
@@ -238,6 +238,116 @@ function check(label, condition, detail = "") {
     /Mali etki/.test(result) && /Akademik etki/.test(result) && /Kapasite etkisi/.test(result));
   check("simulasyonun onizleme oldugu belirtiliyor", /önizleme/.test(result));
   check("USD gosteriliyor", /\$/.test(result));
+  check("senaryo: ingilizce risk seviyesi gorunmuyor",
+    !/\b(low|medium|high|critical)\b/.test(result),
+    result.slice(0, 160));
+
+  // ---------------- UX yeniden tasarim kontrolleri ----------------
+  console.log("\n--- Asamali gosterim ve filtre akisi ---");
+
+  // 1) Surdurulebilirlik: sayfa acilisinda program listesi GORUNMEMELI
+  await openView("sustainability");
+  let view = $("#view");
+  check(
+    "sustainability: acilista program listesi yok",
+    !/Program karnesi/.test(view.textContent) &&
+      /Sonuçları Göster/.test(view.textContent),
+    view.textContent.slice(0, 140)
+  );
+  check(
+    "sustainability: agirlik tablosu ana ekranda degil (kapali bolumde)",
+    view.querySelectorAll("details.disclosure").length > 0 &&
+      !view.querySelector("details.disclosure[open]"),
+    "acik details sayisi: " + view.querySelectorAll("details.disclosure[open]").length
+  );
+
+  // 2) Hiyerarsik filtre: fakulte secilmeden bolum secilemez
+  const facultySelect = view.querySelector('[data-org="faculty"]');
+  const departmentSelect = view.querySelector('[data-org="department"]');
+  const programSelect = view.querySelector('[data-org="program"]');
+  check("sustainability: fakulte secimi var", !!facultySelect);
+  check("sustainability: bolum baslangicta kilitli", departmentSelect.disabled === true);
+  check("sustainability: program baslangicta kilitli", programSelect.disabled === true);
+
+  // Fakulte sec -> bolum acilir, program hala kilitli
+  facultySelect.value = String(
+    (await (await fetch(BASE + "/api/faculties?limit=5")).json())[0].id
+  );
+  facultySelect.dispatchEvent(new w.Event("change"));
+  await sleep(700);
+  check("sustainability: fakulte secilince bolum acildi", departmentSelect.disabled === false);
+  check("sustainability: program hala kilitli", programSelect.disabled === true);
+
+  // Bolum sec -> program acilir
+  const firstDepartmentOption = Array.from(departmentSelect.options).find((o) => o.value);
+  departmentSelect.value = firstDepartmentOption.value;
+  departmentSelect.dispatchEvent(new w.Event("change"));
+  await sleep(700);
+  check("sustainability: bolum secilince program acildi", programSelect.disabled === false);
+
+  // Sonuclari goster -> sonuc gelir
+  view.querySelector('[data-org="apply"]').click();
+  await sleep(3500);
+  const susText = $("#susResult").textContent;
+  check(
+    "sustainability: sonuc geldi",
+    /Genel değerlendirme|Program karnesi/.test(susText),
+    susText.slice(0, 140)
+  );
+  check(
+    "sustainability: teknik alan adi gorunmuyor",
+    !/student_demand|occupancy_rate|graduate_employability|snake_case/.test(susText),
+    susText.slice(0, 200)
+  );
+  check(
+    "sustainability: eksik kriterler tek satir ozet",
+    !/graduate_employability, academic_staff_quality/.test(susText)
+  );
+  check(
+    "sustainability: eksik kriter 0 puan olarak gosterilmiyor",
+    !/Veri bulunamadı/.test(susText) || !/0 \/ 100/.test(susText),
+    susText.slice(0, 160)
+  );
+
+  // 3) KPI: uc sekme
+  await openView("kpi");
+  view = $("#view");
+  const tabButtons = view.querySelectorAll(".tab-btn");
+  check("kpi: uc sekme var", tabButtons.length === 3,
+    Array.from(tabButtons).map((b) => b.textContent).join(" | "));
+  check("kpi: Genel Bakis varsayilan acik",
+    view.querySelector(".tab-panel.is-active").dataset.panel === "overview");
+  check("kpi: ana ekranda formul yigilmamis",
+    !/Formül:/.test(view.querySelector(".tab-panel.is-active").textContent));
+
+  // Tum Gostergeler sekmesine gec
+  Array.from(tabButtons).find((b) => b.dataset.tab === "all").click();
+  await sleep(2000);
+  const allPanel = view.querySelector('[data-panel="all"]');
+  check("kpi: tum gostergeler tablosu geldi", /Gösterge/.test(allPanel.textContent));
+  check("kpi: tabloda 5 sutun (formul yok)",
+    allPanel.querySelectorAll("thead th").length === 5,
+    "sutun: " + allPanel.querySelectorAll("thead th").length);
+
+  // 4) Turetilmis KPI'lar artik 0 degil
+  const kpiRows = await (await fetch(BASE + "/api/kpi?academic_year=2025-2026")).json();
+  const derived = kpiRows.filter((r) => r.value_source === "derived");
+  check("kpi: turetilmis gostergeler gercek deger gosteriyor",
+    derived.length === 2 && derived.every((r) => Number(r.current_value) > 0),
+    JSON.stringify(derived.map((r) => [r.name, r.current_value])));
+  check("kpi: turetilmis gostergeler riskli isaretlenmiyor",
+    derived.every((r) => r.status !== "riskli"),
+    JSON.stringify(derived.map((r) => [r.name, r.status])));
+
+  // 5) Kurum geneli ekranlarda organizasyon filtresi OLMAMALI
+  for (const [name, label] of [["finance", "Finansal Analiz"], ["alerts", "Erken Uyarı"]]) {
+    await openView(name);
+    check(
+      `${name}: zorunlu fakulte/bolum filtresi yok`,
+      !$("#view").querySelector('[data-org="faculty"]'),
+      label
+    );
+  }
 
   console.log("\n--- JavaScript hatalari ---");
   check("konsolda JS hatasi yok", jsErrors.length === 0, jsErrors.slice(0, 3).join(" | "));

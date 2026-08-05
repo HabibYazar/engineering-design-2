@@ -35,6 +35,47 @@ STATUS_ON_TRACK = "hedefte"
 STATUS_DELAYED = "gecikmeli"
 STATUS_AT_RISK = "riskli"
 
+# Ölçümü olmayan gösterge için ayrı durum.
+# ÖNEMLİ: Veri eksikliği "riskli" ile aynı şey değildir. Değeri 0 kabul edip
+# riskli saymak, ölçüm yapılmamış bir alanı başarısız göstermek demektir ve
+# kurum ortalamasını haksız yere düşürür.
+STATUS_NO_DATA = "veri eksik"
+
+# Sistem verisinden hesaplanan (türetilmiş) göstergeler.
+# Bu göstergelerin değeri KPI tablosunda saklanmaz; her istekte ilgili
+# servisten okunur. Elle girilen bir değer formülle veri arasındaki bağı
+# koparırdı.
+DERIVED_KPI_RESOLVERS = {
+    "Üniversite-sanayi iş birliği endeksi": (
+        "engagement", "industry_collaboration", "Sanayi iş birliği kayıtları"
+    ),
+    "Bölgesel katkı endeksi": (
+        "engagement", "regional_contribution", "Bölgesel katkı kayıtları"
+    ),
+}
+
+
+def _resolve_derived_value(db: Session, kpi: StrategicKpi) -> Optional[Decimal]:
+    """Türetilmiş göstergenin güncel değerini ilgili servisten okur.
+
+    Kayıt bulunamazsa None döner; çağıran taraf bunu "veri eksik" olarak
+    işler. Sıfır döndürmek, ölçülmemiş bir alanı "sıfır performans" gibi
+    göstermek olurdu.
+    """
+    resolver = DERIVED_KPI_RESOLVERS.get(kpi.name)
+    if resolver is None:
+        return None
+
+    _, function_name, _ = resolver
+    try:
+        from app.services import engagement_service
+
+        result = getattr(engagement_service, function_name)(db, kpi.academic_year)
+        return Decimal(str(result["index_value"]))
+    except Exception:
+        # Kayıt yoksa servis 404 fırlatır; bu bir hata değil, veri yokluğudur.
+        return None
+
 
 def _base_query():
     """Fakülte kırılımını tek sorguda getirir (N+1 önlenir)."""
@@ -61,32 +102,57 @@ def _direction_label(change_percent, higher_is_better: bool) -> str:
     return f"geçen döneme göre {movement} ({judgement})"
 
 
-def evaluate(kpi: StrategicKpi) -> dict:
-    """KPI'yı hesaplanmış başarı oranı ve durumuyla birlikte döndürür."""
-    achievement = (
-        quantize_money(kpi.current_value / kpi.target_value * Decimal("100"))
-        if kpi.target_value
-        else Decimal("0.00")
-    )
+def evaluate(kpi: StrategicKpi, db: Optional[Session] = None) -> dict:
+    """KPI'yı hesaplanmış başarı oranı ve durumuyla birlikte döndürür.
 
-    if achievement >= kpi.on_track_threshold:
-        state = STATUS_ON_TRACK
-    elif achievement < kpi.at_risk_threshold:
-        state = STATUS_AT_RISK
+    db verilirse türetilmiş göstergelerin değeri ilgili servisten okunur.
+    """
+    current_value = kpi.current_value
+    has_data = True
+
+    if kpi.value_source == "derived":
+        resolved = _resolve_derived_value(db, kpi) if db is not None else None
+        if resolved is None:
+            # Ölçüm bulunamadı. 0 yazmak yerine "veri eksik" olarak işaretliyoruz.
+            has_data = False
+            current_value = None
+        else:
+            current_value = resolved
+
+    if not has_data or current_value is None:
+        achievement = None
+        state = STATUS_NO_DATA
     else:
-        state = STATUS_DELAYED
+        achievement = (
+            quantize_money(current_value / kpi.target_value * Decimal("100"))
+            if kpi.target_value
+            else None
+        )
+        if achievement is None:
+            state = STATUS_NO_DATA
+        elif achievement >= kpi.on_track_threshold:
+            state = STATUS_ON_TRACK
+        elif achievement < kpi.at_risk_threshold:
+            state = STATUS_AT_RISK
+        else:
+            state = STATUS_DELAYED
 
     # Geçmiş veri yoksa değişim hesaplanmaz; %0 yazmak "değişim olmadı"
     # anlamına gelir ve veri eksikliğini gizlerdi.
     change = None
-    if kpi.previous_value is not None and kpi.previous_value != 0:
+    if (
+        has_data
+        and current_value is not None
+        and kpi.previous_value is not None
+        and kpi.previous_value != 0
+    ):
         change = quantize_money(
-            (kpi.current_value - kpi.previous_value) / kpi.previous_value * Decimal("100")
+            (current_value - kpi.previous_value) / kpi.previous_value * Decimal("100")
         )
 
     gap = None
-    if kpi.university_average is not None:
-        gap = quantize_money(kpi.current_value - kpi.university_average)
+    if has_data and current_value is not None and kpi.university_average is not None:
+        gap = quantize_money(current_value - kpi.university_average)
 
     return {
         "id": kpi.id,
@@ -94,7 +160,8 @@ def evaluate(kpi: StrategicKpi) -> dict:
         "dimension": kpi.dimension,
         "unit": kpi.unit,
         "academic_year": kpi.academic_year,
-        "current_value": kpi.current_value,
+        "current_value": current_value,
+        "has_data": has_data,
         "target_value": kpi.target_value,
         "previous_value": kpi.previous_value,
         "university_average": kpi.university_average,
@@ -108,13 +175,21 @@ def evaluate(kpi: StrategicKpi) -> dict:
         # Göstergenin künyesi: ne ölçtüğü, nasıl hesaplandığı, nereden geldiği.
         "description": kpi.description,
         "formula": kpi.formula,
-        "data_source": kpi.data_source,
+        "data_source": (
+            DERIVED_KPI_RESOLVERS[kpi.name][2]
+            if kpi.name in DERIVED_KPI_RESOLVERS
+            else kpi.data_source
+        ),
         "higher_is_better": kpi.higher_is_better,
         "value_source": kpi.value_source,
         # Değişimin sade dille yorumu. Yalnızca artı/eksi işareti göstermek
         # yetmiyor: öğrenci başına maliyetin artması "kötüleşti" demektir ama
         # yayın sayısının artması "iyileşti" demektir.
-        "direction_label": _direction_label(change, kpi.higher_is_better),
+        "direction_label": (
+            "ölçüm bulunamadı"
+            if not has_data
+            else _direction_label(change, kpi.higher_is_better)
+        ),
         "faculty_values": [
             {
                 "faculty_id": fv.faculty_id,
@@ -148,10 +223,15 @@ def list_kpis(
     if dimension:
         query = query.where(StrategicKpi.dimension == dimension)
 
-    rows = [evaluate(k) for k in db.execute(query.order_by(StrategicKpi.dimension, StrategicKpi.name)).scalars().unique()]
+    rows = [
+        evaluate(k, db)
+        for k in db.execute(
+            query.order_by(StrategicKpi.dimension, StrategicKpi.name)
+        ).scalars().unique()
+    ]
 
     if kpi_status:
-        valid = (STATUS_ON_TRACK, STATUS_DELAYED, STATUS_AT_RISK)
+        valid = (STATUS_ON_TRACK, STATUS_DELAYED, STATUS_AT_RISK, STATUS_NO_DATA)
         if kpi_status not in valid:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -317,13 +397,26 @@ def scorecard(db: Session, academic_year: Optional[str] = None) -> dict:
             ),
         )
 
+    # Ölçümü olmayan göstergeler ortalamaya KATILMAZ.
+    # 0 kabul edip ortalamaya katmak, veri toplanmamış bir alanı sıfır
+    # performans saymak ve kurumu haksız yere başarısız göstermek olurdu.
+    measured = [r for r in rows if r["status"] != STATUS_NO_DATA]
+    no_data = [r for r in rows if r["status"] == STATUS_NO_DATA]
+
     dimensions: Dict[str, dict] = {}
     for row in rows:
         bucket = dimensions.setdefault(
             row["dimension"],
-            {"count": 0, "achievement": Decimal("0"), "on": 0, "delayed": 0, "risk": 0},
+            {
+                "count": 0, "measured": 0, "achievement": Decimal("0"),
+                "on": 0, "delayed": 0, "risk": 0, "no_data": 0,
+            },
         )
         bucket["count"] += 1
+        if row["status"] == STATUS_NO_DATA:
+            bucket["no_data"] += 1
+            continue
+        bucket["measured"] += 1
         bucket["achievement"] += row["achievement_percent"]
         if row["status"] == STATUS_ON_TRACK:
             bucket["on"] += 1
@@ -336,26 +429,42 @@ def scorecard(db: Session, academic_year: Optional[str] = None) -> dict:
         {
             "dimension": name,
             "kpi_count": data["count"],
-            "average_achievement_percent": quantize_money(
-                data["achievement"] / data["count"]
+            # Ölçülen gösterge yoksa ortalama hesaplanmaz; 0 yazmak yanıltırdı.
+            "average_achievement_percent": (
+                quantize_money(data["achievement"] / data["measured"])
+                if data["measured"]
+                else None
             ),
             "on_track_count": data["on"],
             "delayed_count": data["delayed"],
             "at_risk_count": data["risk"],
+            "no_data_count": data["no_data"],
         }
         for name, data in dimensions.items()
     ]
-    by_dimension.sort(key=lambda row: row["average_achievement_percent"])
+    # Ölçümü olmayan boyutlar sıralamanın başına düşmesin diye sona atılıyor.
+    by_dimension.sort(
+        key=lambda row: (
+            row["average_achievement_percent"] is None,
+            row["average_achievement_percent"] or Decimal("0"),
+        )
+    )
 
     total = len(rows)
-    overall = quantize_money(
-        sum((r["achievement_percent"] for r in rows), Decimal("0")) / total
+    overall = (
+        quantize_money(
+            sum((r["achievement_percent"] for r in measured), Decimal("0")) / len(measured)
+        )
+        if measured
+        else None
     )
     at_risk = sum(1 for r in rows if r["status"] == STATUS_AT_RISK)
     on_track = sum(1 for r in rows if r["status"] == STATUS_ON_TRACK)
 
     # Kurum geneli durumu, tek tek KPI'larla aynı eşik mantığına göre belirlenir.
-    if overall >= Decimal("90"):
+    if overall is None:
+        overall_status = STATUS_NO_DATA
+    elif overall >= Decimal("90"):
         overall_status = STATUS_ON_TRACK
     elif overall < Decimal("70"):
         overall_status = STATUS_AT_RISK
@@ -365,11 +474,19 @@ def scorecard(db: Session, academic_year: Optional[str] = None) -> dict:
     return {
         "academic_year": academic_year or "tüm yıllar",
         "total_kpis": total,
+        "measured_kpi_count": len(measured),
+        "no_data_count": len(no_data),
         "on_track_count": on_track,
-        "delayed_count": total - on_track - at_risk,
+        "delayed_count": len(measured) - on_track - at_risk,
         "at_risk_count": at_risk,
         "overall_achievement_percent": overall,
         "overall_status": overall_status,
+        "average_basis_note": (
+            f"Genel başarı, ölçümü bulunan {len(measured)} gösterge üzerinden hesaplandı. "
+            f"{len(no_data)} gösterge için veri bulunmadığı için ortalamaya dahil edilmedi."
+            if no_data
+            else f"Genel başarı {len(measured)} göstergenin tamamı üzerinden hesaplandı."
+        ),
         "by_dimension": by_dimension,
     }
 
@@ -389,6 +506,8 @@ def faculty_comparison(db: Session, academic_year: Optional[str] = None) -> List
 
     faculties: Dict[int, dict] = {}
     for row in rows:
+        if row["status"] == STATUS_NO_DATA:
+            continue
         target = row["target_value"]
         average = row["university_average"]
         for fv in row["faculty_values"]:
@@ -425,10 +544,25 @@ def faculty_comparison(db: Session, academic_year: Optional[str] = None) -> List
 
 def attention_list(db: Session, academic_year: Optional[str] = None) -> List[dict]:
     """Riskli ve gecikmeli KPI'lar, en düşük başarıdan başlayarak."""
+    # Veri eksikliği bir performans sorunu değil, bir veri toplama sorunudur.
+    # Müdahale listesi yalnızca ÖLÇÜLEN ve hedefin altında kalan göstergeleri
+    # içerir; eksik veriler ayrı bir listede raporlanır.
     rows = [
         r
         for r in list_kpis(db, academic_year=academic_year)
-        if r["status"] != STATUS_ON_TRACK
+        if r["status"] in (STATUS_DELAYED, STATUS_AT_RISK)
     ]
     rows.sort(key=lambda row: row["achievement_percent"])
     return rows
+
+
+def missing_data_list(db: Session, academic_year: Optional[str] = None) -> List[dict]:
+    """Ölçümü bulunmayan göstergeler.
+
+    Bunlar riskli değildir; ölçüm eksiğidir ve ayrı raporlanır.
+    """
+    return [
+        r
+        for r in list_kpis(db, academic_year=academic_year)
+        if r["status"] == STATUS_NO_DATA
+    ]

@@ -293,3 +293,303 @@ function optionsHtml(rows, { valueKey = "id", labelKey = "name", selected = null
     )
     .join("");
 }
+
+/* ==================== aşamalı gösterim bileşenleri ==================== */
+// Yönetici ekranı, veritabanı dökümü gibi görünmemeli. Uzun formüller,
+// ağırlık tabloları ve eksik veri listeleri ana ekranda yer almaz; bu
+// yardımcılarla kapalı bölümlere taşınır.
+
+const ux = {
+  /**
+   * Varsayılan olarak KAPALI açılır bölüm.
+   * Ana ekranda yalnızca karar için gereken sonuç kalır; yöntem ve teknik
+   * ayrıntı isteyen kullanıcı açar.
+   */
+  details(title, innerHtml, { open = false, hint = "" } = {}) {
+    return `<details class="disclosure"${open ? " open" : ""}>
+      <summary><span class="disclosure-title">${fmt.esc(title)}</span>${
+        hint ? `<span class="disclosure-hint">${fmt.esc(hint)}</span>` : ""
+      }</summary>
+      <div class="disclosure-body">${innerHtml}</div>
+    </details>`;
+  },
+
+  /**
+   * Sekme yapısı. Sekmeye tıklanana kadar o sekmenin verisi ÇEKİLMEZ;
+   * sayfa açılışında tüm detay endpoint'lerini çağırmamak için.
+   */
+  tabs(containerId, tabList) {
+    const buttons = tabList
+      .map(
+        (t, i) =>
+          `<button class="tab-btn${i === 0 ? " is-active" : ""}" data-tab="${t.key}">${fmt.esc(
+            t.label
+          )}</button>`
+      )
+      .join("");
+    const panels = tabList
+      .map(
+        (t, i) =>
+          `<div class="tab-panel${i === 0 ? " is-active" : ""}" data-panel="${t.key}" id="${containerId}-${t.key}"></div>`
+      )
+      .join("");
+    return `<div class="tabs" id="${containerId}">
+      <div class="tab-bar">${buttons}</div>${panels}</div>`;
+  },
+
+  /** Sekme davranışını bağlar. onShow(key) yalnızca ilk açılışta çağrılır. */
+  bindTabs(containerId, onShow) {
+    const root = document.getElementById(containerId);
+    if (!root) return;
+    const loaded = new Set();
+
+    const activate = (key) => {
+      root.querySelectorAll(".tab-btn").forEach((b) =>
+        b.classList.toggle("is-active", b.dataset.tab === key)
+      );
+      root.querySelectorAll(".tab-panel").forEach((p) =>
+        p.classList.toggle("is-active", p.dataset.panel === key)
+      );
+      if (!loaded.has(key)) {
+        loaded.add(key);
+        onShow(key, `${containerId}-${key}`);
+      }
+    };
+
+    root.querySelectorAll(".tab-btn").forEach((b) =>
+      b.addEventListener("click", () => activate(b.dataset.tab))
+    );
+    // İlk sekme hemen yüklenir.
+    activate(root.querySelector(".tab-btn").dataset.tab);
+  },
+
+  /** Yükleme iskeleti — boş ekran yerine yapının önizlemesi. */
+  skeleton(rows = 3) {
+    return (
+      `<div class="skeleton">` +
+      Array.from({ length: rows }, () => `<div class="skeleton-row"></div>`).join("") +
+      `</div>`
+    );
+  },
+
+  /**
+   * Durum rozeti. Renk ve ikon tek başına kullanılmaz; her zaman
+   * yanında ne anlama geldiği yazar.
+   */
+  statusBadge(kind, text, tooltip = "") {
+    const icons = {
+      good: "✓",
+      warning: "⚠",
+      critical: "⚠",
+      nodata: "—",
+      info: "•",
+    };
+    return `<span class="status-badge status-${kind}"${
+      tooltip ? ` title="${fmt.esc(tooltip)}"` : ""
+    }><span class="status-icon">${icons[kind] || ""}</span>${fmt.esc(text)}</span>`;
+  },
+
+  /**
+   * Sayı + ne olduğu. Çıplak "56,3" yerine "56 / 100" ve altında etiket.
+   */
+  scoreBlock(value, max, label, note = "") {
+    const v = value === null || value === undefined ? null : Number(value);
+    return `<div class="score-block">
+      <div class="score-value">${
+        v === null ? "Veri bulunamadı" : `${fmt.dec(v, 0)}<span class="score-max"> / ${max}</span>`
+      }</div>
+      <div class="score-label">${fmt.esc(label)}</div>
+      ${note ? `<div class="score-note">${note}</div>` : ""}
+    </div>`;
+  },
+
+  /** Uzun listelerde ilk N kayıt + "devamını göster". */
+  limitedList(items, limit, renderRow, moreLabel = "Tümünü göster") {
+    if (items.length <= limit) return items.map(renderRow).join("");
+    const id = "more-" + Math.random().toString(36).slice(2, 8);
+    return (
+      items.slice(0, limit).map(renderRow).join("") +
+      `<details class="disclosure inline"><summary><span class="disclosure-title">${fmt.esc(
+        moreLabel
+      )} (${items.length - limit} kayıt daha)</span></summary>` +
+      `<div class="disclosure-body">${items.slice(limit).map(renderRow).join("")}</div></details>`
+    );
+  },
+};
+
+/* ==================== hiyerarşik organizasyon filtresi ==================== */
+// Fakülte → Bölüm → Program sırası zorunludur. Üst seçim değişince alt
+// seçimler sıfırlanır. Sonuçlar "Sonuçları Göster" düğmesine basılınca gelir;
+// sayfa açılışında tüm programların hesaplanması beklenmez.
+
+class OrgFilter {
+  /**
+   * @param {string} containerId  filtrenin çizileceği kap
+   * @param {object} options      { withYear, years, defaultYear, onApply, level }
+   *   level: "program" | "department" | "faculty"  (en alt seçilebilir seviye)
+   */
+  constructor(containerId, options) {
+    this.containerId = containerId;
+    this.opts = Object.assign(
+      { withYear: true, years: [], defaultYear: null, level: "program" },
+      options
+    );
+    this.state = { year: this.opts.defaultYear, facultyId: "", departmentId: "", programId: "" };
+  }
+
+  async render() {
+    const el = document.getElementById(this.containerId);
+    if (!el) return;
+
+    const faculties = await ref.faculties();
+    this.faculties = faculties;
+
+    const yearField = this.opts.withYear
+      ? `<label class="f">Akademik dönem
+           <select data-org="year">${this.opts.years
+             .map(
+               (y) =>
+                 `<option${y === this.state.year ? " selected" : ""}>${fmt.esc(y)}</option>`
+             )
+             .join("")}</select>
+         </label>`
+      : "";
+
+    const departmentField =
+      this.opts.level === "faculty"
+        ? ""
+        : `<label class="f">Bölüm
+             <select data-org="department" disabled>
+               <option value="">Önce fakülte seçin</option>
+             </select>
+           </label>`;
+
+    const programField =
+      this.opts.level === "program"
+        ? `<label class="f">Program
+             <select data-org="program" disabled>
+               <option value="">Önce bölüm seçin</option>
+             </select>
+           </label>`
+        : "";
+
+    el.innerHTML = `
+      <div class="org-filter">
+        ${yearField}
+        <label class="f">Fakülte
+          <select data-org="faculty">
+            <option value="">Üniversite geneli</option>
+            ${optionsHtml(faculties)}
+          </select>
+        </label>
+        ${departmentField}
+        ${programField}
+        <button class="primary" data-org="apply">Sonuçları Göster</button>
+      </div>
+      <div class="org-scope muted" data-org="scope"></div>`;
+
+    this._bind(el);
+    this._updateScopeLabel();
+  }
+
+  _bind(el) {
+    const get = (name) => el.querySelector(`[data-org="${name}"]`);
+
+    const yearSelect = get("year");
+    if (yearSelect) {
+      yearSelect.addEventListener("change", () => {
+        this.state.year = yearSelect.value;
+        this._updateScopeLabel();
+      });
+    }
+
+    get("faculty").addEventListener("change", async (e) => {
+      this.state.facultyId = e.target.value;
+      // Üst seçim değişti: alt seçimler sıfırlanır.
+      this.state.departmentId = "";
+      this.state.programId = "";
+      await this._fillDepartments(el);
+      this._resetPrograms(el);
+      this._updateScopeLabel();
+    });
+
+    const departmentSelect = get("department");
+    if (departmentSelect) {
+      departmentSelect.addEventListener("change", async (e) => {
+        this.state.departmentId = e.target.value;
+        this.state.programId = "";
+        await this._fillPrograms(el);
+        this._updateScopeLabel();
+      });
+    }
+
+    const programSelect = get("program");
+    if (programSelect) {
+      programSelect.addEventListener("change", (e) => {
+        this.state.programId = e.target.value;
+        this._updateScopeLabel();
+      });
+    }
+
+    get("apply").addEventListener("click", () => this.opts.onApply(this.value()));
+  }
+
+  async _fillDepartments(el) {
+    const select = el.querySelector('[data-org="department"]');
+    if (!select) return;
+    if (!this.state.facultyId) {
+      select.innerHTML = `<option value="">Önce fakülte seçin</option>`;
+      select.disabled = true;
+      return;
+    }
+    const all = await ref.departments();
+    const rows = all.filter((d) => String(d.faculty_id) === String(this.state.facultyId));
+    select.innerHTML =
+      `<option value="">Fakültenin tamamı</option>` + optionsHtml(rows);
+    select.disabled = false;
+  }
+
+  _resetPrograms(el) {
+    const select = el.querySelector('[data-org="program"]');
+    if (!select) return;
+    select.innerHTML = `<option value="">Önce bölüm seçin</option>`;
+    select.disabled = true;
+  }
+
+  async _fillPrograms(el) {
+    const select = el.querySelector('[data-org="program"]');
+    if (!select) return;
+    if (!this.state.departmentId) {
+      this._resetPrograms(el);
+      return;
+    }
+    const all = await ref.programs();
+    const rows = all.filter(
+      (p) => String(p.department_id) === String(this.state.departmentId)
+    );
+    select.innerHTML = `<option value="">Bölümün tamamı</option>` + optionsHtml(rows);
+    select.disabled = false;
+  }
+
+  _updateScopeLabel() {
+    const el = document.getElementById(this.containerId);
+    const target = el && el.querySelector('[data-org="scope"]');
+    if (!target) return;
+    const parts = [];
+    if (this.state.year) parts.push(this.state.year);
+    const faculty = this.faculties.find((f) => String(f.id) === String(this.state.facultyId));
+    parts.push(faculty ? faculty.name : "Üniversite geneli");
+    if (this.state.departmentId) parts.push("bölüm seçildi");
+    if (this.state.programId) parts.push("program seçildi");
+    target.textContent = "Seçim: " + parts.join(" › ");
+  }
+
+  value() {
+    return {
+      year: this.state.year,
+      facultyId: this.state.facultyId ? Number(this.state.facultyId) : null,
+      departmentId: this.state.departmentId ? Number(this.state.departmentId) : null,
+      programId: this.state.programId ? Number(this.state.programId) : null,
+    };
+  }
+}

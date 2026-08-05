@@ -14,11 +14,13 @@ VIEWS["success"] = {
   subtitle: "Ders geçme, başarısızlık, öğrenci kaybı ve mezuniyet oranları",
   html: () => `
     <div class="card">
-      <div class="filters">
-        <label class="f">Akademik dönem <select id="acYear"></select></label>
-        <button class="ghost" id="acApply">Uygula</button>
-        <span class="muted">Tüm oranlar yüzde (%) cinsindendir.</span>
+      <h3>Kapsam seçin</h3>
+      <div class="note">
+        Fakülte seçtikten sonra bölüm seçebilirsiniz. Seçim yapmadan
+        “Sonuçları Göster” derseniz üniversite geneli sonuçlar gelir.
+        Tüm oranlar yüzde (%) cinsindendir.
       </div>
+      <div id="acFilter"></div>
       <div class="note" id="acBreadcrumb"></div>
     </div>
 
@@ -31,7 +33,7 @@ VIEWS["success"] = {
         <div id="acTrend"></div>
       </div>
       <div class="card">
-        <h3>Öğrenci sayısı ve öğretmen yükü ile ilişki</h3>
+        <h3>Başarıyı etkileyen etkenler</h3>
         <div class="note">
           Büyük programlarda başarı düşüyor mu? Akademisyen başına öğrenci
           arttıkça geçme oranı ne oluyor?
@@ -65,23 +67,46 @@ VIEWS["success"] = {
 
   async init() {
     const years = await api.get("/api/academic-success/academic-years");
-    const sel = document.getElementById("acYear");
-    sel.innerHTML = years.map((y) => `<option>${fmt.esc(y)}</option>`).join("");
-    if (years.length) sel.value = years[years.length - 1];
-
-    document.getElementById("acApply").addEventListener("click", () => {
-      SUCCESS_SCOPE = { level: "university" };
-      refreshSuccess();
+    AC_FILTER = new OrgFilter("acFilter", {
+      withYear: true,
+      years,
+      defaultYear: years[years.length - 1],
+      level: "department",
+      onApply: (scope) => {
+        // Filtreden gelen seçim, drill-down kapsamına çevrilir.
+        SUCCESS_YEAR = scope.year;
+        if (scope.departmentId) {
+          SUCCESS_SCOPE = {
+            level: "department",
+            facultyId: scope.facultyId,
+            departmentId: scope.departmentId,
+            facultyName: AC_FILTER.faculties.find((f) => f.id === scope.facultyId)?.name,
+          };
+        } else if (scope.facultyId) {
+          SUCCESS_SCOPE = {
+            level: "faculty",
+            facultyId: scope.facultyId,
+            facultyName: AC_FILTER.faculties.find((f) => f.id === scope.facultyId)?.name,
+          };
+        } else {
+          SUCCESS_SCOPE = { level: "university" };
+        }
+        refreshSuccess();
+      },
     });
+    await AC_FILTER.render();
+    SUCCESS_YEAR = years[years.length - 1];
     refreshSuccess();
   },
 };
 
 // Seçili kırılım seviyesi. Drill-down bu nesne üzerinden yürür.
 let SUCCESS_SCOPE = { level: "university" };
+let SUCCESS_YEAR = null;
+let AC_FILTER = null;
 
 function successYear() {
-  return document.getElementById("acYear").value;
+  return SUCCESS_YEAR;
 }
 
 // Başarı göstergelerinin ne anlama geldiği. Çıplak sayı bırakmamak için
@@ -168,7 +193,7 @@ function refreshSuccess() {
   const parts = [`<a href="#" data-level="university">Üniversite geneli</a>`];
   if (scope.facultyName) parts.push(`<a href="#" data-level="faculty">${fmt.esc(scope.facultyName)}</a>`);
   if (scope.departmentName) parts.push(`<b>${fmt.esc(scope.departmentName)}</b>`);
-  crumb.innerHTML = "Kapsam: " + parts.join(" › ");
+  crumb.innerHTML = "Görüntülenen kapsam: " + parts.join(" › ");
   crumb.querySelectorAll("a[data-level]").forEach((a) =>
     a.addEventListener("click", (e) => {
       e.preventDefault();

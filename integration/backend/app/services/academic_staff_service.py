@@ -319,13 +319,28 @@ def staff_trend(db: Session) -> List[dict]:
     ]
 
 
-def staff_overview(db: Session, academic_year: Optional[str] = None) -> dict:
-    """Modül 4 özet göstergeleri.
+def staff_overview(
+    db: Session,
+    academic_year: Optional[str] = None,
+    faculty_id: Optional[int] = None,
+    department_id: Optional[int] = None,
+) -> dict:
+    """Akademik personel özet göstergeleri.
+
+    Fakülte/bölüm verilirse özet o kapsama daraltılır; böylece arayüzdeki
+    hiyerarşik filtre üst kartları da etkiler.
 
     Veri yoksa sıfır değil, boş özet döner; böylece arayüzde "0 personel"
     ile "veri girilmemiş" durumu karışmaz.
     """
-    staff_list = list_staff(db, skip=0, limit=10_000, academic_year=academic_year)
+    staff_list = list_staff(
+        db,
+        skip=0,
+        limit=10_000,
+        department_id=department_id,
+        faculty_id=faculty_id,
+        academic_year=academic_year,
+    )
     if not staff_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
