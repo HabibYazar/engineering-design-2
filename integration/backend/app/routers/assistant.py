@@ -14,6 +14,7 @@ söyler; sayı uydurması engellenir.
 
 import json
 import logging
+from datetime import datetime
 from typing import Iterator, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -76,7 +77,7 @@ def get_status() -> AssistantStatus:
     response_model=ChatResponse,
     summary="Asistana mesaj gönder",
 )
-def chat(payload: ChatRequest) -> ChatResponse:
+def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     """Yerel modelden cevap alır.
 
     Modelin düşünme metni cevaba dâhil edilmez. Ollama kapalı, model kurulu
@@ -84,7 +85,10 @@ def chat(payload: ChatRequest) -> ChatResponse:
     uydurma cevap ÜRETİLMEZ.
     """
     try:
-        result = chat_service.answer(payload.message, payload.conversation_id)
+        # Yetki listesi şimdilik geçilmiyor: oturum bilgisi sohbet uç noktasına
+        # taşınana kadar bütün araçlar açıktır. Yetki KONTROLÜ hazır
+        # (ToolSession.permissions); yalnızca kaynağı bağlanacak.
+        result = chat_service.answer(payload.message, payload.conversation_id, db=db)
     except chat_service.ChatValidationError as exc:
         raise HTTPException(
             status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -93,7 +97,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
     except AssistantProviderError as exc:
         raise _provider_http_error(exc) from exc
 
-    return ChatResponse(**result)
+    return ChatResponse(calculated_at=datetime.now(), **result)
 
 
 @router.post(

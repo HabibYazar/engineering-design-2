@@ -91,3 +91,140 @@ def test_live_streaming_produces_text() -> None:
 
     assert output.strip(), "Akıştan hiç metin gelmedi."
     assert "<think" not in output.lower(), "Akışta düşünme metni sızmış."
+
+
+# ---------------------------------------------------------------------------
+# Araç çağırma — gerçek model, gerçek veritabanı
+# ---------------------------------------------------------------------------
+#
+# Bu üç test, kullanıcının istediği canlı doğrulama sorularını çalıştırır ve
+# cevaptaki HER SAYIYI ilgili backend servisinin sonucuyla karşılaştırır.
+# Modelin uydurduğu bir rakam bu testlerde yakalanır.
+
+
+def _live_db():
+    from app.database import SessionLocal
+
+    return SessionLocal()
+
+
+def _digits(text: str) -> set:
+    """Metindeki sayıları ayrıştırır (binlik ayraçları temizlenmiş)."""
+    import re
+
+    found = set()
+    for raw in re.findall(r"\d[\d.,]*", text):
+        cleaned = raw.replace(".", "").replace(",", "")
+        if cleaned.isdigit():
+            found.add(int(cleaned))
+    return found
+
+
+def test_live_current_student_count_comes_from_tools() -> None:
+    """Soru 1: mevcut öğrenci sayısı — rakam araç çıktısıyla aynı olmalı."""
+    from app.services.assistant import entity_resolver
+    from app.services import student_analytics_service as students
+
+    db = _live_db()
+    try:
+        result = chat_service.answer(
+            "Bilgisayar Mühendisliği programının mevcut öğrenci sayısı nedir?", db=db
+        )
+        program = entity_resolver.resolve(db, "program", "Bilgisayar Mühendisliği")
+        expected = int(
+            students.build_program_analytics(
+                db, academic_program_id=program.id, academic_year="2025-2026"
+            )[0].total_students
+        )
+    finally:
+        db.close()
+
+    assert result["used_tools"], "Model araç çağırmadan cevap üretti."
+    assert result["data_source"] == "institutional_data"
+    assert expected in _digits(result["answer"]), (
+        f"Cevapta gerçek öğrenci sayısı ({expected}) geçmiyor: {result['answer'][:400]}"
+    )
+    # Senaryo sorulmadı; senaryo aracı çağrılmamalı.
+    assert not any("scenario" in t["name"] for t in result["used_tools"]), (
+        "Mevcut durum sorusuna senaryo motoru çalıştırılmış."
+    )
+
+
+def test_live_salary_scenario_numbers_match_the_engine() -> None:
+    """Soru 2: %2 zam — rakamlar senaryo motoruyla aynı olmalı."""
+    from app.services.assistant.tool_registry import registry
+
+    db = _live_db()
+    try:
+        result = chat_service.answer(
+            "Akademik personel maaşlarına %2 zam yapılırsa bütçe nasıl etkilenir?", db=db
+        )
+        tool = registry.get("run_staff_salary_scenario")
+        expected = tool.handler(
+            db, tool.input_model(academic_year="2025-2026", salary_change_percentage=2)
+        )
+    finally:
+        db.close()
+
+    assert result["used_tools"], "Model araç çağırmadan cevap üretti."
+    assert "Senaryo motoru" in result["data_sources"]
+
+    numbers = _digits(result["answer"])
+    expected_change = int(expected.cost_change_usd)
+    # Model sayıyı yuvarlayabilir; ±%1 tolerans ile en az bir eşleşme aranır.
+    assert any(abs(n - expected_change) <= expected_change * 0.01 for n in numbers), (
+        f"Maliyet artışı ({expected_change} USD) cevapta geçmiyor: {result['answer'][:400]}"
+    )
+
+
+def test_live_multi_tool_enrollment_question() -> None:
+    """Soru 3: %15 artış — birden fazla araç çağrılmalı, sayılar doğrulanmalı."""
+    from app.services.assistant.tool_registry import registry
+
+    db = _live_db()
+    try:
+        result = chat_service.answer(
+            "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa mali durum, "
+            "personel ihtiyacı ve laboratuvar kapasitesi nasıl etkilenir?",
+            db=db,
+        )
+        tool = registry.get("run_enrollment_change_scenario")
+        expected = tool.handler(
+            db,
+            tool.input_model(
+                program="Bilgisayar Mühendisliği",
+                academic_year="2025-2026",
+                student_change_percentage=15,
+            ),
+        )
+    finally:
+        db.close()
+
+    assert result["used_tools"], "Model araç çağırmadan cevap üretti."
+    assert result["data_source"] == "institutional_data"
+    assert result["academic_year"] == "2025-2026"
+
+    numbers = _digits(result["answer"])
+    projected = expected.scenario.program_student_count
+    assert projected in numbers, (
+        f"Senaryo sonrası öğrenci sayısı ({projected}) cevapta geçmiyor: "
+        f"{result['answer'][:400]}"
+    )
+    assert "<think" not in result["answer"].lower()
+
+
+def test_live_unknown_program_is_not_invented() -> None:
+    """Var olmayan program için model sayı uydurmamalı."""
+    db = _live_db()
+    try:
+        result = chat_service.answer(
+            "Uzay Mühendisliği programında kaç öğrenci var?", db=db
+        )
+    finally:
+        db.close()
+
+    answer = result["answer"].lower()
+    assert any(
+        word in answer
+        for word in ("bulunamadı", "bulamadım", "yok", "mevcut değil", "kayıtlı değil")
+    ), f"Model olmayan program için sayı üretmiş olabilir: {result['answer'][:300]}"

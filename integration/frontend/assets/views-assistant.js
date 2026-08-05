@@ -41,7 +41,7 @@ let ASSISTANT_BUSY = false;
 
 VIEWS["assistant"] = {
   title: "Akıllı Asistan",
-  subtitle: "Yerel dil modeli · veriler makineden çıkmaz",
+  subtitle: "Yerel dil modeli · kurum verisine bağlı · veriler makineden çıkmaz",
   html: () => `
     <div class="card assistant-card">
       <div class="assistant-head">
@@ -62,8 +62,9 @@ VIEWS["assistant"] = {
       </form>
 
       <div class="note assistant-scope-note">
-        Model bu aşamada üniversite veritabanına <b>erişemez</b>. Kurum verisi
-        gerektiren sorularda sayı üretmez, hangi veriye ihtiyaç duyduğunu söyler.
+        Asistan kurum verisini <b>gerçek kayıtlardan</b> okur ve senaryoları
+        mevcut hesaplama motoruyla çalıştırır. Sayıları kendi üretmez; veri
+        bulunamazsa bunu açıkça söyler.
       </div>
     </div>
 
@@ -186,6 +187,45 @@ function bubble(item) {
     <div class="body">${
       item.pending ? `<span class="typing">Yanıt oluşturuluyor…</span>` : safeText(item.text)
     }</div>
+    ${item.pending ? "" : sourceBlock(item)}
+  </div>`;
+}
+
+/**
+ * "Kullanılan veriler" bölümü.
+ *
+ * Teknik araç adları (get_program_summary gibi) KULLANICIYA GÖSTERİLMEZ;
+ * backend bunların Türkçe veri kaynağı karşılıklarını `data_sources` alanında
+ * gönderir. Kapsam ve akademik yıl da burada yazar: kullanıcı cevabın hangi
+ * yıla ve hangi birime ait olduğunu görmeden rakama güvenemez.
+ */
+function sourceBlock(item) {
+  const sources = item.dataSources || [];
+  if (!sources.length) {
+    // Araç kullanılmamış: cevap modelin genel bilgisine dayanıyor.
+    return item.role === "assistant" && item.generalKnowledge
+      ? `<div class="assistant-basis general">
+           Bu cevap kurum verisine değil, modelin genel bilgisine dayanıyor.
+         </div>`
+      : "";
+  }
+
+  const chips = [];
+  if (item.academicYear) chips.push(`${fmt.esc(item.academicYear)} akademik yılı`);
+  if (item.scope) {
+    const scopeText = item.scope.program || item.scope.department || item.scope.faculty;
+    chips.push(fmt.esc(scopeText || "Üniversite geneli"));
+  }
+
+  return `<div class="assistant-basis">
+    ${chips.length ? `<div class="basis-scope">${chips.join(" · ")}</div>` : ""}
+    ${ux.details(
+      "Kullanılan veriler",
+      `<ul class="source-list">${sources
+        .map((s) => `<li>${fmt.esc(s)}</li>`)
+        .join("")}</ul>`,
+      { hint: `${sources.length} kaynak` }
+    )}
   </div>`;
 }
 
@@ -292,6 +332,11 @@ async function sendMessage(rawMessage) {
     ASSISTANT_CONVERSATION = result.conversation_id;
     pending.text = result.answer;
     pending.pending = false;
+    // Teknik araç adları (result.used_tools) BİLİNÇLİ OLARAK kullanılmıyor.
+    pending.dataSources = result.data_sources || [];
+    pending.academicYear = result.academic_year || null;
+    pending.scope = result.scope || null;
+    pending.generalKnowledge = result.data_source === "general_model_knowledge";
     renderThread();
     await refreshAssistantStatus();
   } catch (err) {

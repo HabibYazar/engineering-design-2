@@ -1,0 +1,252 @@
+"""Araçların girdi ve çıktı sözleşmeleri.
+
+Her araç bir girdi modeliyle çağrılır ve bir çıktı modeli döndürür. Model bu
+şemaların dışına çıkamaz:
+
+* Girdide serbest metin yalnızca BİRİM ADIDIR. SQL parçası, tablo adı, sütun
+  adı veya endpoint yolu alan hiçbir alan yoktur.
+* Çıktı modelden geçmeden modele gönderilmez; şemaya uymayan sonuç atılır.
+
+Ölçülemeyen değerler `None` döner ve `notes` alanında sebebi yazar. Sıfır bir
+ölçüm sonucudur, eksik veri değildir; ikisi karıştırılırsa model "0 öğrenci
+var" der.
+"""
+
+from decimal import Decimal
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
+# Girdi modellerinin ortak ayarı: bilinmeyen alan sessizce yok sayılmaz.
+# Model "program_name" yerine "programName" gönderirse hata alsın; sessiz
+# yok sayma yanlış kapsamda doğru görünen bir cevap üretirdi.
+STRICT = ConfigDict(extra="forbid")
+
+# Birim adı alanlarının ortak açıklaması.
+_FACULTY_DESC = "Fakülte adı veya kodu (örn. 'Mühendislik ve Mimarlık Fakültesi', 'FEA')."
+_DEPARTMENT_DESC = "Bölüm adı veya kodu (örn. 'Bilgisayar Mühendisliği', 'CENG')."
+_PROGRAM_DESC = "Program adı veya kodu (örn. 'Bilgisayar Mühendisliği Lisans Programı', 'CENG-BSC')."
+_YEAR_DESC = "Akademik yıl (örn. '2025-2026'). Boş bırakılırsa en güncel yıl kullanılır."
+
+
+class ScopeInput(BaseModel):
+    """Fakülte / bölüm / program kapsamı olan araçların ortak girdisi."""
+
+    model_config = STRICT
+
+    academic_year: Optional[str] = Field(default=None, description=_YEAR_DESC)
+    faculty: Optional[str] = Field(default=None, description=_FACULTY_DESC)
+    department: Optional[str] = Field(default=None, description=_DEPARTMENT_DESC)
+    program: Optional[str] = Field(default=None, description=_PROGRAM_DESC)
+
+
+class ScopeInfo(BaseModel):
+    """Sonucun hangi kapsama ait olduğu. Model bunu cevabında belirtmek zorunda."""
+
+    academic_year: str
+    faculty: Optional[str] = None
+    department: Optional[str] = None
+    program: Optional[str] = None
+    #: Kapsamın tek cümlelik özeti (ör. "Üniversite geneli", "Bilgisayar Mühendisliği").
+    label: str
+
+
+# ---------------------------------------------------------------------------
+# 1) Program özeti
+# ---------------------------------------------------------------------------
+
+
+class ProgramSummaryInput(BaseModel):
+    """Program özeti girdisi. Program adı ZORUNLUDUR."""
+
+    model_config = STRICT
+
+    academic_year: Optional[str] = Field(default=None, description=_YEAR_DESC)
+    faculty: Optional[str] = Field(default=None, description=_FACULTY_DESC)
+    department: Optional[str] = Field(default=None, description=_DEPARTMENT_DESC)
+    program: str = Field(description=_PROGRAM_DESC)
+
+
+class ProgramSummaryOutput(BaseModel):
+    scope: ScopeInfo
+    program_name: str
+    student_count: Optional[int] = None
+    quota: Optional[int] = None
+    occupancy_rate: Optional[Decimal] = Field(default=None, description="Yüzde")
+    graduation_rate: Optional[Decimal] = Field(default=None, description="Yüzde")
+    dropout_rate: Optional[Decimal] = Field(default=None, description="Yüzde")
+    academic_staff_count: Optional[int] = None
+    student_staff_ratio: Optional[Decimal] = Field(
+        default=None, description="Öğrenci / öğretim üyesi"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 2) Mali özet
+# ---------------------------------------------------------------------------
+
+
+class FinancialSummaryInput(ScopeInput):
+    pass
+
+
+class FinancialSummaryOutput(BaseModel):
+    scope: ScopeInfo
+    total_revenue_usd: Optional[Decimal] = None
+    total_expenditure_usd: Optional[Decimal] = None
+    net_balance_usd: Optional[Decimal] = None
+    personnel_cost_usd: Optional[Decimal] = None
+    scholarship_cost_usd: Optional[Decimal] = None
+    cost_per_student_usd: Optional[Decimal] = None
+    currency: str = "USD"
+    notes: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 3) Kapasite özeti
+# ---------------------------------------------------------------------------
+
+
+class CapacitySummaryInput(ScopeInput):
+    pass
+
+
+class CapacitySummaryOutput(BaseModel):
+    scope: ScopeInfo
+    classroom_capacity: Optional[int] = None
+    laboratory_capacity: Optional[int] = None
+    current_usage: Optional[int] = None
+    occupancy_rate: Optional[Decimal] = Field(default=None, description="Yüzde")
+    capacity_gap: Optional[int] = Field(
+        default=None,
+        description="Eş zamanlı talep eksi kapasite. Pozitif değer açık demektir.",
+    )
+    capacity_status: Optional[str] = Field(
+        default=None, description="yeterli | sınırda | yetersiz | veri yok"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 4) Akademik personel özeti
+# ---------------------------------------------------------------------------
+
+
+class AcademicStaffSummaryInput(ScopeInput):
+    pass
+
+
+class AcademicStaffSummaryOutput(BaseModel):
+    scope: ScopeInfo
+    academic_staff_count: Optional[int] = None
+    average_salary_usd: Optional[Decimal] = None
+    annual_salary_cost_usd: Optional[Decimal] = None
+    student_staff_ratio: Optional[Decimal] = None
+    recommended_staff_count: Optional[int] = Field(
+        default=None,
+        description="Hedef öğrenci/öğretim üyesi oranına göre gereken personel sayısı.",
+    )
+    staff_gap: Optional[int] = Field(
+        default=None, description="Önerilen eksi mevcut. Pozitif değer eksik demektir."
+    )
+    target_student_staff_ratio: Optional[Decimal] = None
+    notes: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 5) Öğrenci sayısı değişimi senaryosu
+# ---------------------------------------------------------------------------
+
+
+class EnrollmentScenarioInput(BaseModel):
+    model_config = STRICT
+
+    academic_year: Optional[str] = Field(default=None, description=_YEAR_DESC)
+    program: str = Field(description=_PROGRAM_DESC)
+    student_change_percentage: Decimal = Field(
+        ge=Decimal("-100"),
+        le=Decimal("500"),
+        description="Öğrenci sayısındaki yüzdesel değişim (örn. 15 = %15 artış).",
+    )
+
+
+class MetricChange(BaseModel):
+    """Bir göstergenin taban ve senaryo değeri."""
+
+    key: str
+    label: str
+    unit: str = Field(description="usd | count | percent | ratio")
+    baseline_value: Optional[Decimal] = None
+    projected_value: Optional[Decimal] = None
+    absolute_change: Optional[Decimal] = None
+    percent_change: Optional[Decimal] = None
+
+
+class ScenarioBaselineBlock(BaseModel):
+    """Senaryonun dayandığı mevcut durum."""
+
+    academic_year: str
+    program_student_count: Optional[int] = None
+    university_student_count: Optional[int] = None
+    total_revenue_usd: Optional[Decimal] = None
+    total_expenditure_usd: Optional[Decimal] = None
+    net_balance_usd: Optional[Decimal] = None
+    academic_staff_count: Optional[int] = None
+
+
+class ScenarioProjectionBlock(BaseModel):
+    """Senaryo sonrası durum."""
+
+    program_student_count: Optional[int] = None
+    university_student_count: Optional[int] = None
+    total_revenue_usd: Optional[Decimal] = None
+    total_expenditure_usd: Optional[Decimal] = None
+    net_balance_usd: Optional[Decimal] = None
+    academic_staff_count: Optional[int] = None
+
+
+class EnrollmentScenarioOutput(BaseModel):
+    scope: ScopeInfo
+    baseline: ScenarioBaselineBlock
+    scenario: ScenarioProjectionBlock
+    absolute_change: List[MetricChange] = Field(default_factory=list)
+    percentage_change: List[MetricChange] = Field(default_factory=list)
+    affected_metrics: List[MetricChange] = Field(default_factory=list)
+    risks: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    #: Program düzeyindeki değişimin üniversite geneline yansıma oranı.
+    method_note: str
+    notes: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 6) Maaş değişimi senaryosu
+# ---------------------------------------------------------------------------
+
+
+class SalaryScenarioInput(BaseModel):
+    model_config = STRICT
+
+    academic_year: Optional[str] = Field(default=None, description=_YEAR_DESC)
+    salary_change_percentage: Decimal = Field(
+        ge=Decimal("-100"),
+        le=Decimal("500"),
+        description="Akademik personel maaşlarındaki yüzdesel değişim (örn. 2 = %2 zam).",
+    )
+    faculty: Optional[str] = Field(default=None, description=_FACULTY_DESC)
+    department: Optional[str] = Field(default=None, description=_DEPARTMENT_DESC)
+
+
+class SalaryScenarioOutput(BaseModel):
+    scope: ScopeInfo
+    previous_annual_staff_cost_usd: Optional[Decimal] = None
+    new_annual_staff_cost_usd: Optional[Decimal] = None
+    cost_change_usd: Optional[Decimal] = None
+    total_expenditure_change_usd: Optional[Decimal] = None
+    net_balance_change_usd: Optional[Decimal] = None
+    cost_per_student_change_usd: Optional[Decimal] = None
+    risks: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    method_note: str
+    notes: List[str] = Field(default_factory=list)

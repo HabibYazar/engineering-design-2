@@ -349,8 +349,9 @@ def test_system_prompt_is_sent_with_every_request(monkeypatch) -> None:
     assert sent[0]["role"] == "system"
     assert "Ankara Bilim Üniversitesi" in sent[0]["content"]
     assert "Türkçe" in sent[0]["content"]
-    # Yönerge modele veri erişimi olmadığını söylemeli; yoksa sayı uydurur.
-    assert "ERİŞİMİN YOK" in sent[0]["content"]
+    # Yönerge, kurumsal sayıların yalnızca araç sonuçlarından alınmasını
+    # ve araç sonucu yokken sayı uydurulmamasını dayatmalı.
+    assert "YALNIZCA araç sonuçlarından" in sent[0]["content"]
     assert "UYDURMA" in sent[0]["content"]
 
 

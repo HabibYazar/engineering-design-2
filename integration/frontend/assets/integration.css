@@ -827,3 +827,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .composer-side { flex-direction: row; }
   .assistant-msg { max-width: 100%; }
 }
+
+/* --- asistan: cevabın dayandığı veri --- */
+.assistant-basis { margin-top: 6px; }
+.basis-scope {
+  font-size: .72rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+  letter-spacing: .01em;
+}
+.assistant-basis .disclosure { margin: 0; }
+.assistant-basis .disclosure summary { padding: 5px 9px; font-size: .78rem; }
+.source-list { margin: 6px 0 0; padding-left: 18px; font-size: .82rem; }
+.source-list li { padding: 2px 0; border: 0; }
+.assistant-basis.general {
+  font-size: .76rem;
+  color: var(--muted);
+  font-style: italic;
+  padding: 5px 0 0;
+}

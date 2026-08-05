@@ -410,10 +410,27 @@ function check(label, condition, detail = "") {
     check("asistan: cevapta dusunme metni yok",
       !/<think|muhakeme|gizli/i.test(thread),
       thread.replace(/\s+/g, " ").slice(0, 180));
+
+    // Arac kullanildiysa "Kullanilan veriler" bolumu cikmali, teknik arac
+    // adlari GORUNMEMELI.
+    const basis = $("#assistantThread").querySelector(".assistant-basis");
+    if (basis) {
+      check("asistan: kullanilan veriler bolumu var",
+        /Kullanılan veriler/.test(basis.textContent), basis.textContent.slice(0, 120));
+      check("asistan: teknik arac adi gorunmuyor",
+        !/get_program_summary|get_financial_summary|run_[a-z_]+scenario/.test(thread),
+        thread.slice(0, 200));
+      check("asistan: veri kaynagi turkce yazilmis",
+        /Öğrenci kayıtları|Mali dönem kayıtları|Senaryo motoru|Akademik personel|Fiziksel kapasite/
+          .test(basis.textContent),
+        basis.textContent.slice(0, 160));
+    }
   }
+  // Araç entegrasyonu sonrası model kurum verisine ERİŞİYOR. Ekran artık
+  // "erişemez" demiyor; sayıları kendi üretmediğini söylüyor.
   check(
-    "asistan: model erisimi olmadigini soyluyor",
-    /veritabanına|erişemez/.test(assistantText),
+    "asistan: sayilari kendi uretmedigini soyluyor",
+    /gerçek kayıtlardan|Sayıları kendi üretmez/.test(assistantText),
     assistantText.slice(0, 220)
   );
 

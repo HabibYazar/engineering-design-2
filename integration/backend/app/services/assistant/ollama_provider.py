@@ -222,8 +222,13 @@ class OllamaProvider(AssistantProvider):
     # Sohbet
     # ------------------------------------------------------------------
 
-    def _payload(self, messages: List[Dict[str, str]], stream: bool) -> Dict:
-        return {
+    def _payload(
+        self,
+        messages: List[Dict[str, str]],
+        stream: bool,
+        tools: Optional[List[Dict]] = None,
+    ) -> Dict:
+        payload: Dict = {
             "model": self.model,
             "messages": messages,
             "stream": stream,
@@ -232,6 +237,11 @@ class OllamaProvider(AssistantProvider):
                 "num_ctx": settings.OLLAMA_CONTEXT_LENGTH,
             },
         }
+        # Araç listesi yalnızca doluysa gönderilir; boş liste bazı model
+        # sürümlerinde "araç kullanmalısın" sinyali gibi yorumlanabiliyor.
+        if tools:
+            payload["tools"] = tools
+        return payload
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         """HTTP hatalarını kullanıcıya anlaşılır hataya çevirir."""
@@ -244,12 +254,27 @@ class OllamaProvider(AssistantProvider):
             logger.warning("Ollama %s dondu", response.status_code)
             raise AssistantProviderError(ERROR_INVALID_RESPONSE, kind="invalid_response")
 
-    def chat(self, messages: List[Dict[str, str]]) -> Tuple[str, str]:
+    def chat(
+        self, messages: List[Dict[str, str]], tools: Optional[List[Dict]] = None
+    ) -> Tuple[str, str]:
         """Tek seferde cevap alır. (görünen cevap, düşünme metni) döndürür."""
+        _, visible, thinking = self.chat_with_tools(messages, tools)
+        return visible, thinking
+
+    def chat_with_tools(
+        self, messages: List[Dict[str, str]], tools: Optional[List[Dict]] = None
+    ) -> Tuple[List[Dict], str, str]:
+        """Araç çağrısı da döndürebilen sohbet.
+
+        Dönen üçlü: (araç çağrıları, görünen cevap, düşünme metni).
+        Model araç çağırdığında görünen cevap boş olabilir; bu bir hata
+        değildir, bu yüzden `chat()`ten farklı olarak boş metin kabul edilir.
+        """
         try:
             with _local_client(self.timeout_seconds) as client:
                 response = client.post(
-                    f"{self.base_url}/api/chat", json=self._payload(messages, stream=False)
+                    f"{self.base_url}/api/chat",
+                    json=self._payload(messages, stream=False, tools=tools),
                 )
                 self._raise_for_status(response)
                 payload = response.json()
@@ -265,10 +290,10 @@ class OllamaProvider(AssistantProvider):
             logger.warning("Ollama cevabi okunamadi: %s", exc.__class__.__name__)
             raise AssistantProviderError(ERROR_INVALID_RESPONSE, kind="invalid_response") from exc
 
-        return self._extract(payload)
+        return self._extract_with_tools(payload)
 
-    def _extract(self, payload: Dict) -> Tuple[str, str]:
-        """Ollama cevabından görünen metni ve düşünme metnini çıkarır."""
+    def _extract_with_tools(self, payload: Dict) -> Tuple[List[Dict], str, str]:
+        """Ollama cevabından araç çağrılarını, görünen metni ve muhakemeyi ayırır."""
         if not isinstance(payload, dict):
             raise AssistantProviderError(ERROR_INVALID_RESPONSE, kind="invalid_response")
 
@@ -283,11 +308,20 @@ class OllamaProvider(AssistantProvider):
         visible, inline_thinking = split_thinking(content)
         thinking = "\n".join(part for part in (thinking_field, inline_thinking) if part)
 
-        if not visible:
-            # Model yalnızca düşünme üretmiş: kullanıcıya boş balon göstermek
-            # yerine kontrollü hata döndürülür.
+        tool_calls = _parse_tool_calls(message.get("tool_calls"))
+
+        if not visible and not tool_calls:
+            # Ne cevap ne araç çağrısı: kullanıcıya boş balon göstermek yerine
+            # kontrollü hata döndürülür.
             raise AssistantProviderError(ERROR_INVALID_RESPONSE, kind="invalid_response")
 
+        return tool_calls, visible, thinking
+
+    def _extract(self, payload: Dict) -> Tuple[str, str]:
+        """Geriye uyum: yalnızca metin döndürür."""
+        _, visible, thinking = self._extract_with_tools(payload)
+        if not visible:
+            raise AssistantProviderError(ERROR_INVALID_RESPONSE, kind="invalid_response")
         return visible, thinking
 
     def stream_chat(self, messages: List[Dict[str, str]]) -> Iterator[str]:
@@ -342,6 +376,39 @@ class OllamaProvider(AssistantProvider):
         """
         visible, _ = self.chat([{"role": "user", "content": question}])
         return visible
+
+
+def _parse_tool_calls(raw) -> List[Dict]:
+    """Ollama'nın döndürdüğü araç çağrılarını sadeleştirir.
+
+    Beklenen biçim:
+        [{"function": {"name": "...", "arguments": {...}}}]
+
+    Bazı model sürümleri `arguments` alanını JSON METNİ olarak döndürüyor;
+    ikisi de kabul edilir. Ayrıştırılamayan bir çağrı sessizce atılmaz —
+    boş sözlükle geçirilir ki doğrulama katmanı hatayı modele bildirsin.
+    """
+    if not isinstance(raw, list):
+        return []
+
+    calls: List[Dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function") or {}
+        name = function.get("name")
+        if not name:
+            continue
+        arguments = function.get("arguments")
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except ValueError:
+                arguments = {}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        calls.append({"name": str(name), "arguments": arguments})
+    return calls
 
 
 # Akış filtresi: <think> bloğu içindeyken hiçbir şey yayınlanmaz.

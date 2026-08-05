@@ -8,7 +8,8 @@ senaryo motoru bağlantısı yoktur. Bağlam hazırlama katmanı (`context_build
 ayrı durur ve bir sonraki aşamada modele bağlanacaktır.
 """
 
-from typing import List, Optional
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +41,11 @@ class AssistantStatus(BaseModel):
         description="Ollama'da kurulu model adları. Servis kapalıysa boştur.",
         examples=[["qwen3.5:9b"]],
     )
+    tool_count: int = Field(
+        default=0,
+        description="Modelin çağırabileceği kurumsal veri aracı sayısı.",
+        examples=[6],
+    )
 
 
 class ChatRequest(BaseModel):
@@ -67,28 +73,55 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class UsedTool(BaseModel):
+    """Modelin çağırdığı bir araç ve sonucu."""
+
+    name: str = Field(
+        description="Teknik araç adı. Arayüzde KULLANICIYA GÖSTERİLMEZ.",
+        examples=["run_enrollment_change_scenario"],
+    )
+    success: bool = Field(examples=[True])
+
+
 class ChatResponse(BaseModel):
-    """Modelin ürettiği cevap.
+    """Modelin ürettiği cevap ve dayandığı veri.
 
     Modelin düşünme (reasoning) metni bu cevaba KONULMAZ; sağlayıcı katmanında
     ayıklanır ve yalnızca sunucu günlüğüne uzunluğu yazılır.
     """
 
     conversation_id: str = Field(examples=["7f1c2e6a-9a4b-4d1f-9c2a-1f3b5d7e9c11"])
-    answer: str = Field(examples=["Merhaba, size nasıl yardımcı olabilirim?"])
+    answer: str = Field(examples=["2025-2026 verilerine göre…"])
     provider: str = Field(examples=["ollama"])
     model: str = Field(examples=["qwen3.5:9b"])
-    used_tools: List[str] = Field(
+    used_tools: List[UsedTool] = Field(
         default_factory=list,
-        description="Bu aşamada araç çağrısı yoktur; liste her zaman boştur.",
-        examples=[[]],
+        description="Çağrılan araçlar. Arayüz teknik adları göstermez.",
+    )
+    data_sources: List[str] = Field(
+        default_factory=list,
+        description="Kullanıcıya gösterilecek Türkçe veri kaynağı adları.",
+        examples=[["Öğrenci kayıtları", "Mali dönem kayıtları"]],
+    )
+    academic_year: Optional[str] = Field(
+        default=None,
+        description="Araç sonuçlarının ait olduğu akademik yıl.",
+        examples=["2025-2026"],
+    )
+    scope: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Araç sonuçlarından derlenen kapsam (fakülte/bölüm/program).",
+        examples=[{"program": "Bilgisayar Mühendisliği Lisans Programı"}],
+    )
+    calculated_at: datetime = Field(
+        description="Cevabın üretildiği an.",
     )
     data_source: str = Field(
         description=(
-            "Cevabın dayanağı. 'general_model_knowledge' modelin kendi genel "
-            "bilgisidir; kurum verisi DEĞİLDİR."
+            "Cevabın dayanağı. 'institutional_data' araç sonuçlarına, "
+            "'general_model_knowledge' modelin kendi genel bilgisine dayanır."
         ),
-        examples=["general_model_knowledge"],
+        examples=["institutional_data"],
     )
 
 

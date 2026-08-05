@@ -1,51 +1,83 @@
 """Asistan sohbet servisi.
 
-Sorumluluk: sistem yönergesini hazırlamak, konuşma geçmişini tutmak ve
-sağlayıcıyı çağırmak. HTTP ayrıntısı bilmez (o router'ın işi), Ollama
-ayrıntısı bilmez (o sağlayıcının işi).
+Sorumluluk: sistem yönergesini hazırlamak, konuşma geçmişini tutmak, ARAÇ
+ÇAĞRI DÖNGÜSÜNÜ yürütmek ve sağlayıcıyı çağırmak. HTTP ayrıntısı bilmez (o
+router'ın işi), Ollama ayrıntısı bilmez (o sağlayıcının işi), araç
+doğrulaması yapmaz (o `tool_runner`ın işi).
 
-BU AŞAMADA ARAÇ ÇAĞRISI YOKTUR. Model veritabanına erişemez, senaryo motorunu
-çalıştıramaz. Sistem yönergesi modele bunu açıkça söyler; böylece model
-"Bilgisayar Mühendisliği'nde 400 öğrenci var" gibi bir sayı UYDURMAZ, veriye
-erişimi olmadığını belirtir.
+ARAÇ ÇAĞRI DÖNGÜSÜ
+------------------
+1. Kullanıcı mesajı + sistem yönergesi + araç tanımları modele gönderilir.
+2. Model bir veya birden fazla araç çağırır.
+3. Her çağrı `tool_runner` tarafından doğrulanıp çalıştırılır.
+4. Sonuçlar `tool` rolüyle konuşmaya eklenir.
+5. Model gerekiyorsa başka araç çağırır (en fazla MAX_TOOL_STEPS tur).
+6. Adım ya da süre sınırına gelinirse model araçsız olarak son cevabı yazar.
 
-Konuşmalar bellekte tutulur, veritabanına yazılmaz. Sunucu yeniden başlarsa
-geçmiş silinir; bu bilinçli bir tercihtir — kullanıcı mesajlarını kalıcı
-saklamak ayrı bir gizlilik kararı gerektirir.
+Model kurumsal bir sayıyı yalnızca araç sonucundan alabilir. Sistem yönergesi
+bunu dayatır; araç sonucu yoksa "veri bulunamadı" demesi beklenir.
+
+Konuşmalar bellekte tutulur, veritabanına yazılmaz.
 """
 
 import logging
+import time
 import uuid
 from collections import OrderedDict
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.services.assistant.ollama_provider import (
     AssistantProviderError,
     OllamaProvider,
 )
+from app.services.assistant import tools as _tools  # noqa: F401  (kayıt için)
+from app.services.assistant.tool_registry import registry
+from app.services.assistant.tool_runner import ToolSession
 
 logger = logging.getLogger(__name__)
 
-# Modelin rolünü ve sınırlarını tanımlayan yönerge. Türkçe yazılmıştır çünkü
-# kullanıcı arayüzü ve kurum dili Türkçedir; İngilizce yönerge modelin İngilizce
-# cevap verme eğilimini artırıyor.
+# Modelin bir soruda yapabileceği en fazla araç turu.
+MAX_TOOL_STEPS = 5
+
+# Bütün araç turlarının toplam süre sınırı (saniye). Tek tek araçların kendi
+# sınırı var; bu sınır beş turun toplamda kullanıcıyı dakikalarca bekletmesini
+# engeller.
+MAX_TOOL_WALL_SECONDS = 90.0
+
 SYSTEM_PROMPT = """Sen, Ankara Bilim Üniversitesi Stratejik Yönetim ve Karar Destek Sistemi içinde çalışan bir yönetim asistanısın.
 
-Görevin, üniversite üst yönetimine stratejik konularda yardımcı olmaktır.
+Görevin, üniversite üst yönetimine kurum verisine dayalı, doğrulanabilir cevaplar vermektir.
 
-Uyman gereken kurallar:
+VERİ KULLANIMI — EN ÖNEMLİ KURALLAR
 
-1. Kullanıcıya her zaman Türkçe cevap ver.
-2. Şu anda üniversitenin veritabanına, raporlarına veya hesaplama motorlarına ERİŞİMİN YOK. Araç entegrasyonu henüz etkin değil.
-3. Bir soru kurumun kendi verisini gerektiriyorsa (öğrenci sayısı, bütçe rakamı, doluluk oranı, personel sayısı, program başarısı gibi), sayı UYDURMA. Bunun yerine hangi verilere erişmen gerektiğini açıkça söyle ve araç entegrasyonunun henüz etkin olmadığını belirt.
-4. Genel bilgi ile kurum verisini birbirine karıştırma. Genel bir yöntem, tanım veya yaklaşım anlatıyorsan bunun genel bilgi olduğunu belirt.
-5. Cevaplarını yönetici odaklı ver: kısa, açık, düzenli ve eyleme dönük olsun. Gerektiğinde madde işaretleri kullan.
-6. Emin olmadığın konularda tahmin yürütmek yerine belirsizliği açıkça söyle.
+1. Kurumsal sayıları YALNIZCA araç sonuçlarından al. Öğrenci sayısı, bütçe, doluluk oranı, personel sayısı, kapasite gibi her rakam bir araç çıktısından gelmelidir.
+2. Araç sonucu yoksa sayı UYDURMA. "Bu bilgi için gerekli veriye ulaşamadım" de.
+3. Kendi kafandan hesap YAPMA. Toplama, çıkarma, yüzde hesabı gerekiyorsa ilgili aracı çağır. Araçların döndürdüğü değerleri olduğu gibi aktar.
+4. Bir araç hata döndürürse o konuda sayı verme; hatanın sebebini kullanıcıya sade bir dille açıkla.
+5. Araç çıktısındaki "notes" alanında yazan uyarıları cevabına taşı. Örneğin bir değer üniversite geneli ise bunu belirt.
 
-Örnek doğru davranış:
-Kullanıcı: "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?"
-Sen: "Bu soruyu kurum verileriyle hesaplamak için öğrenci, mali durum, personel ve kapasite verilerine erişmem gerekiyor. Araç entegrasyonu henüz etkin değil." — ardından hangi göstergelerin bakılması gerektiğini genel olarak açıklayabilirsin, ancak somut sayı veremezsin."""
+NE ZAMAN SENARYO ÇALIŞTIRILIR
+
+6. Kullanıcı "artarsa", "azalırsa", "zam yapılırsa", "ne olur" gibi bir VARSAYIM soruyorsa ilgili senaryo aracını çağır.
+7. Kullanıcı yalnızca mevcut durumu soruyorsa (kaç öğrenci var, bütçe ne kadar) SENARYO ÇALIŞTIRMA; yalnızca özet araçlarını kullan.
+
+CEVAP BİÇİMİ
+
+8. Her zaman Türkçe cevap ver.
+9. Cevabın başında hangi akademik yıla ve hangi kapsama (üniversite geneli / fakülte / bölüm / program) ait olduğunu belirt.
+10. Para değerlerini USD olarak ve okunabilir biçimde yaz (örnek: 35.960.000 USD).
+11. Veri eksikse açıkça "veri bulunamadı" de; sıfır yazma.
+12. Hesaplanmış sonuç ile genel bilgiyi birbirinden ayır. Genel bir yöntem anlatıyorsan bunun kurum verisi olmadığını söyle.
+13. Kullanıcıya teknik araç adlarını (get_program_summary gibi) YAZMA. Bunun yerine "öğrenci kayıtları", "mali dönem kayıtları" gibi anlaşılır kaynak adları kullan.
+14. Cevabı yönetici odaklı ver: kısa, düzenli, madde işaretli ve eyleme dönük.
+
+BİRİM ADLARI
+
+15. Kullanıcı bir bölüm veya program adını Türkçe, İngilizce ya da kod olarak yazabilir. Araçlara kullanıcının yazdığı adı olduğu gibi ver; eşleştirmeyi sistem yapar.
+16. Bir araç "birden fazla eşleşme" hatası döndürürse kullanıcıya seçenekleri sun ve hangisini kastettiğini sor. Kendin seçme."""
 
 
 class ChatValidationError(ValueError):
@@ -57,11 +89,7 @@ class ChatValidationError(ValueError):
 
 
 class ConversationStore:
-    """Bellekte tutulan konuşma geçmişi.
-
-    Sınırsız büyüyen bir sözlük, uzun süre açık kalan sunucuda belleği
-    tüketirdi. En eski konuşma, sınır aşılınca düşürülür (LRU).
-    """
+    """Bellekte tutulan konuşma geçmişi (LRU)."""
 
     def __init__(self, max_conversations: int, max_messages: int) -> None:
         self._data: "OrderedDict[str, List[Dict[str, str]]]" = OrderedDict()
@@ -80,7 +108,6 @@ class ConversationStore:
     def append(self, conversation_id: str, role: str, content: str) -> None:
         history = self._data.setdefault(conversation_id, [])
         history.append({"role": role, "content": content})
-        # Yalnızca son N mesaj tutulur; bağlam penceresi sınırsız değil.
         if len(history) > self.max_messages:
             del history[: len(history) - self.max_messages]
         self._data.move_to_end(conversation_id)
@@ -122,8 +149,6 @@ def validate_message(message: str) -> str:
 def build_messages(user_message: str, history: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """Modele gönderilecek mesaj listesini kurar: system + geçmiş + yeni soru."""
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    # Geçmişte yalnızca user/assistant rolleri taşınır; eski bir system
-    # mesajının tekrar eklenmesi yönergeyi çelişkili hale getirirdi.
     messages.extend(
         {"role": item["role"], "content": item["content"]}
         for item in history
@@ -148,38 +173,122 @@ def _prepare(message: str, conversation_id: Optional[str]) -> Tuple[str, List[Di
     return conversation, build_messages(cleaned, history)
 
 
-def answer(message: str, conversation_id: Optional[str] = None) -> Dict[str, object]:
-    """Tek seferde cevap üretir.
+def answer(
+    message: str,
+    conversation_id: Optional[str] = None,
+    db: Optional[Session] = None,
+    permissions: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Araç çağrı döngüsünü yürütür ve son cevabı üretir.
 
-    AssistantProviderError router tarafından yakalanıp kullanıcıya anlaşılır
-    hata olarak döndürülür. Bu katman hatayı yutmaz ve sahte cevap üretmez.
+    `db` verilmezse araçlar devre dışıdır; model yalnızca genel bilgiyle
+    cevap verir ve sistem yönergesi gereği kurumsal sayı üretmez.
     """
     conversation, messages = _prepare(message, conversation_id)
     provider = get_provider()
+    user_content = messages[-1]["content"]
 
-    visible, thinking = provider.chat(messages)
-    if thinking:
-        # Düşünme metni yalnızca günlükte, uzunluğu kadar. İçeriği yazılmaz.
-        logger.debug("Model dusunme metni uretti (%d karakter), kullaniciya gonderilmedi", len(thinking))
+    session: Optional[ToolSession] = None
+    tool_schemas: Optional[List[Dict]] = None
+    if db is not None:
+        session = ToolSession(db=db, permissions=permissions, registry=registry)
+        tool_schemas = registry.schemas(permissions)
 
-    _store.append(conversation, "user", messages[-1]["content"])
+    started = time.monotonic()
+    steps = 0
+    visible = ""
+
+    while True:
+        elapsed = time.monotonic() - started
+        # Süre veya adım sınırına gelindiyse araçsız son tur: model eldeki
+        # sonuçlarla cevabı yazar, yeni araç çağıramaz.
+        out_of_budget = steps >= MAX_TOOL_STEPS or elapsed >= MAX_TOOL_WALL_SECONDS
+        offered_tools = None if (out_of_budget or not tool_schemas) else tool_schemas
+
+        if out_of_budget and session is not None and steps > 0:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Araç kullanım sınırına ulaşıldı. Yeni araç çağırma; "
+                        "eldeki sonuçlarla son cevabı yaz. Eksik kalan bilgi "
+                        "varsa bunu açıkça belirt."
+                    ),
+                }
+            )
+
+        tool_calls, visible, thinking = provider.chat_with_tools(messages, offered_tools)
+        if thinking:
+            logger.debug(
+                "Model dusunme metni uretti (%d karakter), kullaniciya gonderilmedi",
+                len(thinking),
+            )
+
+        if not tool_calls or session is None or offered_tools is None:
+            break
+
+        steps += 1
+        # Modelin araç çağrısı konuşmaya eklenir; sonuçların hangi çağrıya ait
+        # olduğu böylece belli olur.
+        messages.append(
+            {
+                "role": "assistant",
+                "content": visible,
+                "tool_calls": [
+                    {"function": {"name": c["name"], "arguments": c["arguments"]}}
+                    for c in tool_calls
+                ],
+            }
+        )
+
+        for call in tool_calls:
+            record = session.run(call["name"], call.get("arguments"))
+            messages.append(
+                {"role": "tool", "name": record.name, "content": record.content}
+            )
+
+    if not visible:
+        raise AssistantProviderError(
+            "Yerel modelden geçerli bir yanıt alınamadı. Ollama günlüklerini kontrol edin.",
+            kind="invalid_response",
+        )
+
+    _store.append(conversation, "user", user_content)
     _store.append(conversation, "assistant", visible)
+
+    used_tools = session.used_tools() if session else []
+    data_sources = session.data_sources() if session else []
+    scope = session.scope() if session else {}
+    academic_year = session.academic_year() if session else None
 
     return {
         "conversation_id": conversation,
         "answer": visible,
         "provider": provider.name,
         "model": provider.model,
-        "used_tools": [],
-        # Bu aşamada model yalnızca kendi genel bilgisini kullanır.
-        "data_source": "general_model_knowledge",
+        "used_tools": used_tools,
+        "data_sources": data_sources,
+        "academic_year": academic_year,
+        "scope": scope,
+        # Araç kullanıldıysa cevap kurum verisine, kullanılmadıysa modelin
+        # genel bilgisine dayanır. Bu ayrım kullanıcıya gösterilir.
+        "data_source": (
+            "institutional_data"
+            if session is not None and session.any_success()
+            else "general_model_knowledge"
+        ),
     }
 
 
 def stream_answer(
     message: str, conversation_id: Optional[str] = None
 ) -> Tuple[str, Iterator[str]]:
-    """Cevabı parça parça üretir. (konuşma kimliği, parça üreteci) döndürür."""
+    """Cevabı parça parça üretir.
+
+    NOT: Akış modunda araç çağrısı YAPILMAZ. Araç turları arasında akışı
+    bölmek kullanıcıya yarım cümleler gösterirdi; araçlı sorular tek seferlik
+    `/chat` uç noktasından cevaplanır.
+    """
     conversation, messages = _prepare(message, conversation_id)
     provider = get_provider()
     user_content = messages[-1]["content"]
@@ -197,11 +306,8 @@ def stream_answer(
     return conversation, generate()
 
 
-def status() -> Dict[str, object]:
-    """Asistanın kullanıcıya gösterilecek durumu.
-
-    Hata FIRLATMAZ: Ollama kapalıyken bile ekran açılabilmelidir.
-    """
+def status() -> Dict[str, Any]:
+    """Asistanın kullanıcıya gösterilecek durumu. Hata FIRLATMAZ."""
     provider = get_provider()
 
     if not settings.ASSISTANT_ENABLED:
@@ -214,6 +320,7 @@ def status() -> Dict[str, object]:
             "ready": False,
             "message": "Akıllı Asistan yapılandırmada devre dışı bırakıldı.",
             "installed_models": [],
+            "tool_count": len(registry.names()),
         }
 
     health = provider.health()
@@ -226,10 +333,10 @@ def status() -> Dict[str, object]:
         "ready": health.ready,
         "message": health.message,
         "installed_models": list(health.installed_models),
+        "tool_count": len(registry.names()),
     }
 
 
-# Testlerin konuşma geçmişini sıfırlayabilmesi için.
 def reset_conversations() -> None:
     """Bellekteki tüm konuşmaları siler."""
     _store.clear()
@@ -238,6 +345,8 @@ def reset_conversations() -> None:
 __all__ = [
     "AssistantProviderError",
     "ChatValidationError",
+    "MAX_TOOL_STEPS",
+    "MAX_TOOL_WALL_SECONDS",
     "SYSTEM_PROMPT",
     "answer",
     "build_messages",
