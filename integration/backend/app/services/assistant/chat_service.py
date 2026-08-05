@@ -33,7 +33,7 @@ from app.services.assistant.ollama_provider import (
     AssistantProviderError,
     OllamaProvider,
 )
-from app.services.assistant import entity_resolver, query_policy
+from app.services.assistant import entity_resolver, query_policy, response_composer
 from app.services.assistant import tools as _tools  # noqa: F401  (kayıt için)
 from app.services.assistant.tool_registry import registry
 from app.services.assistant.tool_runner import ToolSession
@@ -47,6 +47,13 @@ MAX_TOOL_STEPS = 5
 # sınırı var; bu sınır beş turun toplamda kullanıcıyı dakikalarca bekletmesini
 # engeller.
 MAX_TOOL_WALL_SECONDS = 90.0
+
+# Senaryo sonucu zorunlu alanları taşımıyorsa kullanıcıya gösterilen metin.
+MISSING_METRIC_MESSAGE = (
+    "Senaryo sonucu eksik üretildi; bazı zorunlu göstergeler hesaplanamadı. "
+    "Güvenilir olmayan bir sonuç göstermemek için sayısal cevap "
+    "oluşturulmadı."
+)
 
 SYSTEM_PROMPT = """Sen, Ankara Bilim Üniversitesi Stratejik Yönetim ve Karar Destek Sistemi içinde çalışan bir yönetim asistanısın.
 
@@ -65,6 +72,7 @@ NE ZAMAN SENARYO ÇALIŞTIRILIR
 6. Kullanıcı "artarsa", "azalırsa", "zam yapılırsa", "ne olur" gibi bir VARSAYIM soruyorsa ilgili SENARYO aracını çağır. Mevcut durumu döndüren özet araçları (gelir, gider, öğrenci sayısı) bir senaryo sorusunu CEVAPLAMAZ; onlar değişimin etkisini hesaplamaz.
 7. Kullanıcı yalnızca mevcut durumu soruyorsa (kaç öğrenci var, bütçe ne kadar) SENARYO ÇALIŞTIRMA; yalnızca özet araçlarını kullan.
 7a. Bir senaryo sonucu sana hazır olarak verilmişse yeni araç çağırma; o sonucu yorumla.
+7b. "Hesaplanan sonuçlar" bölümü backend tarafından hazırlanır ve kullanıcıya aynen gösterilir. O bölümdeki değerleri değiştirme, yeniden hesaplama, yuvarlama veya farklı birimle tekrar yazma. Sayıları tekrar listeleme; yalnızca etkilerini yorumla.
 
 CEVAP BİÇİMİ
 
@@ -212,6 +220,7 @@ def answer(
             "academic_year": None,
             "scope": {},
             "data_source": query_policy.SOURCE_UNAVAILABLE,
+            "structured_result": None,
         }
 
     provider = get_provider()
@@ -233,6 +242,7 @@ def answer(
     # ------------------------------------------------------------------
     intent = query_policy.classify(user_content)
     forced_tool: Optional[str] = None
+    composed: Optional[response_composer.ComposedResponse] = None
 
     # Kullanıcı adını verdiği bir birim sistemde yoksa MODELE HİÇ SORULMAZ.
     # Aksi halde model soruyu alakasız bir araçla cevaplayabiliyor ve
@@ -257,6 +267,7 @@ def answer(
                 "academic_year": None,
                 "scope": {},
                 "data_source": query_policy.SOURCE_UNAVAILABLE,
+                "structured_result": None,
             }
 
     # Program özeti zorunluluğu, cümlede GERÇEKTEN bir program adı geçmesine
@@ -286,8 +297,41 @@ def answer(
             messages.append(
                 {"role": "tool", "name": record.name, "content": record.content}
             )
-            if record.success:
-                # Sonuç hazır: modelden yalnızca yorum isteniyor, yeni araç değil.
+            if record.success and response_composer.supports(forced_tool):
+                # ZORUNLU GERÇEKLER burada üretilir. Model bir metriği
+                # atlarsa cevap eksik kalmasın diye bu bölüm backend
+                # tarafından yazılır ve final cevaba mutlaka eklenir.
+                try:
+                    composed = response_composer.compose(forced_tool, record.output)
+                except response_composer.MissingMetricError as exc:
+                    logger.error("Senaryo sonucu eksik uretildi: %s", exc.missing)
+                    _store.append(conversation, "user", user_content)
+                    _store.append(conversation, "assistant", MISSING_METRIC_MESSAGE)
+                    return {
+                        "conversation_id": conversation,
+                        "answer": MISSING_METRIC_MESSAGE,
+                        "provider": provider.name,
+                        "model": provider.model,
+                        "used_tools": session.used_tools(),
+                        "data_sources": session.data_sources(),
+                        "academic_year": session.academic_year(),
+                        "scope": session.scope(),
+                        "data_source": query_policy.SOURCE_UNAVAILABLE,
+                        "structured_result": None,
+                    }
+
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            response_composer.COMPOSER_INSTRUCTION
+                            + "\n\n"
+                            + composed.facts_markdown
+                        ),
+                    }
+                )
+                tool_schemas = None
+            elif record.success:
                 messages.append(
                     {
                         "role": "system",
@@ -340,7 +384,18 @@ def answer(
                 }
             )
 
-        tool_calls, visible, thinking = provider.chat_with_tools(messages, offered_tools)
+        try:
+            tool_calls, visible, thinking = provider.chat_with_tools(messages, offered_tools)
+        except AssistantProviderError:
+            # Hesaplanan sonuçlar hazırsa modelin yorumu olmadan da cevap
+            # verilir. Model boş metin döndürdü diye doğru hesaplanmış bir
+            # senaryoyu kullanıcıdan saklamak yanlış olur.
+            if composed is None:
+                raise
+            logger.warning(
+                "Model yorum uretemedi; yalnizca hesaplanan sonuclar donuluyor."
+            )
+            tool_calls, visible, thinking = [], "", ""
         if thinking:
             logger.debug(
                 "Model dusunme metni uretti (%d karakter), kullaniciya gonderilmedi",
@@ -417,6 +472,18 @@ def answer(
     else:
         data_source = query_policy.SOURCE_GENERAL
 
+    # ZORUNLU GERÇEKLER + MODEL YORUMU.
+    #
+    # Model yorumu boş olsa bile hesaplanan sonuçlar kullanıcıya ulaşır:
+    # canlı testte model 370 → 426 değişimini yazmayı atlamıştı.
+    structured_result: Optional[Dict[str, Any]] = None
+    if composed is not None and data_source == query_policy.SOURCE_INSTITUTIONAL:
+        structured_result = composed.structured_result
+        interpretation = _clean_interpretation(visible, composed.facts_markdown)
+        visible = composed.facts_markdown
+        if interpretation:
+            visible += "\n\n" + interpretation
+
     if not visible:
         raise AssistantProviderError(
             "Yerel modelden geçerli bir yanıt alınamadı. Ollama günlüklerini kontrol edin.",
@@ -436,7 +503,36 @@ def answer(
         "academic_year": academic_year,
         "scope": scope,
         "data_source": data_source,
+        "structured_result": structured_result,
     }
+
+
+def _clean_interpretation(text: str, facts_markdown: str) -> str:
+    """Modelin yorumunu hazırlar.
+
+    Model bazen zorunlu gerçekler bölümünü kopyalıyor; aynı sayılar iki kez
+    görünmesin diye tekrar eden satırlar atılır. Model yorumu boşsa boş
+    dizge döner — gerçekler bölümü yine de kullanıcıya gider.
+    """
+    if not text:
+        return ""
+
+    fact_lines = {line.strip() for line in facts_markdown.splitlines() if line.strip()}
+    kept: List[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped and stripped in fact_lines:
+            continue
+        if stripped.startswith("### Hesaplanan sonuçlar"):
+            continue
+        kept.append(line)
+
+    cleaned = "\n".join(kept).strip()
+    if not cleaned:
+        return ""
+    if response_composer.INTERPRETATION_HEADING not in cleaned:
+        cleaned = f"{response_composer.INTERPRETATION_HEADING}\n{cleaned}"
+    return cleaned
 
 
 def _build_forced_arguments(

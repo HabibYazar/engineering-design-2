@@ -229,6 +229,10 @@ class ScenarioBaselineBlock(BaseModel):
     total_expenditure_usd: Optional[Decimal] = None
     net_balance_usd: Optional[Decimal] = None
     academic_staff_count: Optional[int] = None
+    laboratory_capacity: Optional[int] = None
+    laboratory_demand: Optional[int] = None
+    classroom_capacity: Optional[int] = None
+    classroom_demand: Optional[int] = None
 
 
 class ScenarioProjectionBlock(BaseModel):
@@ -240,12 +244,37 @@ class ScenarioProjectionBlock(BaseModel):
     total_expenditure_usd: Optional[Decimal] = None
     net_balance_usd: Optional[Decimal] = None
     academic_staff_count: Optional[int] = None
+    recommended_staff_count: Optional[int] = None
+    staff_gap: Optional[int] = None
+    laboratory_capacity: Optional[int] = None
+    laboratory_demand: Optional[int] = None
+    laboratory_gap: Optional[int] = None
+    classroom_capacity: Optional[int] = None
+    classroom_demand: Optional[int] = None
+    classroom_gap: Optional[int] = None
+    capacity_status: Optional[str] = None
 
 
 class EnrollmentScenarioOutput(BaseModel):
+    """Öğrenci sayısı değişimi senaryosunun sonucu.
+
+    ZORUNLU METRİKLER doğrudan alan olarak taşınır. Cevap oluşturucu bu
+    alanları yalnızca BİÇİMLENDİRİR; hesap burada, veri katmanında yapılır.
+    Model bir metriği atlarsa cevap eksik kalmasın diye zorunlu gerçekler
+    backend tarafından ayrıca yazılır.
+    """
+
     scope: ScopeInfo
     baseline: ScenarioBaselineBlock
     scenario: ScenarioProjectionBlock
+    #: Program öğrenci sayısındaki mutlak değişim (senaryo eksi mevcut).
+    program_student_change: Optional[int] = None
+    #: Kullanıcının istediği yüzdesel değişim.
+    student_change_percentage: Optional[Decimal] = None
+    #: Toplam gelirdeki mutlak değişim (USD).
+    revenue_change_usd: Optional[Decimal] = None
+    #: Bütçe dengesindeki mutlak değişim (USD).
+    net_balance_change_usd: Optional[Decimal] = None
     absolute_change: List[MetricChange] = Field(default_factory=list)
     percentage_change: List[MetricChange] = Field(default_factory=list)
     affected_metrics: List[MetricChange] = Field(default_factory=list)
@@ -275,7 +304,10 @@ class SalaryScenarioInput(BaseModel):
 
 
 class SalaryScenarioOutput(BaseModel):
+    """Maaş değişimi senaryosunun sonucu. Zorunlu metrikler alan olarak taşınır."""
+
     scope: ScopeInfo
+    salary_change_percentage: Optional[Decimal] = None
     previous_annual_staff_cost_usd: Optional[Decimal] = None
     new_annual_staff_cost_usd: Optional[Decimal] = None
     cost_change_usd: Optional[Decimal] = None

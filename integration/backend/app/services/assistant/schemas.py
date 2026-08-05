@@ -9,7 +9,7 @@ ayrı durur ve bir sonraki aşamada modele bağlanacaktır.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -115,6 +115,33 @@ class ChatResponse(BaseModel):
     )
     calculated_at: datetime = Field(
         description="Cevabın üretildiği an.",
+    )
+    structured_result: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Senaryo/özet sonucunun makine okunur hâli. Arayüz şimdilik "
+            "yalnızca `answer` metnini gösterir; bu alan sonraki dinamik "
+            "grafik aşaması için korunur."
+        ),
+        examples=[
+            {
+                "type": "enrollment_change_scenario",
+                "academic_year": "2025-2026",
+                "scope": {"program": "Bilgisayar Mühendisliği Lisans Programı"},
+                "metrics": [
+                    {
+                        "key": "program_student_count",
+                        "label": "Öğrenci sayısı",
+                        "baseline": 370,
+                        "scenario": 426,
+                        "change": 56,
+                        "unit": "öğrenci",
+                    }
+                ],
+                "risks": [],
+                "recommendations": [],
+            }
+        ],
     )
     data_source: str = Field(
         description=(

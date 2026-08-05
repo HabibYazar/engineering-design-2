@@ -1000,3 +1000,250 @@ def test_forced_tool_arguments_come_from_the_message(db) -> None:
 
 def intent_message() -> str:
     return "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?"
+
+
+# ===========================================================================
+# DETERMİNİSTİK CEVAP OLUŞTURUCU
+#
+# Canlı testte araç doğru çağrıldı ve senaryo motoru 370 → 426 sonucunu
+# üretti, ama model bu iki sayıyı final cevaba YAZMADI. Kritik metriklerin
+# cevapta bulunması artık backend tarafından garanti ediliyor.
+# ===========================================================================
+
+
+def _enrollment_output(db):
+    tool = registry.get("run_enrollment_change_scenario")
+    return tool.handler(
+        db,
+        tool.input_model(
+            program="CENG-BSC", academic_year=YEAR, student_change_percentage=15
+        ),
+    )
+
+
+def test_enrollment_facts_are_composed_by_the_backend(db) -> None:
+    """Zorunlu gerçekler bölümü backend tarafından oluşturulmalı."""
+    from app.services.assistant import response_composer
+
+    composed = response_composer.compose(
+        "run_enrollment_change_scenario", _enrollment_output(db)
+    )
+
+    facts = composed.facts_markdown
+    assert "### Hesaplanan sonuçlar" in facts
+    assert "Öğrenci sayısı: 370 → 426" in facts
+    assert "+56 öğrenci" in facts
+    assert "%15" in facts
+    # Mali, personel ve kapasite metrikleri de zorunlu.
+    for expected in ("Yıllık gelir", "Önerilen personel", "Laboratuvar kapasitesi",
+                     "Kapasite durumu"):
+        assert expected in facts, f"Zorunlu satır eksik: {expected}"
+
+
+def test_student_numbers_survive_when_the_model_skips_them(monkeypatch, db) -> None:
+    """Model öğrenci sayılarını atlarsa bile final cevapta görünmeli.
+
+    Canlı testte tam olarak bu oldu: model mali etkileri anlattı, senaryonun
+    ana metriğini yazmadı.
+    """
+    script_ollama(
+        monkeypatch,
+        ["### Yönetim değerlendirmesi\n- Gelir artışı bütçeyi olumlu etkiler."],
+    )
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa mali durum nasıl etkilenir?",
+        db=db,
+    )
+
+    assert "370" in result["answer"], "Mevcut öğrenci sayısı cevapta yok."
+    assert "426" in result["answer"], "Senaryo öğrenci sayısı cevapta yok."
+    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    # Modelin yorumu da korunmalı.
+    assert "Gelir artışı" in result["answer"]
+
+
+def test_model_cannot_overwrite_the_composed_facts(monkeypatch, db) -> None:
+    """Model farklı bir öğrenci sayısı yazsa bile zorunlu gerçekler değişmez."""
+    script_ollama(
+        monkeypatch,
+        ["### Yönetim değerlendirmesi\n- Öğrenci sayısı 999'a çıkacaktır."],
+    )
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+
+    # Zorunlu bölüm doğru sayıları taşır…
+    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    # …ve makine okunur sonuç modelin uydurduğu sayıdan etkilenmez.
+    metrics = {m["key"]: m for m in result["structured_result"]["metrics"]}
+    assert metrics["program_student_count"]["baseline"] == 370
+    assert metrics["program_student_count"]["scenario"] == 426
+    assert metrics["program_student_count"]["change"] == 56
+
+
+def test_structured_result_contains_baseline_and_scenario(db, monkeypatch) -> None:
+    """structured_result baseline ve scenario değerlerini taşımalı."""
+    script_ollama(monkeypatch, ["### Yönetim değerlendirmesi\n- Değerlendirme."])
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+
+    structured = result["structured_result"]
+    assert structured["type"] == "enrollment_change_scenario"
+    assert structured["academic_year"] == YEAR
+    assert structured["scope"]["program"] == "Bilgisayar Mühendisliği Lisans Programı"
+
+    student_metric = next(
+        m for m in structured["metrics"] if m["key"] == "program_student_count"
+    )
+    assert student_metric == {
+        "key": "program_student_count",
+        "label": "Öğrenci sayısı",
+        "baseline": 370,
+        "scenario": 426,
+        "change": 56,
+        "unit": "öğrenci",
+    }
+
+
+def test_money_values_keep_the_usd_unit(db) -> None:
+    """Para değerleri USD olarak yazılmalı; milyona çevrilmemeli."""
+    from app.services.assistant import response_composer
+
+    composed = response_composer.compose(
+        "run_enrollment_change_scenario", _enrollment_output(db)
+    )
+    facts = composed.facts_markdown
+
+    # Gerçek değer 35.960.000 USD. "35,96 milyon" veya "36 USD" olmamalı.
+    assert "35.960.000 USD" in facts
+    assert "milyon" not in facts.lower(), "Tutar milyon birimine çevrilmiş."
+
+    for metric in composed.metrics:
+        if metric["unit"] == "USD" and metric["baseline"] is not None:
+            assert abs(metric["baseline"]) > 1000, (
+                f"{metric['key']} milyon cinsinden görünüyor: {metric['baseline']}"
+            )
+
+
+def test_facts_are_returned_even_with_an_empty_model_interpretation(
+    monkeypatch, db
+) -> None:
+    """Model yorumu boş olsa bile hesaplanan sonuçlar kullanıcıya döner."""
+    script_ollama(monkeypatch, ["   "])
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+
+    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    assert result["data_source"] == "institutional_data"
+
+
+def test_missing_required_metric_produces_a_controlled_error(monkeypatch, db) -> None:
+    """Tool çıktısında zorunlu alan eksikse kontrollü hata oluşmalı."""
+    from app.services.assistant import query_policy, response_composer
+    from app.services.assistant.tool_schemas import EnrollmentScenarioOutput
+
+    broken = _enrollment_output(db).model_copy(deep=True)
+    broken.baseline.program_student_count = None
+
+    with pytest.raises(response_composer.MissingMetricError) as exc:
+        response_composer.compose("run_enrollment_change_scenario", broken)
+    assert "baseline.program_student_count" in exc.value.missing
+
+    # Uçtan uca: araç eksik çıktı verirse kullanıcıya kontrollü mesaj gider.
+    tool = registry.get("run_enrollment_change_scenario")
+
+    def incomplete(_db, _payload) -> EnrollmentScenarioOutput:
+        return broken
+
+    monkeypatch.setitem(
+        registry._tools,
+        "run_enrollment_change_scenario",
+        replace(tool, handler=incomplete),
+    )
+    script_ollama(monkeypatch, ["Bir şeyler oldu."])
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+    assert result["data_source"] == query_policy.SOURCE_UNAVAILABLE
+    assert result["answer"] == chat_service.MISSING_METRIC_MESSAGE
+    assert result["structured_result"] is None
+
+
+def test_salary_scenario_required_metrics_appear_in_the_answer(monkeypatch, db) -> None:
+    """Maaş senaryosunun zorunlu metrikleri cevapta bulunmalı."""
+    script_ollama(monkeypatch, ["### Yönetim değerlendirmesi\n- Bütçe baskısı artar."])
+
+    result = chat_service.answer(
+        "Akademik personel maaşlarına %2 zam yapılırsa bütçe nasıl etkilenir?", db=db
+    )
+
+    answer = result["answer"]
+    for expected in (
+        "Maaş değişimi: %2",
+        "Yıllık personel gideri: 6.120.000 USD → 6.242.400 USD",
+        "Gider değişimi: +122.400 USD",
+        "Net bütçe etkisi: -122.400 USD",
+    ):
+        assert expected in answer, f"Zorunlu satır eksik: {expected}"
+
+    assert result["structured_result"]["type"] == "staff_salary_scenario"
+
+
+def test_composer_only_formats_and_never_calculates(db) -> None:
+    """Cevap oluşturucu hesap YAPMAZ; yalnızca araç değerlerini biçimlendirir.
+
+    Araç çıktısındaki her sayı, oluşturucunun ürettiği metrik kaydında
+    aynen bulunmalı.
+    """
+    from app.services.assistant import response_composer
+
+    output = _enrollment_output(db)
+    composed = response_composer.compose("run_enrollment_change_scenario", output)
+    metrics = {m["key"]: m for m in composed.metrics}
+
+    assert metrics["program_student_count"]["baseline"] == output.baseline.program_student_count
+    assert metrics["program_student_count"]["scenario"] == output.scenario.program_student_count
+    assert metrics["program_student_count"]["change"] == output.program_student_change
+    assert metrics["total_revenue_usd"]["baseline"] == float(output.baseline.total_revenue_usd)
+    assert metrics["total_revenue_usd"]["change"] == float(output.revenue_change_usd)
+    assert metrics["recommended_staff_count"]["scenario"] == output.scenario.recommended_staff_count
+    assert metrics["laboratory_demand"]["change"] == output.scenario.laboratory_gap
+
+
+def test_same_number_is_never_shown_in_two_units(db) -> None:
+    """Aynı sayı farklı birimle gösterilmemeli."""
+    from app.services.assistant import response_composer
+
+    composed = response_composer.compose(
+        "run_enrollment_change_scenario", _enrollment_output(db)
+    )
+    facts = composed.facts_markdown
+
+    # Gelir yalnızca tam USD olarak geçmeli; milyon karşılığı yazılmamalı.
+    assert "35.960.000 USD" in facts
+    assert "35,96 milyon" not in facts
+    assert "milyon USD" not in facts
+    # Aynı tutar iki farklı ölçekte yazılmamalı.
+    assert facts.count("35.960.000") == 1
+    # Öğrenci sayısı yalnızca bir kez, adet olarak geçmeli.
+    assert facts.count("370 →") == 1
+
+
+def test_missing_tool_field_is_written_as_veri_bulunamadi(db) -> None:
+    """Araç çıktısında olmayan alan uydurulmaz; 'Veri bulunamadı' yazılır."""
+    from app.services.assistant import response_composer
+
+    output = _enrollment_output(db)
+    output.scenario.laboratory_capacity = None
+    output.scenario.laboratory_gap = None
+
+    composed = response_composer.compose("run_enrollment_change_scenario", output)
+    assert "Laboratuvar kapasitesi: Veri bulunamadı" in composed.facts_markdown
+    assert "Laboratuvar kapasite farkı: Veri bulunamadı" in composed.facts_markdown

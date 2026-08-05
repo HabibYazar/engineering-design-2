@@ -632,12 +632,57 @@ def _handle_enrollment_scenario(
     revenue = _find("total_revenue")
     expenditure = _find("total_expenditure")
     balance = _find("balance")
-    staff = _find("staff_count")
+    lab_capacity = _find("laboratory_capacity")
+    lab_demand = _find("laboratory_demand")
+    class_capacity = _find("classroom_capacity")
+    class_demand = _find("classroom_demand")
 
     projected_program_students = program_students + int(added_students)
 
+    # ZORUNLU METRİKLER — burada, veri katmanında hesaplanır.
+    # Cevap oluşturucu hesap yapmaz; yalnızca bu değerleri biçimlendirir.
+    def _int(metric, field: str) -> Optional[int]:
+        if metric is None:
+            return None
+        value = getattr(metric, field)
+        return int(value) if value is not None else None
+
+    projected_lab_capacity = _int(lab_capacity, "projected_value")
+    projected_lab_demand = _int(lab_demand, "projected_value")
+    projected_class_capacity = _int(class_capacity, "projected_value")
+    projected_class_demand = _int(class_demand, "projected_value")
+
+    lab_gap = (
+        projected_lab_demand - projected_lab_capacity
+        if projected_lab_demand is not None and projected_lab_capacity is not None
+        else None
+    )
+    class_gap = (
+        projected_class_demand - projected_class_capacity
+        if projected_class_demand is not None and projected_class_capacity is not None
+        else None
+    )
+    if lab_gap is None and class_gap is None:
+        capacity_status = None
+    elif (lab_gap or 0) > 0 or (class_gap or 0) > 0:
+        capacity_status = "yetersiz"
+    else:
+        capacity_status = "yeterli"
+
+    # Personel ihtiyacı, senaryo sonrası üniversite öğrenci sayısına göre.
+    projected_university_students = computation.projected_student_count
+    recommended_staff = int(
+        (Decimal(projected_university_students) / TARGET_STUDENT_STAFF_RATIO)
+        .to_integral_value(rounding="ROUND_CEILING")
+    )
+    staff_gap = recommended_staff - computation.projected_staff_count
+
     return EnrollmentScenarioOutput(
         scope=_scope_info(year, faculty, department, program),
+        program_student_change=int(added_students),
+        student_change_percentage=change_percent,
+        revenue_change_usd=revenue.absolute_change if revenue else None,
+        net_balance_change_usd=balance.absolute_change if balance else None,
         baseline=ScenarioBaselineBlock(
             academic_year=year,
             program_student_count=program_students,
@@ -646,6 +691,10 @@ def _handle_enrollment_scenario(
             total_expenditure_usd=expenditure.baseline_value if expenditure else None,
             net_balance_usd=balance.baseline_value if balance else None,
             academic_staff_count=computation.baseline_staff_count,
+            laboratory_capacity=_int(lab_capacity, "baseline_value"),
+            laboratory_demand=_int(lab_demand, "baseline_value"),
+            classroom_capacity=_int(class_capacity, "baseline_value"),
+            classroom_demand=_int(class_demand, "baseline_value"),
         ),
         scenario=ScenarioProjectionBlock(
             program_student_count=projected_program_students,
@@ -654,6 +703,15 @@ def _handle_enrollment_scenario(
             total_expenditure_usd=expenditure.projected_value if expenditure else None,
             net_balance_usd=balance.projected_value if balance else None,
             academic_staff_count=computation.projected_staff_count,
+            recommended_staff_count=recommended_staff,
+            staff_gap=staff_gap,
+            laboratory_capacity=projected_lab_capacity,
+            laboratory_demand=projected_lab_demand,
+            laboratory_gap=lab_gap,
+            classroom_capacity=projected_class_capacity,
+            classroom_demand=projected_class_demand,
+            classroom_gap=class_gap,
+            capacity_status=capacity_status,
         ),
         absolute_change=[m for m in all_metrics if m.absolute_change is not None],
         percentage_change=[m for m in all_metrics if m.percent_change is not None],
@@ -707,6 +765,7 @@ def _handle_salary_scenario(
 
     return SalaryScenarioOutput(
         scope=_scope_info(year, faculty, department, None),
+        salary_change_percentage=Decimal(str(payload.salary_change_percentage)),
         previous_annual_staff_cost_usd=personnel.baseline_value if personnel else None,
         new_annual_staff_cost_usd=personnel.projected_value if personnel else None,
         cost_change_usd=personnel.absolute_change if personnel else None,
