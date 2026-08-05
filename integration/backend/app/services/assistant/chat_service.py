@@ -530,7 +530,11 @@ def _clean_interpretation(text: str, facts_markdown: str) -> str:
     cleaned = "\n".join(kept).strip()
     if not cleaned:
         return ""
-    if response_composer.INTERPRETATION_HEADING not in cleaned:
+    # Model başlıkları hiç yazmadıysa en azından bir başlık altına alınır;
+    # başlıksız serbest metin, kapsamı belirsiz bir yorum demektir.
+    if not any(
+        heading in cleaned for heading in response_composer.INTERPRETATION_HEADINGS
+    ):
         cleaned = f"{response_composer.INTERPRETATION_HEADING}\n{cleaned}"
     return cleaned
 

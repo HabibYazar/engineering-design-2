@@ -363,6 +363,31 @@ def _render_scope_groups(metrics: List[Any]) -> List[str]:
 # ---------------------------------------------------------------------------
 
 
+def _baseline_capacity_risks(metrics: List[Any]) -> List[str]:
+    """Senaryodan BAĞIMSIZ, hâlihazırda var olan kapasite riskleri.
+
+    Kullanım oranı taban değerinde %100'ü aşıyorsa sorun senaryodan önce de
+    vardır ve öyle raporlanmalıdır.
+    """
+    risks: List[str] = []
+    for metric in metrics:
+        if not metric.key.endswith("_utilization") or metric.baseline is None:
+            continue
+        if Decimal(str(metric.baseline)) <= 100:
+            continue
+        scenario_text = (
+            f" Senaryo bu oranı {_percent(metric.scenario)}'e yükseltiyor."
+            if metric.scenario is not None
+            else ""
+        )
+        risks.append(
+            f"{metric.scope_name}: {metric.label.lower()} mevcut durumda "
+            f"{_percent(metric.baseline)} — tahsis edilmiş kapasite zaten "
+            f"aşılmış durumda.{scenario_text}"
+        )
+    return risks
+
+
 def _compose_enrollment(payload: Any) -> ComposedResponse:
     """Öğrenci senaryosunu KAPSAMLARA AYIRARAK yazar.
 
@@ -384,18 +409,33 @@ def _compose_enrollment(payload: Any) -> ComposedResponse:
     ]
     lines.extend(_render_scope_groups(scoped))
 
-    risks = list(getattr(payload, "risks", []) or [])
-    if risks:
-        lines.append("")
-        lines.append("### Tespit edilen riskler (üniversite geneli)")
-        lines.extend(f"- {risk}" for risk in risks[:5])
+    # RİSKLER İKİYE AYRILIR.
+    #
+    # Program mevcut durumda da kapasite sınırının üzerindeyse senaryo o
+    # sorunu OLUŞTURMUYOR, BÜYÜTÜYOR. İkisini tek listede vermek, senaryoyu
+    # tek sebep gibi gösterir.
+    baseline_risks = _baseline_capacity_risks(scoped)
+    scenario_risks = list(getattr(payload, "risks", []) or [])
 
+    if baseline_risks:
+        lines.append("")
+        lines.append("### Mevcut durumdaki riskler (senaryodan bağımsız)")
+        lines.extend(f"- {risk}" for risk in baseline_risks[:5])
+
+    if scenario_risks:
+        lines.append("")
+        lines.append("### Senaryonun eklediği etki (üniversite geneli)")
+        lines.extend(f"- {risk}" for risk in scenario_risks[:5])
+
+    risks = baseline_risks + scenario_risks
     metrics = [_metric_from_scoped(metric) for metric in scoped]
 
     return ComposedResponse(
         facts_markdown="\n".join(lines),
         structured_result={
             "type": "enrollment_change_scenario",
+            "baseline_risks": baseline_risks,
+            "scenario_risks": scenario_risks,
             "academic_year": scope.academic_year,
             "scope": {
                 "faculty": scope.faculty,
@@ -590,13 +630,30 @@ def compose(tool_name: str, payload: Any) -> ComposedResponse:
 
 # Modelin zorunlu gerçekleri yeniden yazmasını engelleyen yönerge.
 COMPOSER_INSTRUCTION = (
-    "Aşağıdaki 'Hesaplanan sonuçlar' bölümü backend tarafından hazırlanmıştır "
-    "ve kullanıcıya AYNEN gösterilecektir. Bu değerleri değiştirme, yeniden "
-    "hesaplama, yuvarlama veya farklı birimle (milyon USD / USD) tekrar yazma. "
-    "Sayıları tekrar listeleme; yalnızca etkilerini yorumla.\n\n"
-    "Senden istenen: '### Yönetim değerlendirmesi' başlığı altında en fazla "
-    "dört madde yaz — en önemli mali etki, en önemli personel riski, en "
-    "önemli kapasite riski ve önerilen karar. Kısa ve yönetici odaklı ol."
+    "Yukarıdaki hesaplanan sonuçlar backend tarafından hazırlanmıştır ve "
+    "kullanıcıya AYNEN gösterilecektir. Bu değerleri değiştirme, yeniden "
+    "hesaplama, yuvarlama veya farklı birimle tekrar yazma. Oranları KENDİN "
+    "HESAPLAMA; yukarıda yazılanları kullan.\n\n"
+    "Yorumunu İKİ BÖLÜM hâlinde yaz:\n\n"
+    "### Program değerlendirmesi\n"
+    "Yalnızca program kapsamındaki sonuçları yorumla: öğrenci değişimi, "
+    "program FTE kapasitesi ve ihtiyacı, program derslik koltuk-saat "
+    "kullanımı, program laboratuvar istasyon-saat kullanımı, programın "
+    "oluşturduğu ek gelir.\n\n"
+    "### Üniversite düzeyindeki etki\n"
+    "Yalnızca kurum kapsamındaki sonuçları yorumla: kurum toplam gelir "
+    "değişimi, kurum net bütçe değişimi, kurum geneli kapasite açığındaki "
+    "değişim, kurum geneli kadro etkisi.\n\n"
+    "KURALLAR:\n"
+    "- Program değerlerini üniversite başlığı altında anlatma.\n"
+    "- Mevcut açık ile senaryonun eklediği açığı karıştırma; kurumun kadro "
+    "açığı senaryodan önce de vardı.\n"
+    "- Net bütçe etkisi ek personel ve yatırım maliyetleri UYGULANMADAN "
+    "hesaplanmıştır. 'Gelir artışı bu maliyetleri karşılamaya yetmez' gibi "
+    "kesin hüküm verme; bu maliyetler hesaplandıktan sonra yeniden "
+    "değerlendirilmesi gerektiğini söyle.\n"
+    "- Her bölümde en fazla dört madde. Kısa ve yönetici odaklı ol."
 )
 
-INTERPRETATION_HEADING = "### Yönetim değerlendirmesi"
+INTERPRETATION_HEADING = "### Program değerlendirmesi"
+INTERPRETATION_HEADINGS = ("### Program değerlendirmesi", "### Üniversite düzeyindeki etki")

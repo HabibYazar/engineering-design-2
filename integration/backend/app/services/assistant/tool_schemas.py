@@ -370,6 +370,25 @@ class EnrollmentScenarioOutput(BaseModel):
     net_balance_change_usd: Optional[Decimal] = None
     #: Kapsamı etiketlenmiş göstergeler. Cevap oluşturucu BU listeden yazar.
     scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
+
+    # --- MEVCUT AÇIK ile SENARYODAN DOĞAN AÇIK ayrı tutulur ---
+    #
+    # Kurumun kadro açığı senaryodan ÖNCE de vardı. 23 kişilik toplam açığı
+    # "bu programdaki %15 artıştan doğdu" diye sunmak yanlıştır.
+    baseline_recommended_university_staff: Optional[int] = None
+    scenario_recommended_university_staff: Optional[int] = None
+    marginal_university_staff_requirement: Optional[int] = None
+    baseline_university_staff_gap: Optional[int] = None
+    scenario_university_staff_gap: Optional[int] = None
+
+    # --- BÜTÇE ETKİSİNİN KAPSAMI ---
+    #
+    # Net bütçe etkisi, ek personel alımı ve fiziksel kapasite yatırımı
+    # UYGULANMADAN önceki sonuçtur. Bu maliyetler hesaba katılmadan
+    # "gelir artışı bunları karşılamaz" gibi kesin hüküm verilemez.
+    operating_budget_effect_before_investment: Optional[Decimal] = None
+    additional_staff_cost_included: bool = False
+    facility_investment_cost_included: bool = False
     absolute_change: List[MetricChange] = Field(default_factory=list)
     percentage_change: List[MetricChange] = Field(default_factory=list)
     affected_metrics: List[MetricChange] = Field(default_factory=list)

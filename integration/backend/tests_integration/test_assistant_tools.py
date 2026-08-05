@@ -1671,3 +1671,180 @@ def test_allocation_seed_is_idempotent() -> None:
 
     assert first[0] > 0 and first[1] > 0, "Tahsis kaydı üretilmemiş."
     assert first == second, f"Seed idempotent değil: {first} -> {second}"
+
+
+# ===========================================================================
+# MEVCUT AÇIK ile SENARYO ETKİSİNİN AYRILMASI
+#
+# Canlı cevapta kurumun 23 kişilik kadro açığı, sanki tamamı Bilgisayar
+# Mühendisliği'ndeki %15 artıştan doğmuş gibi anlatılıyordu. Açığın 20'si
+# senaryodan önce de vardı.
+# ===========================================================================
+
+
+def test_classroom_shortfall_percent_is_correct(db) -> None:
+    """1.020 kapasite / 1.420 talep için karşılanamayan oran %28,17 olur."""
+    from app.services.program_allocation_service import (
+        coverage_percent,
+        shortfall_percent,
+    )
+
+    assert coverage_percent(Decimal("1420"), Decimal("1020")) == Decimal("71.83")
+    assert shortfall_percent(Decimal("1420"), Decimal("1020")) == Decimal("28.17")
+
+    # Uçtan uca: senaryo çıktısında da aynı değerler.
+    metrics = {m.key: m for m in _enrollment_output(db).scoped_metrics}
+    assert metrics["university_classroom_coverage"].scenario == Decimal("71.83")
+    assert metrics["university_classroom_shortfall"].scenario == Decimal("28.17")
+
+
+def test_laboratory_shortfall_percent_is_correct(db) -> None:
+    """328 kapasite / 730 talep için karşılanamayan oran %55,07 olur."""
+    from app.services.program_allocation_service import (
+        coverage_percent,
+        shortfall_percent,
+    )
+
+    assert coverage_percent(Decimal("730"), Decimal("328")) == Decimal("44.93")
+    assert shortfall_percent(Decimal("730"), Decimal("328")) == Decimal("55.07")
+
+    metrics = {m.key: m for m in _enrollment_output(db).scoped_metrics}
+    assert metrics["university_laboratory_coverage"].scenario == Decimal("44.93")
+    assert metrics["university_laboratory_shortfall"].scenario == Decimal("55.07")
+
+    # Karşılanma oranı hiçbir zaman %100'ü aşamaz — kullanım oranıyla
+    # karıştırılmamalı.
+    for key in ("university_classroom_coverage", "university_laboratory_coverage"):
+        assert metrics[key].scenario <= Decimal("100")
+
+
+def test_total_university_gap_is_not_attributed_to_the_scenario(db) -> None:
+    """23 kişilik kurum açığı senaryodan doğmuş gibi gösterilmez."""
+    output = _enrollment_output(db)
+
+    assert output.baseline_university_staff_gap == 20
+    assert output.scenario_university_staff_gap == 23
+    # Senaryonun eklediği ihtiyaç yalnızca 3 kişi.
+    assert output.marginal_university_staff_requirement == 3
+    assert output.baseline_recommended_university_staff == 200
+    assert output.scenario_recommended_university_staff == 203
+
+    gap_metric = next(
+        m for m in output.scoped_metrics if m.key == "university_staff_gap"
+    )
+    assert gap_metric.baseline == Decimal("20")
+    assert gap_metric.scenario == Decimal("23")
+    assert gap_metric.change == Decimal("3")
+    assert "senaryodan ÖNCE de vardı" in (gap_metric.note or "")
+
+
+def test_program_marginal_requirement_stays_at_two_point_eight(db) -> None:
+    """Programın marjinal ihtiyacı +2,80 FTE olarak kalır."""
+    metrics = {m.key: m for m in _enrollment_output(db).scoped_metrics}
+
+    assert metrics["program_baseline_fte_gap"].baseline == Decimal("0.50")
+    assert metrics["program_scenario_fte_gap"].scenario == Decimal("3.30")
+    assert metrics["program_marginal_fte"].change == Decimal("2.80")
+    # Mevcut açık senaryodan bağımsız olduğu belirtilmeli.
+    assert "senaryodan bağımsız" in (
+        metrics["program_baseline_fte_gap"].note or ""
+    )
+
+
+def test_interpretation_is_split_into_program_and_university(monkeypatch, db) -> None:
+    """Yönetim değerlendirmesi program ve üniversite başlıklarına ayrılır."""
+    from app.services.assistant import response_composer
+
+    script_ollama(
+        monkeypatch,
+        [
+            "### Program değerlendirmesi\n- Program kapasitesi zorlanıyor.\n"
+            "### Üniversite düzeyindeki etki\n- Kurum bütçesi olumlu."
+        ],
+    )
+
+    answer = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )["answer"]
+
+    assert "### Program değerlendirmesi" in answer
+    assert "### Üniversite düzeyindeki etki" in answer
+    # Modele gönderilen yönerge bu ayrımı zorunlu kılmalı.
+    assert "Program değerlendirmesi" in response_composer.COMPOSER_INSTRUCTION
+    assert "Üniversite düzeyindeki etki" in response_composer.COMPOSER_INSTRUCTION
+
+
+def test_budget_effect_is_labelled_as_before_investment(db) -> None:
+    """Ek personel maliyeti hesaplanmadıysa bütçe sonucunda bu yazılır."""
+    from app.services.assistant import response_composer
+
+    output = _enrollment_output(db)
+
+    assert output.additional_staff_cost_included is False
+    assert output.facility_investment_cost_included is False
+    assert output.operating_budget_effect_before_investment == Decimal("257040.00")
+
+    balance = next(
+        m for m in output.scoped_metrics if m.key == "university_net_balance"
+    )
+    note = balance.note or ""
+    assert "EK PERSONEL" in note
+    assert "YATIRIM" in note.upper()
+    assert "yeniden değerlendirilmeli" in note
+
+    facts = response_composer.compose(
+        "run_enrollment_change_scenario", output
+    ).facts_markdown
+    assert "uygulanmadan öncesine aittir" in facts
+    # Kesin hüküm veren ifade bulunmamalı.
+    assert "karşılamaya yetmez" not in facts
+
+    # Modele de bu kural veriliyor.
+    assert "kesin hüküm verme" in response_composer.COMPOSER_INSTRUCTION
+
+
+def test_baseline_and_scenario_risks_are_separated(db) -> None:
+    """Mevcut kapasite açığı ile senaryonun artırdığı açık ayrı gösterilir."""
+    from app.services.assistant import response_composer
+
+    composed = response_composer.compose(
+        "run_enrollment_change_scenario", _enrollment_output(db)
+    )
+    facts = composed.facts_markdown
+
+    assert "### Mevcut durumdaki riskler (senaryodan bağımsız)" in facts
+    assert "### Senaryonun eklediği etki" in facts
+    assert "%222,92" in facts and "%256,66" in facts
+    assert "zaten aşılmış durumda" in facts
+
+    structured = composed.structured_result
+    assert structured["baseline_risks"], "Mevcut riskler ayrı listelenmemiş."
+    assert structured["scenario_risks"], "Senaryo riskleri ayrı listelenmemiş."
+    # Mevcut risk, programın hâlihazırdaki aşımını anlatmalı.
+    assert any("mevcut durumda" in risk for risk in structured["baseline_risks"])
+
+
+def test_deterministic_block_survives_a_wrong_percentage_from_the_model(
+    monkeypatch, db
+) -> None:
+    """LLM yanlış yüzde yazsa bile deterministik blok değişmez."""
+    script_ollama(
+        monkeypatch,
+        [
+            "### Program değerlendirmesi\n"
+            "- Talebin %68'i karşılanamıyor ve derslik kullanımı %500'e çıkıyor."
+        ],
+    )
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+    answer = result["answer"]
+
+    # Doğru oranlar deterministik blokta duruyor.
+    assert "%28,17" in answer
+    assert "%55,07" in answer
+    # Makine okunur sonuç modelin uydurduğu orandan etkilenmiyor.
+    metrics = {m["key"]: m for m in result["structured_result"]["metrics"]}
+    assert metrics["university_classroom_shortfall"]["scenario"] == 28.17
+    assert metrics["university_laboratory_shortfall"]["scenario"] == 55.07

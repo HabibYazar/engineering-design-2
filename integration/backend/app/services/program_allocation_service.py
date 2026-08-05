@@ -336,11 +336,42 @@ def peak_laboratory_demand(student_count: int) -> int:
 
 
 def utilization_percent(demand: Decimal, capacity: Decimal) -> Optional[Decimal]:
-    """Kapasite kullanım oranı. Kapasite yoksa None — sıfır DEĞİL."""
+    """Kapasite kullanım oranı. Kapasite yoksa None — sıfır DEĞİL.
+
+    Formül: talep / kapasite × 100. Talep kapasiteyi aşarsa %100'ün üzerine
+    çıkar; bu KULLANIM oranıdır, karşılanma oranı değildir.
+    """
     capacity_value = Decimal(str(capacity))
     if capacity_value <= 0:
         return None
     return _q2(Decimal(str(demand)) / capacity_value * Decimal("100"))
+
+
+def coverage_percent(demand: Decimal, capacity: Decimal) -> Optional[Decimal]:
+    """Talebin yüzde kaçı KARŞILANIYOR.
+
+    Formül: min(kapasite, talep) / talep × 100
+
+    Kullanım oranıyla karıştırılmamalı. 1.020 kapasite / 1.420 talep için
+    kullanım %139,22, karşılanma ise %71,83'tür. "Talebin %139'u karşılanıyor"
+    anlamsızdır; karşılanma oranı hiçbir zaman %100'ü aşamaz.
+    """
+    demand_value = Decimal(str(demand))
+    capacity_value = Decimal(str(capacity))
+    if demand_value <= 0:
+        return None
+    return _q2(min(capacity_value, demand_value) / demand_value * Decimal("100"))
+
+
+def shortfall_percent(demand: Decimal, capacity: Decimal) -> Optional[Decimal]:
+    """Talebin yüzde kaçı KARŞILANAMIYOR.
+
+    Formül: 100 − karşılanma oranı. Kapasite talebi karşılıyorsa 0.
+    """
+    coverage = coverage_percent(demand, capacity)
+    if coverage is None:
+        return None
+    return _q2(Decimal("100") - coverage)
 
 
 # ---------------------------------------------------------------------------
@@ -363,12 +394,16 @@ class ProgramCapacityReport:
     classroom: ProgramFacilityCapacity
     weekly_classroom_demand: Decimal
     classroom_utilization_percent: Optional[Decimal]
+    classroom_coverage_percent: Optional[Decimal]
+    classroom_shortfall_percent: Optional[Decimal]
     peak_classroom_demand: int
     peak_classroom_gap: int
 
     laboratory: ProgramFacilityCapacity
     weekly_laboratory_demand: Decimal
     laboratory_utilization_percent: Optional[Decimal]
+    laboratory_coverage_percent: Optional[Decimal]
+    laboratory_shortfall_percent: Optional[Decimal]
     peak_laboratory_demand: int
     peak_laboratory_gap: int
 
@@ -427,11 +462,23 @@ def build_program_capacity_report(
         classroom_utilization_percent=utilization_percent(
             classroom_demand, classroom.weekly_capacity_unit_hours
         ),
+        classroom_coverage_percent=coverage_percent(
+            classroom_demand, classroom.weekly_capacity_unit_hours
+        ),
+        classroom_shortfall_percent=shortfall_percent(
+            classroom_demand, classroom.weekly_capacity_unit_hours
+        ),
         peak_classroom_demand=peak_class_demand,
         peak_classroom_gap=peak_class_demand - classroom.peak_concurrent_capacity,
         laboratory=laboratory,
         weekly_laboratory_demand=laboratory_demand,
         laboratory_utilization_percent=utilization_percent(
+            laboratory_demand, laboratory.weekly_capacity_unit_hours
+        ),
+        laboratory_coverage_percent=coverage_percent(
+            laboratory_demand, laboratory.weekly_capacity_unit_hours
+        ),
+        laboratory_shortfall_percent=shortfall_percent(
             laboratory_demand, laboratory.weekly_capacity_unit_hours
         ),
         peak_laboratory_demand=peak_lab_demand,

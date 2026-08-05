@@ -810,13 +810,23 @@ def _handle_enrollment_scenario(
     else:
         capacity_status = "yeterli"
 
-    # Personel ihtiyacı, senaryo sonrası üniversite öğrenci sayısına göre.
+    # ÜNİVERSİTE KADRO AÇIĞI — mevcut ve senaryo AYRI hesaplanır.
+    #
+    # Kurumun kadro açığı senaryodan önce de vardı. Toplam açığı senaryodan
+    # doğmuş gibi göstermek, yöneticiye yanlış bir sebep-sonuç ilişkisi
+    # sunar.
+    baseline_recommended_staff = int(
+        (Decimal(computation.baseline_student_count) / TARGET_STUDENT_STAFF_RATIO)
+        .to_integral_value(rounding="ROUND_CEILING")
+    )
     projected_university_students = computation.projected_student_count
     recommended_staff = int(
         (Decimal(projected_university_students) / TARGET_STUDENT_STAFF_RATIO)
         .to_integral_value(rounding="ROUND_CEILING")
     )
+    baseline_staff_gap = baseline_recommended_staff - computation.baseline_staff_count
     staff_gap = recommended_staff - computation.projected_staff_count
+    marginal_staff_requirement = recommended_staff - baseline_recommended_staff
 
     # ------------------------------------------------------------------
     # KAPSAM ETİKETLİ GÖSTERGELER
@@ -900,12 +910,23 @@ def _handle_enrollment_scenario(
             ),
         ),
         ScopedMetric(
-            key="program_fte_gap", label="Ek akademik kapasite ihtiyacı",
+            key="program_baseline_fte_gap", label="Mevcut program açığı",
             scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
             baseline=base_report.fte_gap,
+            formula="mevcut gerekli FTE − mevcut FTE",
+            note="Bu açık senaryodan bağımsızdır; şu anda da vardır.",
+        ),
+        ScopedMetric(
+            key="program_scenario_fte_gap", label="Senaryo sonrası program açığı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
             scenario=scenario_report.fte_gap,
-            change=scenario_report.fte_gap - base_report.fte_gap,
-            formula="gerekli FTE − mevcut FTE",
+            formula="senaryo gerekli FTE − mevcut FTE",
+        ),
+        ScopedMetric(
+            key="program_marginal_fte", label="Senaryodan kaynaklanan ek ihtiyaç",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
+            change=scenario_report.required_fte - base_report.required_fte,
+            formula="senaryo gerekli FTE − mevcut gerekli FTE",
         ),
         ScopedMetric(
             key="program_classroom_capacity", label="Program derslik kapasitesi",
@@ -936,6 +957,27 @@ def _handle_enrollment_scenario(
             baseline=base_report.classroom_utilization_percent,
             scenario=scenario_report.classroom_utilization_percent,
             formula="haftalık ihtiyaç / haftalık kapasite × 100",
+            note=(
+                "Program MEVCUT durumda da tahsisli derslik kapasitesini "
+                "aşıyor; senaryo bu sorunu oluşturmuyor, büyütüyor."
+                if base_report.classroom_utilization_percent
+                and base_report.classroom_utilization_percent > 100
+                else None
+            ),
+        ),
+        ScopedMetric(
+            key="program_classroom_coverage", label="Derslik talebinin karşılanan oranı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+            baseline=base_report.classroom_coverage_percent,
+            scenario=scenario_report.classroom_coverage_percent,
+            formula="min(kapasite, talep) / talep × 100",
+        ),
+        ScopedMetric(
+            key="program_classroom_shortfall", label="Derslik talebinin karşılanamayan oranı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+            baseline=base_report.classroom_shortfall_percent,
+            scenario=scenario_report.classroom_shortfall_percent,
+            formula="100 − karşılanan oran",
         ),
     ]
 
@@ -970,6 +1012,28 @@ def _handle_enrollment_scenario(
                 baseline=base_report.laboratory_utilization_percent,
                 scenario=scenario_report.laboratory_utilization_percent,
                 formula="haftalık ihtiyaç / haftalık kapasite × 100",
+                note=(
+                    "Program MEVCUT durumda da tahsisli laboratuvar "
+                    "kapasitesini aşıyor."
+                    if base_report.laboratory_utilization_percent
+                    and base_report.laboratory_utilization_percent > 100
+                    else None
+                ),
+            ),
+            ScopedMetric(
+                key="program_laboratory_coverage", label="Laboratuvar talebinin karşılanan oranı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+                baseline=base_report.laboratory_coverage_percent,
+                scenario=scenario_report.laboratory_coverage_percent,
+                formula="min(kapasite, talep) / talep × 100",
+            ),
+            ScopedMetric(
+                key="program_laboratory_shortfall",
+                label="Laboratuvar talebinin karşılanamayan oranı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+                baseline=base_report.laboratory_shortfall_percent,
+                scenario=scenario_report.laboratory_shortfall_percent,
+                formula="100 − karşılanan oran",
             ),
         ])
     else:
@@ -1025,6 +1089,12 @@ def _handle_enrollment_scenario(
             scenario=balance.projected_value if balance else None,
             change=balance.absolute_change if balance else None,
             formula="toplam gelir − toplam gider",
+            note=(
+                "Bu sonuç, gerekli EK PERSONEL ALIMI ve FİZİKSEL KAPASİTE "
+                "YATIRIMLARI uygulanmadan öncesine aittir. Bu maliyetler "
+                "hesaplandıktan sonra net finansal sürdürülebilirlik yeniden "
+                "değerlendirilmelidir."
+            ),
         ),
         ScopedMetric(
             key="university_staff_count", label="Üniversite akademik personeli",
@@ -1039,11 +1109,25 @@ def _handle_enrollment_scenario(
         ScopedMetric(
             key="university_recommended_staff", label="Üniversite için önerilen kadro",
             scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=Decimal(baseline_recommended_staff),
             scenario=Decimal(recommended_staff),
-            change=Decimal(staff_gap),
+            change=Decimal(marginal_staff_requirement),
             formula=(
-                f"senaryo üniversite öğrenci sayısı / {TARGET_STUDENT_STAFF_RATIO:.0f} "
+                f"üniversite öğrenci sayısı / {TARGET_STUDENT_STAFF_RATIO:.0f} "
                 "(hedef öğrenci-öğretim üyesi oranı)"
+            ),
+        ),
+        ScopedMetric(
+            key="university_staff_gap", label="Üniversite kadro açığı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=Decimal(baseline_staff_gap),
+            scenario=Decimal(staff_gap),
+            change=Decimal(staff_gap - baseline_staff_gap),
+            formula="önerilen kadro − mevcut kadro",
+            note=(
+                f"Kurumun {baseline_staff_gap} kişilik kadro açığı senaryodan "
+                f"ÖNCE de vardı. Bu senaryonun eklediği ihtiyaç "
+                f"{marginal_staff_requirement} kişidir."
             ),
         ),
         ScopedMetric(
@@ -1074,8 +1158,49 @@ def _handle_enrollment_scenario(
             key="university_classroom_gap", label="Üniversite derslik kapasite açığı",
             scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
             unit="eş zamanlı kişi",
+            baseline=(
+                Decimal(int(class_demand.baseline_value) - int(class_capacity.baseline_value))
+                if class_demand and class_capacity else None
+            ),
             scenario=Decimal(class_gap) if class_gap is not None else None,
             formula="eş zamanlı derslik talebi − derslik kapasitesi",
+        ),
+        ScopedMetric(
+            key="university_classroom_coverage", label="Derslik talebinin karşılanan oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=(
+                allocation.coverage_percent(
+                    Decimal(class_demand.baseline_value),
+                    Decimal(class_capacity.baseline_value),
+                )
+                if class_demand and class_capacity else None
+            ),
+            scenario=(
+                allocation.coverage_percent(
+                    Decimal(projected_class_demand), Decimal(projected_class_capacity)
+                )
+                if projected_class_demand and projected_class_capacity else None
+            ),
+            formula="min(kapasite, talep) / talep × 100",
+        ),
+        ScopedMetric(
+            key="university_classroom_shortfall",
+            label="Derslik talebinin karşılanamayan oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=(
+                allocation.shortfall_percent(
+                    Decimal(class_demand.baseline_value),
+                    Decimal(class_capacity.baseline_value),
+                )
+                if class_demand and class_capacity else None
+            ),
+            scenario=(
+                allocation.shortfall_percent(
+                    Decimal(projected_class_demand), Decimal(projected_class_capacity)
+                )
+                if projected_class_demand and projected_class_capacity else None
+            ),
+            formula="100 − karşılanan oran",
         ),
         ScopedMetric(
             key="university_laboratory_capacity", label="Üniversite laboratuvar kapasitesi",
@@ -1103,8 +1228,50 @@ def _handle_enrollment_scenario(
             key="university_laboratory_gap", label="Üniversite laboratuvar kapasite açığı",
             scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
             unit="eş zamanlı kişi",
+            baseline=(
+                Decimal(int(lab_demand.baseline_value) - int(lab_capacity.baseline_value))
+                if lab_demand and lab_capacity else None
+            ),
             scenario=Decimal(lab_gap) if lab_gap is not None else None,
             formula="eş zamanlı laboratuvar talebi − laboratuvar kapasitesi",
+        ),
+        ScopedMetric(
+            key="university_laboratory_coverage",
+            label="Laboratuvar talebinin karşılanan oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=(
+                allocation.coverage_percent(
+                    Decimal(lab_demand.baseline_value),
+                    Decimal(lab_capacity.baseline_value),
+                )
+                if lab_demand and lab_capacity else None
+            ),
+            scenario=(
+                allocation.coverage_percent(
+                    Decimal(projected_lab_demand), Decimal(projected_lab_capacity)
+                )
+                if projected_lab_demand and projected_lab_capacity else None
+            ),
+            formula="min(kapasite, talep) / talep × 100",
+        ),
+        ScopedMetric(
+            key="university_laboratory_shortfall",
+            label="Laboratuvar talebinin karşılanamayan oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=(
+                allocation.shortfall_percent(
+                    Decimal(lab_demand.baseline_value),
+                    Decimal(lab_capacity.baseline_value),
+                )
+                if lab_demand and lab_capacity else None
+            ),
+            scenario=(
+                allocation.shortfall_percent(
+                    Decimal(projected_lab_demand), Decimal(projected_lab_capacity)
+                )
+                if projected_lab_demand and projected_lab_capacity else None
+            ),
+            formula="100 − karşılanan oran",
         ),
         ScopedMetric(
             key="university_capacity_status", label="Kapasite durumu",
@@ -1116,6 +1283,16 @@ def _handle_enrollment_scenario(
     return EnrollmentScenarioOutput(
         scope=_scope_info(year, faculty, department, program),
         scoped_metrics=scoped,
+        baseline_recommended_university_staff=baseline_recommended_staff,
+        scenario_recommended_university_staff=recommended_staff,
+        marginal_university_staff_requirement=marginal_staff_requirement,
+        baseline_university_staff_gap=baseline_staff_gap,
+        scenario_university_staff_gap=staff_gap,
+        operating_budget_effect_before_investment=(
+            balance.absolute_change if balance else None
+        ),
+        additional_staff_cost_included=False,
+        facility_investment_cost_included=False,
         program_student_change=int(added_students),
         student_change_percentage=change_percent,
         revenue_change_usd=revenue.absolute_change if revenue else None,
