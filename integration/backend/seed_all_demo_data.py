@@ -405,10 +405,21 @@ def _salary_for_title(title: str, rng: random.Random) -> Decimal:
 
 
 def seed_academic_staff(db: Session, counter: Counter) -> None:
-    """Akademik personel kayıtlarını deterministik olarak üretir."""
-    spec = load("03_academic_staff.json")
-    rng = random.Random(spec["random_seed"])
+    """Akademik personel kayıtlarını deterministik olarak üretir.
 
+    VERİ MODELİ DÜZELTMESİ
+    ----------------------
+    Önceki sürüm 180 personeli iki akademik yıla RASTGELE bölüştürüyordu
+    (92 + 88). Sonuç: "2025-2026'da kaç akademik personel var?" sorusu 88
+    cevabını veriyor, aynı yılın mali dönem kaydı ise 180 kadro üzerinden
+    bordro planlıyordu. Asistan tek cevapta iki farklı rakam söylüyordu.
+
+    Doğrusu: AcademicStaff bir YILLIK ANLIK GÖRÜNTÜ tablosudur. Kurumun 180
+    akademik personeli her yıl için ayrı satır olarak kaydedilir. Sicil
+    numarası tekil olmak zorunda olduğundan yıl eki eklenir; aynı kişi
+    yıllar arasında aynı numara kökünü taşır (AK0001-2425 / AK0001-2526).
+    """
+    spec = load("03_academic_staff.json")
     departments = {d.code: d for d in db.execute(select(Department)).scalars()}
     existing_numbers = {
         s.staff_number for s in db.execute(select(AcademicStaff)).scalars()
@@ -420,59 +431,72 @@ def seed_academic_staff(db: Session, counter: Counter) -> None:
     dept_weights = [spec["department_weights"][c] for c in dept_codes]
 
     created = existing = 0
-    for index in range(1, spec["total_staff"] + 1):
-        staff_number = f"AK{index:04d}"
-        if staff_number in existing_numbers:
-            existing += 1
-            continue
+    for academic_year in spec["academic_years"]:
+        # Her yıl için aynı tohum: kişi kimliği ve bölümü yıllar arasında
+        # değişmez, yalnızca üretim sayıları yeniden çekilir.
+        rng = random.Random(spec["random_seed"])
+        year_suffix = academic_year.split("-")[0][-2:] + academic_year.split("-")[1][-2:]
 
-        title_spec = rng.choices(titles, weights=title_weights, k=1)[0]
-        dept_code = rng.choices(dept_codes, weights=dept_weights, k=1)[0]
-        department = departments.get(dept_code)
-        if department is None:
-            continue
+        for index in range(1, spec["total_staff"] + 1):
+            title_spec = rng.choices(titles, weights=title_weights, k=1)[0]
+            dept_code = rng.choices(dept_codes, weights=dept_weights, k=1)[0]
 
-        pub_lo, pub_hi = title_spec["publication_range"]
-        cit_lo, cit_hi = title_spec["citation_range"]
-        load_lo, load_hi = title_spec["teaching_load_range"]
-        adv_lo, adv_hi = spec["advising_count_range"]
-        prj_lo, prj_hi = spec["project_count_range"]
-        pat_lo, pat_hi = spec["patent_count_range"]
-        com_lo, com_hi = spec["community_engagement_range"]
+            pub_lo, pub_hi = title_spec["publication_range"]
+            cit_lo, cit_hi = title_spec["citation_range"]
+            load_lo, load_hi = title_spec["teaching_load_range"]
+            adv_lo, adv_hi = spec["advising_count_range"]
+            prj_lo, prj_hi = spec["project_count_range"]
+            pat_lo, pat_hi = spec["patent_count_range"]
+            com_lo, com_hi = spec["community_engagement_range"]
 
-        db.add(
-            AcademicStaff(
-                staff_number=staff_number,
-                first_name=rng.choice(FIRST_NAMES),
-                last_name=rng.choice(LAST_NAMES),
-                title=title_spec["title"],
-                department_id=department.id,
-                academic_year=rng.choice(spec["academic_years"]),
-                publication_count=rng.randint(pub_lo, pub_hi),
-                citation_count=rng.randint(cit_lo, cit_hi),
-                teaching_load_hours=rng.randint(load_lo, load_hi),
-                advising_count=rng.randint(adv_lo, adv_hi),
-                project_count=rng.randint(prj_lo, prj_hi),
-                patent_count=rng.randint(pat_lo, pat_hi),
-                community_engagement_score=rng.randint(com_lo, com_hi),
-                annual_salary_usd=_salary_for_title(title_spec["title"], rng),
-                has_administrative_duty=(
-                    rng.randint(1, 100) <= spec["administrative_duty_percent"]
-                ),
-                has_industry_collaboration=(
-                    rng.randint(1, 100) <= spec["industry_collaboration_percent"]
-                ),
+            first_name = rng.choice(FIRST_NAMES)
+            last_name = rng.choice(LAST_NAMES)
+            publication = rng.randint(pub_lo, pub_hi)
+            citation = rng.randint(cit_lo, cit_hi)
+            teaching_load = rng.randint(load_lo, load_hi)
+            advising = rng.randint(adv_lo, adv_hi)
+            projects = rng.randint(prj_lo, prj_hi)
+            patents = rng.randint(pat_lo, pat_hi)
+            community = rng.randint(com_lo, com_hi)
+            has_admin = rng.random() * 100 < spec["administrative_duty_percent"]
+            has_industry = rng.random() * 100 < spec["industry_collaboration_percent"]
+            # Maaş unvana göre belirlenir; maaş senaryosu bu alana dayanır.
+            salary = _salary_for_title(title_spec["title"], rng)
+
+            staff_number = f"AK{index:04d}-{year_suffix}"
+            if staff_number in existing_numbers:
+                existing += 1
+                continue
+
+            department = departments.get(dept_code)
+            if department is None:
+                continue
+
+            db.add(
+                AcademicStaff(
+                    staff_number=staff_number,
+                    first_name=first_name,
+                    last_name=last_name,
+                    title=title_spec["title"],
+                    department_id=department.id,
+                    academic_year=academic_year,
+                    publication_count=publication,
+                    citation_count=citation,
+                    teaching_load_hours=teaching_load,
+                    advising_count=advising,
+                    project_count=projects,
+                    patent_count=patents,
+                    community_engagement_score=community,
+                    has_administrative_duty=has_admin,
+                    has_industry_collaboration=has_industry,
+                    annual_salary_usd=salary,
+                )
             )
-        )
-        created += 1
+            existing_numbers.add(staff_number)
+            created += 1
 
     db.commit()
-    counter.add("Akademik personel (Modül 4)", created, existing)
-
-
-# ----------------------------------------------------------------------------
-# 4) Fiziksel mekânlar (Modül 5)
-# ----------------------------------------------------------------------------
+    counter.add("Akademik personel", created, existing)
 
 
 def seed_facilities(db: Session, counter: Counter) -> None:

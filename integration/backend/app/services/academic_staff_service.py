@@ -332,7 +332,21 @@ def staff_overview(
 
     Veri yoksa sıfır değil, boş özet döner; böylece arayüzde "0 personel"
     ile "veri girilmemiş" durumu karışmaz.
+
+    YIL VERİLMEZSE EN GÜNCEL YIL kullanılır. AcademicStaff yıllık bir anlık
+    görüntü tablosudur: aynı 180 kişi her akademik yıl için ayrı satır taşır.
+    Yıl süzülmezse iki yılın satırları toplanıp "360 personel" gibi anlamsız
+    bir sayı çıkardı.
     """
+    if academic_year is None:
+        years = [
+            row for row in db.execute(
+                select(AcademicStaff.academic_year).distinct()
+            ).scalars() if row
+        ]
+        if years:
+            academic_year = max(years)
+
     staff_list = list_staff(
         db,
         skip=0,

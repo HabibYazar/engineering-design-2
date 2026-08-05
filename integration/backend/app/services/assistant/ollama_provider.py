@@ -22,6 +22,7 @@ gösterilmez; `split_thinking()` her ikisini de ayıklar.
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Dict, Iterator, List, Optional, Tuple
@@ -54,6 +55,25 @@ ERROR_INVALID_RESPONSE = (
 THINK_BLOCK = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
 # Kapanmamış açılış etiketi: model yarıda kesilmişse geri kalan her şey düşünmedir.
 UNCLOSED_THINK = re.compile(r"<think(?:ing)?>.*\Z", re.DOTALL | re.IGNORECASE)
+
+
+def _effective_timeout() -> int:
+    """Geçerli zaman aşımı süresi.
+
+    Canlı testler ASSISTANT_LIVE_TIMEOUT_SECONDS ortam değişkeniyle bu değeri
+    yükseltebilir; uygulamanın varsayılanı config'te kalır. Bir kullanıcıyı
+    beş dakika bekletmek kabul edilemez, ama canlı testin modeli diskten
+    yüklemesi için o kadar süre gerekebiliyor.
+    """
+    raw = os.getenv("ASSISTANT_LIVE_TIMEOUT_SECONDS", "").strip()
+    if raw:
+        try:
+            value = int(raw)
+            if value > 0:
+                return value
+        except ValueError:
+            logger.warning("ASSISTANT_LIVE_TIMEOUT_SECONDS sayi degil: %r", raw)
+    return settings.OLLAMA_TIMEOUT_SECONDS
 
 
 def _local_client(timeout: float) -> httpx.Client:
@@ -139,12 +159,20 @@ class OllamaProvider(AssistantProvider):
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         timeout_seconds: Optional[int] = None,
+        think: Optional[bool] = None,
+        keep_alive: Optional[str] = None,
+        context_length: Optional[int] = None,
     ) -> None:
         # Ayarlar tek merkezden gelir; testlerde açıkça geçilebilsin diye
         # parametre olarak da kabul edilir.
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL
-        self.timeout_seconds = timeout_seconds or settings.OLLAMA_TIMEOUT_SECONDS
+        # Canlı testler ASSISTANT_LIVE_TIMEOUT_SECONDS ile bu değeri
+        # yükseltebilir; uygulamanın kendi sınırı config'te kalır.
+        self.timeout_seconds = timeout_seconds or _effective_timeout()
+        self.think = settings.OLLAMA_THINK if think is None else think
+        self.keep_alive = keep_alive or settings.OLLAMA_KEEP_ALIVE
+        self.context_length = context_length or settings.OLLAMA_CONTEXT_LENGTH
 
     # ------------------------------------------------------------------
     # Durum sorgulama
@@ -232,9 +260,16 @@ class OllamaProvider(AssistantProvider):
             "model": self.model,
             "messages": messages,
             "stream": stream,
+            # think=False: muhakeme üretimi kapalı. Hesabı araçlar yapıyor,
+            # muhakeme metni kullanıcıya zaten gösterilmiyor ve ilk cevabı
+            # dakikalarca geciktiriyordu.
+            "think": self.think,
+            # Model bellekte kalsın; her istekte yeniden yüklenmesi canlı
+            # testlerde 120 saniyelik zaman aşımının başlıca sebebiydi.
+            "keep_alive": self.keep_alive,
             "options": {
                 "temperature": settings.OLLAMA_TEMPERATURE,
-                "num_ctx": settings.OLLAMA_CONTEXT_LENGTH,
+                "num_ctx": self.context_length,
             },
         }
         # Araç listesi yalnızca doluysa gönderilir; boş liste bazı model
@@ -242,6 +277,31 @@ class OllamaProvider(AssistantProvider):
         if tools:
             payload["tools"] = tools
         return payload
+
+    def warm_up(self) -> bool:
+        """Modeli belleğe yükler. Başarısız olursa sessizce False döner.
+
+        İlk gerçek soru sorulduğunda model diskten yükleniyor ve 9B'lik bir
+        model için bu tek başına dakikalar sürebiliyor. Kısa bir ısınma
+        isteği bu maliyeti kullanıcının sorusundan önce ödetir.
+        """
+        try:
+            with _local_client(self.timeout_seconds) as client:
+                response = client.post(
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": "Merhaba"}],
+                        "stream": False,
+                        "think": False,
+                        "keep_alive": self.keep_alive,
+                        "options": {"temperature": 0, "num_predict": 1},
+                    },
+                )
+                return response.status_code == 200
+        except Exception:  # noqa: BLE001 - ısınma başarısızlığı testi durdurmamalı
+            logger.warning("Model isitma istegi basarisiz oldu")
+            return False
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         """HTTP hatalarını kullanıcıya anlaşılır hataya çevirir."""

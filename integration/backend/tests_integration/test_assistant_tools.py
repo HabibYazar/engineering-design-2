@@ -366,19 +366,105 @@ def test_salary_scenario_does_not_change_headcount(db) -> None:
 
 
 def test_model_cannot_produce_numbers_without_tools(monkeypatch, db) -> None:
-    """Model araç çağırmadan sayı yazarsa bu 'kurum verisi' sayılmamalı.
+    """Model araç çağırmadan kurumsal sayı yazarsa cevabı KULLANICIYA VERİLMEZ.
 
-    Sistem bunu engelleyemez (model istediğini yazabilir) ama metadata
-    dürüst kalmalı: araç kullanılmadıysa `data_source` genel bilgi der ve
-    arayüz "bu cevap kurum verisine dayanmıyor" uyarısını gösterir.
+    Bu davranış canlı testte bulunan bir hatanın sonucudur: model
+    "Bilgisayar Mühendisliği'nin öğrenci sayısı nedir?" sorusuna hiç araç
+    çağırmadan cevap üretti ve sistem bunu genel bilgi etiketiyle kullanıcıya
+    sundu. Artık sunucu tarafında engelleniyor.
     """
-    script_ollama(monkeypatch, ["Bilgisayar Mühendisliği'nde 9999 öğrenci var."])
+    from app.services.assistant import query_policy
+
+    # Model iki turda da araç çağırmıyor.
+    script_ollama(
+        monkeypatch,
+        [
+            "Bilgisayar Mühendisliği'nde 9999 öğrenci var.",
+            "Yine de 9999 öğrenci olduğunu düşünüyorum.",
+        ],
+    )
 
     result = chat_service.answer("Kaç öğrenci var?", db=db)
 
     assert result["used_tools"] == []
     assert result["data_sources"] == []
-    assert result["data_source"] == "general_model_knowledge"
+    assert result["data_source"] == query_policy.SOURCE_UNAVAILABLE
+    assert result["answer"] == query_policy.NO_TOOL_RESULT_MESSAGE
+    assert "9999" not in result["answer"], "Uydurma sayı kullanıcıya sızmış."
+
+
+def test_institutional_question_retries_before_giving_up(monkeypatch, db) -> None:
+    """İlk turda araç çağırmayan model ikinci bir şans almalı."""
+    fake = script_ollama(
+        monkeypatch,
+        [
+            # 1. tur: araç yok
+            "Sanırım 500 civarı öğrenci var.",
+            # 2. tur: uyarı sonrası aracı çağırıyor
+            [{"name": "get_program_summary",
+              "arguments": {"program": "CENG-BSC", "academic_year": YEAR}}],
+            "2025-2026 · Bilgisayar Mühendisliği: 370 öğrenci.",
+        ],
+    )
+
+    result = chat_service.answer("Bilgisayar Mühendisliği kaç öğrencisi var?", db=db)
+
+    assert len(fake.requests) == 3, "Zorunlu ikinci deneme yapılmadı."
+    # İkinci istekte modele uyarı gönderilmiş olmalı.
+    from app.services.assistant import query_policy
+
+    second = fake.requests[1]["messages"]
+    assert any(query_policy.RETRY_INSTRUCTION in m.get("content", "") for m in second)
+    assert result["data_source"] == query_policy.SOURCE_INSTITUTIONAL
+    assert "370" in result["answer"]
+
+
+def test_general_chat_is_not_forced_to_use_tools(monkeypatch, db) -> None:
+    """Genel sohbette araç zorunluluğu uygulanmamalı."""
+    from app.services.assistant import query_policy
+
+    fake = script_ollama(monkeypatch, ["Merhaba! Nasıl yardımcı olabilirim?"])
+
+    result = chat_service.answer("Merhaba", db=db)
+
+    assert len(fake.requests) == 1, "Genel sohbette gereksiz ikinci tur yapılmış."
+    assert result["data_source"] == query_policy.SOURCE_GENERAL
+    assert result["answer"] == "Merhaba! Nasıl yardımcı olabilirim?"
+
+
+def test_institutional_question_without_database_skips_the_model(monkeypatch, db) -> None:
+    """db=None ise kurumsal soruda model HİÇ çağrılmamalı."""
+    from app.services.assistant import query_policy
+
+    fake = script_ollama(monkeypatch, ["Bu cevap hiç üretilmemeli."])
+
+    result = chat_service.answer("Toplam öğrenci sayısı kaç?", db=None)
+
+    assert fake.requests == [], "Veri oturumu yokken model çağrılmış."
+    assert result["data_source"] == query_policy.SOURCE_UNAVAILABLE
+    assert result["answer"] == query_policy.NO_DATABASE_MESSAGE
+
+
+def test_query_policy_classifies_questions_correctly() -> None:
+    """Kurumsal soru tespiti doğru çalışmalı."""
+    from app.services.assistant import query_policy
+
+    institutional = [
+        "Bilgisayar Mühendisliği kaç öğrencisi var?",
+        "Toplam gelir ne kadar?",
+        "Laboratuvar kapasitesi yeterli mi?",
+        "Mezuniyet oranı nedir?",
+        "Maaşlara %2 zam yapılırsa ne olur?",
+        "Öğrenci sayısı %15 artarsa bütçe nasıl etkilenir?",
+    ]
+    general = ["Merhaba", "Teşekkürler", "Sen kimsin?", "İyi günler"]
+
+    for message in institutional:
+        assert query_policy.is_institutional_query(message), f"Kurumsal sayılmadı: {message}"
+    for message in general:
+        assert not query_policy.is_institutional_query(message), (
+            f"Genel sohbet kurumsal sayıldı: {message}"
+        )
 
 
 def test_system_prompt_forbids_inventing_numbers() -> None:

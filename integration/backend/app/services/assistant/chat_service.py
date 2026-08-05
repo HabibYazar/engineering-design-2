@@ -33,6 +33,7 @@ from app.services.assistant.ollama_provider import (
     AssistantProviderError,
     OllamaProvider,
 )
+from app.services.assistant import query_policy
 from app.services.assistant import tools as _tools  # noqa: F401  (kayıt için)
 from app.services.assistant.tool_registry import registry
 from app.services.assistant.tool_runner import ToolSession
@@ -181,12 +182,38 @@ def answer(
 ) -> Dict[str, Any]:
     """Araç çağrı döngüsünü yürütür ve son cevabı üretir.
 
-    `db` verilmezse araçlar devre dışıdır; model yalnızca genel bilgiyle
-    cevap verir ve sistem yönergesi gereği kurumsal sayı üretmez.
+    KURUMSAL SORU POLİTİKASI
+    ------------------------
+    Soru kurum verisi gerektiriyorsa araç sonucu olmadan üretilen cevap
+    kullanıcıya VERİLMEZ. Sistem yönergesine güvenmek yetmiyor: canlı testte
+    model kurumsal bir soruya hiç araç çağırmadan cevap üretti. Kural artık
+    sunucu tarafında uygulanıyor.
     """
     conversation, messages = _prepare(message, conversation_id)
-    provider = get_provider()
     user_content = messages[-1]["content"]
+    institutional = query_policy.is_institutional_query(user_content)
+
+    # Veri oturumu yoksa kurumsal soru için MODEL HİÇ ÇAĞRILMAZ. Modelden
+    # "genel bilgi" cevabı istemek, kullanıcıya kurum verisi gibi görünen bir
+    # metin üretme riskini boşuna alır.
+    if institutional and db is None:
+        logger.warning("Kurumsal soru veri oturumu olmadan geldi; model cagrilmadi.")
+        _store.append(conversation, "user", user_content)
+        _store.append(conversation, "assistant", query_policy.NO_DATABASE_MESSAGE)
+        provider = get_provider()
+        return {
+            "conversation_id": conversation,
+            "answer": query_policy.NO_DATABASE_MESSAGE,
+            "provider": provider.name,
+            "model": provider.model,
+            "used_tools": [],
+            "data_sources": [],
+            "academic_year": None,
+            "scope": {},
+            "data_source": query_policy.SOURCE_UNAVAILABLE,
+        }
+
+    provider = get_provider()
 
     session: Optional[ToolSession] = None
     tool_schemas: Optional[List[Dict]] = None
@@ -197,11 +224,11 @@ def answer(
     started = time.monotonic()
     steps = 0
     visible = ""
+    # Kurumsal soruda modele araçsız cevap için verilen ikinci şans.
+    forced_retry_used = False
 
     while True:
         elapsed = time.monotonic() - started
-        # Süre veya adım sınırına gelindiyse araçsız son tur: model eldeki
-        # sonuçlarla cevabı yazar, yeni araç çağıramaz.
         out_of_budget = steps >= MAX_TOOL_STEPS or elapsed >= MAX_TOOL_WALL_SECONDS
         offered_tools = None if (out_of_budget or not tool_schemas) else tool_schemas
 
@@ -224,28 +251,62 @@ def answer(
                 len(thinking),
             )
 
-        if not tool_calls or session is None or offered_tools is None:
-            break
-
-        steps += 1
-        # Modelin araç çağrısı konuşmaya eklenir; sonuçların hangi çağrıya ait
-        # olduğu böylece belli olur.
-        messages.append(
-            {
-                "role": "assistant",
-                "content": visible,
-                "tool_calls": [
-                    {"function": {"name": c["name"], "arguments": c["arguments"]}}
-                    for c in tool_calls
-                ],
-            }
-        )
-
-        for call in tool_calls:
-            record = session.run(call["name"], call.get("arguments"))
+        if tool_calls and session is not None and offered_tools is not None:
+            steps += 1
             messages.append(
-                {"role": "tool", "name": record.name, "content": record.content}
+                {
+                    "role": "assistant",
+                    "content": visible,
+                    "tool_calls": [
+                        {"function": {"name": c["name"], "arguments": c["arguments"]}}
+                        for c in tool_calls
+                    ],
+                }
             )
+            for call in tool_calls:
+                record = session.run(call["name"], call.get("arguments"))
+                messages.append(
+                    {"role": "tool", "name": record.name, "content": record.content}
+                )
+            continue
+
+        # --- Araç çağrısı yok. Kurumsal soruda bu yeterli değil. ---
+        needs_tool_result = (
+            institutional
+            and session is not None
+            and not session.any_success()
+            and offered_tools is not None
+        )
+        if needs_tool_result and not forced_retry_used:
+            logger.info("Kurumsal soruya aracsiz cevap uretildi; ikinci sans veriliyor.")
+            forced_retry_used = True
+            # Modelin araçsız metni ATILIR: kullanıcıya gösterilmeyecek bir
+            # cevabı konuşma geçmişine koymak modeli aynı hataya iter.
+            messages.append(
+                {"role": "system", "content": query_policy.RETRY_INSTRUCTION}
+            )
+            visible = ""
+            continue
+
+        break
+
+    used_tools = session.used_tools() if session else []
+    data_sources = session.data_sources() if session else []
+    scope = session.scope() if session else {}
+    academic_year = session.academic_year() if session else None
+    tool_data_available = session is not None and session.any_success()
+
+    # Kurumsal soru + araç sonucu yok → modelin metni KULLANICIYA VERİLMEZ.
+    if institutional and not tool_data_available:
+        logger.warning(
+            "Kurumsal soru arac sonucu olmadan cevaplandi; model metni reddedildi."
+        )
+        visible = query_policy.NO_TOOL_RESULT_MESSAGE
+        data_source = query_policy.SOURCE_UNAVAILABLE
+    elif tool_data_available:
+        data_source = query_policy.SOURCE_INSTITUTIONAL
+    else:
+        data_source = query_policy.SOURCE_GENERAL
 
     if not visible:
         raise AssistantProviderError(
@@ -256,11 +317,6 @@ def answer(
     _store.append(conversation, "user", user_content)
     _store.append(conversation, "assistant", visible)
 
-    used_tools = session.used_tools() if session else []
-    data_sources = session.data_sources() if session else []
-    scope = session.scope() if session else {}
-    academic_year = session.academic_year() if session else None
-
     return {
         "conversation_id": conversation,
         "answer": visible,
@@ -270,13 +326,7 @@ def answer(
         "data_sources": data_sources,
         "academic_year": academic_year,
         "scope": scope,
-        # Araç kullanıldıysa cevap kurum verisine, kullanılmadıysa modelin
-        # genel bilgisine dayanır. Bu ayrım kullanıcıya gösterilir.
-        "data_source": (
-            "institutional_data"
-            if session is not None and session.any_success()
-            else "general_model_knowledge"
-        ),
+        "data_source": data_source,
     }
 
 
@@ -346,6 +396,7 @@ __all__ = [
     "AssistantProviderError",
     "ChatValidationError",
     "MAX_TOOL_STEPS",
+    "query_policy",
     "MAX_TOOL_WALL_SECONDS",
     "SYSTEM_PROMPT",
     "answer",

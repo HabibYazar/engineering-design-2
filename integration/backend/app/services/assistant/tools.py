@@ -443,26 +443,30 @@ def _handle_staff_summary(
             "kişi bazlı maaş verisi sistemde tutulmaz."
         )
 
-    # VERİ TUTARSIZLIĞI — bilinçli olarak gizlenmiyor.
-    # Personel tablosunda kayıtlı kişi sayısı ile mali dönemin bordro
-    # planlamasındaki kadro sayısı farklı olabilir. Maaş maliyeti için mali
-    # dönem kaydı esas alınır (senaryo motoru da onu kullanır); aksi halde
-    # asistan tek cevabın içinde kendisiyle çelişen iki rakam verir.
-    payroll_headcount = period.academic_staff_count if period else None
+    # İKİ FARKLI SAYI, AÇIKÇA AYRILIYOR.
+    # Personel kayıtlarındaki kişi sayısı ile mali dönemin bordro
+    # planlamasındaki kadro sayısı ayrı alanlarda döndürülür. Tek bir
+    # "academic_staff_count" alanında birleştirmek, hangisinin neyi ölçtüğünü
+    # belirsiz bırakıyordu.
+    payroll_positions = period.academic_staff_count if period else None
     is_university_wide = faculty is None and department is None and program is None
 
-    if (
-        is_university_wide
-        and payroll_headcount
-        and payroll_headcount != count
-    ):
-        notes.append(
-            f"Personel kayıtlarında {count} kişi bulunuyor; {year} mali dönem "
-            f"bordro planlaması ise {payroll_headcount} kadro üzerinden yapılmış. "
-            f"Maaş maliyeti mali dönem kaydına göre hesaplandı."
-        )
+    # Maaş maliyeti bordro kadrosundan hesaplanır: senaryo motoru da onu
+    # kullanır, aksi halde asistan tek cevabın içinde çelişir.
+    use_payroll = bool(is_university_wide and payroll_positions)
+    cost_headcount = payroll_positions if use_payroll else count
+    cost_basis = "bordro kadrosu" if use_payroll else "personel kayıtları"
 
-    cost_headcount = payroll_headcount if (is_university_wide and payroll_headcount) else count
+    consistent: Optional[bool] = None
+    if is_university_wide and payroll_positions is not None:
+        consistent = payroll_positions == count
+        if not consistent:
+            notes.append(
+                f"Personel kayıtlarında {count} kişi, {year} mali dönem bordro "
+                f"planlamasında {payroll_positions} kadro görünüyor. Maaş maliyeti "
+                f"bordro kadrosundan hesaplandı."
+            )
+
     annual_cost = (
         quantize_money(Decimal(cost_headcount) * average_salary) if average_salary else None
     )
@@ -496,6 +500,10 @@ def _handle_staff_summary(
     return AcademicStaffSummaryOutput(
         scope=_scope_info(year, faculty, department, program),
         academic_staff_count=count,
+        active_academic_staff_count=count,
+        payroll_academic_positions=payroll_positions if is_university_wide else None,
+        cost_basis=cost_basis,
+        staffing_data_consistent=consistent,
         average_salary_usd=average_salary,
         annual_salary_cost_usd=annual_cost,
         student_staff_ratio=ratio,
@@ -505,7 +513,9 @@ def _handle_staff_summary(
         notes=notes
         + [
             f"Önerilen kadro, hedef öğrenci/öğretim üyesi oranı "
-            f"{TARGET_STUDENT_STAFF_RATIO:.0f} kabul edilerek hesaplanmıştır."
+            f"{TARGET_STUDENT_STAFF_RATIO:.0f} kabul edilerek hesaplanmıştır. "
+            f"Kadro açığı, personel kayıtlarındaki {count} kişiye göre hesaplanır.",
+            f"Yıllık maaş maliyeti {cost_basis} ({cost_headcount}) üzerinden hesaplandı.",
         ],
     )
 

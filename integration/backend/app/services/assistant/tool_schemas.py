@@ -138,8 +138,44 @@ class AcademicStaffSummaryInput(ScopeInput):
 
 
 class AcademicStaffSummaryOutput(BaseModel):
+    """Akademik personel özeti.
+
+    İKİ AYRI SAYI, İKİ AYRI ANLAM
+    -----------------------------
+    `active_academic_staff_count` personel kayıtlarındaki kişi sayısıdır.
+    `payroll_academic_positions` mali dönemin bordro planlamasındaki kadro
+    sayısıdır. Normalde eşittirler; ayrıştıkları durumda hangisinin neyi
+    ölçtüğü belirsiz kalmasın diye ikisi de ayrı alanlarda döndürülür ve
+    maaş maliyetinin hangisinden hesaplandığı `cost_basis` alanında yazar.
+    """
+
     scope: ScopeInfo
-    academic_staff_count: Optional[int] = None
+    #: Geriye uyum için korunur; `active_academic_staff_count` ile aynıdır.
+    academic_staff_count: Optional[int] = Field(
+        default=None,
+        description=(
+            "Personel kayıtlarındaki aktif kişi sayısı. "
+            "active_academic_staff_count ile aynı değerdir."
+        ),
+    )
+    active_academic_staff_count: Optional[int] = Field(
+        default=None, description="Personel kayıtlarında bu yıl görünen kişi sayısı."
+    )
+    payroll_academic_positions: Optional[int] = Field(
+        default=None,
+        description="Mali dönem bordro planlamasındaki akademik kadro sayısı.",
+    )
+    cost_basis: Optional[str] = Field(
+        default=None,
+        description=(
+            "Yıllık maaş maliyetinin hangi sayıdan hesaplandığı: "
+            "'bordro kadrosu' veya 'personel kayıtları'."
+        ),
+    )
+    staffing_data_consistent: Optional[bool] = Field(
+        default=None,
+        description="İki sayı eşitse True; ayrışıyorsa False.",
+    )
     average_salary_usd: Optional[Decimal] = None
     annual_salary_cost_usd: Optional[Decimal] = None
     student_staff_ratio: Optional[Decimal] = None

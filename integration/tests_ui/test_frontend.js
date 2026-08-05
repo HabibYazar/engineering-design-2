@@ -398,7 +398,10 @@ function check(label, condition, detail = "") {
     check("asistan: model hazirken giris acik",
       view.querySelector("#assistantInput").disabled === false);
 
-    view.querySelector("#assistantInput").value = "Merhaba";
+    // Kurumsal bir soru sorulur: "Merhaba" genel sohbettir ve araç
+    // kullanmaz, dolayısıyla "Kullanılan veriler" bölümü de çıkmaz.
+    view.querySelector("#assistantInput").value =
+      "Bilgisayar Mühendisliği programının mevcut öğrenci sayısı nedir?";
     view.querySelector("#assistantForm").dispatchEvent(
       new w.Event("submit", { cancelable: true, bubbles: true })
     );

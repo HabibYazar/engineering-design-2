@@ -33,8 +33,19 @@ class Settings(BaseSettings):
     # Yerel modelde ilk üretim yavaş olabilir (model belleğe yüklenir).
     OLLAMA_TIMEOUT_SECONDS: int = 120
     OLLAMA_CONTEXT_LENGTH: int = 8192
-    # Düşük sıcaklık: yönetim raporlarında yaratıcılık değil tutarlılık isteniyor.
-    OLLAMA_TEMPERATURE: float = 0.2
+    # Sıcaklık 0: araçlar hesabı yaptığı için modelin işi sonucu aktarmak.
+    # Yaratıcılık burada yalnızca sapma üretir. Araç SEÇİMİ de kararlı olmalı;
+    # aynı soru her seferinde aynı aracı çağırmalı.
+    OLLAMA_TEMPERATURE: float = 0.0
+
+    # Modelin muhakeme (thinking) üretimi KAPALI. Hesaplamayı araçlar yapıyor;
+    # uzun muhakeme yalnızca ilk cevabı dakikalarca geciktiriyor ve zaten
+    # kullanıcıya gösterilmiyor. qwen3 ailesi bu bayrağı destekler.
+    OLLAMA_THINK: bool = False
+
+    # Model bellekte ne kadar kalsın. Her istekte yeniden yüklenmesi ilk
+    # cevabı 1-2 dakika geciktiriyordu.
+    OLLAMA_KEEP_ALIVE: str = "10m"
 
     # Kullanıcı mesajı sınırları. Üst sınır olmadan tek bir istek modelin
     # bağlam penceresini doldurup sunucuyu dakikalarca meşgul edebilir.
