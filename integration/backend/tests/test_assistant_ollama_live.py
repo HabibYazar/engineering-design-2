@@ -508,18 +508,27 @@ def test_live_unknown_program_is_not_invented(db: Session) -> None:
 def test_live_institutional_answer_without_tools_is_blocked(db: Session, monkeypatch) -> None:
     """Model araç çağırmamakta ısrar ederse cevabı kullanıcıya verilmemeli.
 
-    Modelin araçsız metni taklit edilir; iki turda da araç çağrılmazsa
-    sistemin kontrollü hata döndürmesi beklenir.
+    Soru bilinçli olarak ZORUNLU ARACI OLMAYAN bir kurumsal sorudur
+    ("mekân doluluğu"). Zorunlu aracı olan sorularda backend aracı zaten
+    kendisi çalıştırdığı için bu yol hiç devreye girmez; retry mekanizmasını
+    ancak araç seçimi modele bırakılan sorular sınayabilir.
     """
+    from app.services.assistant import query_policy as policy
+
+    question = "Mekânların doluluk oranı ne kadar?"
+    assert policy.classify(question).required_tool is None, (
+        "Test geçersiz: bu sorunun artık zorunlu aracı var."
+    )
+
     calls = {"count": 0}
 
     def never_calls_tools(self, messages, tools=None):
         calls["count"] += 1
-        return [], "Bilgisayar Mühendisliği'nde yaklaşık 500 öğrenci var.", ""
+        return [], "Doluluk oranı yaklaşık %500.", ""
 
     monkeypatch.setattr(OllamaProvider, "chat_with_tools", never_calls_tools)
 
-    result = chat_service.answer(f"{PROGRAM} kaç öğrencisi var?", db=db)
+    result = chat_service.answer(question, db=db)
 
     assert calls["count"] == 2, (
         f"Zorunlu ikinci deneme yapılmadı (model çağrısı: {calls['count']})."
@@ -527,6 +536,28 @@ def test_live_institutional_answer_without_tools_is_blocked(db: Session, monkeyp
     assert result["data_source"] == query_policy.SOURCE_UNAVAILABLE
     assert result["answer"] == query_policy.NO_TOOL_RESULT_MESSAGE
     assert "500" not in result["answer"], "Modelin uydurduğu sayı kullanıcıya sızmış."
+
+
+def test_live_forced_tool_makes_retry_unnecessary(db: Session, monkeypatch) -> None:
+    """Zorunlu aracı olan soruda model araç çağırmasa bile sonuç doğru olmalı.
+
+    Backend aracı kendisi çalıştırdığı için modelin araç seçme becerisi
+    devreden çıkar; bu, canlı testte model yanlış aracı seçtiği için eklendi.
+    """
+    calls = {"count": 0}
+
+    def never_calls_tools(self, messages, tools=None):
+        calls["count"] += 1
+        return [], "2025-2026 döneminde program özeti hazır.", ""
+
+    monkeypatch.setattr(OllamaProvider, "chat_with_tools", never_calls_tools)
+
+    result = chat_service.answer(f"{PROGRAM} kaç öğrencisi var?", db=db)
+
+    assert calls["count"] == 1, "Zorunlu araç çalıştığı halde gereksiz retry yapılmış."
+    assert "get_program_summary" in tool_names(result)
+    assert result["data_source"] == query_policy.SOURCE_INSTITUTIONAL
+    assert result["academic_year"] == YEAR
 
 
 def test_live_general_chat_does_not_force_tools(db: Session, monkeypatch) -> None:

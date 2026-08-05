@@ -13,6 +13,7 @@ Gerçek Ollama ile çalışan isteğe bağlı testler:
 """
 
 import json
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -394,20 +395,29 @@ def test_model_cannot_produce_numbers_without_tools(monkeypatch, db) -> None:
 
 
 def test_institutional_question_retries_before_giving_up(monkeypatch, db) -> None:
-    """İlk turda araç çağırmayan model ikinci bir şans almalı."""
+    """İlk turda araç çağırmayan model ikinci bir şans almalı.
+
+    Soru bilinçli olarak ZORUNLU ARACI OLMAYAN bir kurumsal sorudur; zorunlu
+    aracı olan sorularda backend aracı kendisi çalıştırdığı için retry yolu
+    hiç devreye girmez.
+    """
+    from app.services.assistant import query_policy
+
+    question = "Mekânların doluluk oranı ne kadar?"
+    assert query_policy.classify(question).required_tool is None
+
     fake = script_ollama(
         monkeypatch,
         [
             # 1. tur: araç yok
-            "Sanırım 500 civarı öğrenci var.",
+            "Sanırım %500 civarı.",
             # 2. tur: uyarı sonrası aracı çağırıyor
-            [{"name": "get_program_summary",
-              "arguments": {"program": "CENG-BSC", "academic_year": YEAR}}],
-            "2025-2026 · Bilgisayar Mühendisliği: 370 öğrenci.",
+            [{"name": "get_capacity_summary", "arguments": {"academic_year": YEAR}}],
+            "2025-2026 · mekân doluluğu %73,93.",
         ],
     )
 
-    result = chat_service.answer("Bilgisayar Mühendisliği kaç öğrencisi var?", db=db)
+    result = chat_service.answer(question, db=db)
 
     assert len(fake.requests) == 3, "Zorunlu ikinci deneme yapılmadı."
     # İkinci istekte modele uyarı gönderilmiş olmalı.
@@ -416,7 +426,7 @@ def test_institutional_question_retries_before_giving_up(monkeypatch, db) -> Non
     second = fake.requests[1]["messages"]
     assert any(query_policy.RETRY_INSTRUCTION in m.get("content", "") for m in second)
     assert result["data_source"] == query_policy.SOURCE_INSTITUTIONAL
-    assert "370" in result["answer"]
+    assert "73,93" in result["answer"]
 
 
 def test_general_chat_is_not_forced_to_use_tools(monkeypatch, db) -> None:
@@ -624,22 +634,29 @@ def test_missing_data_returns_null_not_zero(db) -> None:
         assert any("alt kapsam" in n or "yalnızca üniversite geneli" in n for n in result.notes)
 
 
-def test_tool_error_does_not_crash_the_endpoint(client: TestClient, monkeypatch) -> None:
-    """Araç hatası uygulamayı çökertmemeli."""
-    script_ollama(
-        monkeypatch,
-        [
-            [{"name": "get_program_summary", "arguments": {"program": "Uzay Mühendisliği"}}],
-            "Böyle bir program bulunamadı.",
-        ],
-    )
+def test_unknown_unit_short_circuits_before_the_model(client: TestClient, monkeypatch) -> None:
+    """Sistemde olmayan bir birim adı modele hiç gönderilmemeli.
 
-    response = client.post("/api/assistant/chat", json={"message": "Uzay Mühendisliği kaç kişi?"})
+    Model bu soruyu alakasız bir araçla cevaplayabiliyordu ("toplam gelir
+    50,4 milyon USD"); başarılı ama konuyla ilgisiz bir araç çağrısı kapıyı
+    geçiyordu. Artık birim adı çözülemezse model çağrılmaz.
+    """
+    from app.services.assistant import query_policy
+
+    fake = script_ollama(monkeypatch, ["Bu cevap hiç üretilmemeli."])
+
+    response = client.post(
+        "/api/assistant/chat", json={"message": "Uzay Mühendisliği programında kaç kişi var?"}
+    )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["used_tools"] == [{"name": "get_program_summary", "success": False}]
+    assert fake.requests == [], "Bulunamayan birim için model çağrılmış."
+    assert body["used_tools"] == []
     assert body["data_sources"] == []
+    assert body["data_source"] == query_policy.SOURCE_UNAVAILABLE
+    assert "Uzay Mühendisliği" in body["answer"]
+    assert "bulunamadı" in body["answer"]
 
 
 # ===========================================================================
@@ -648,30 +665,28 @@ def test_tool_error_does_not_crash_the_endpoint(client: TestClient, monkeypatch)
 
 
 def test_tool_results_are_sent_back_to_the_model(monkeypatch, db) -> None:
-    """Araç sonucu modele `tool` rolüyle geri verilmeli."""
+    """Araç sonucu modele `tool` rolüyle geri verilmeli.
+
+    Bu soruda araç backend tarafından çalıştırılır; model yalnızca sonucu
+    yorumlar. Sonucun modele gerçekten ulaştığı doğrulanır.
+    """
     fake = script_ollama(
-        monkeypatch,
-        [
-            [
-                {
-                    "name": "get_program_summary",
-                    "arguments": {"program": "Bilgisayar Mühendisliği", "academic_year": YEAR},
-                }
-            ],
-            "2025-2026 · Bilgisayar Mühendisliği: 370 öğrenci.",
-        ],
+        monkeypatch, ["2025-2026 · Bilgisayar Mühendisliği: 370 öğrenci."]
     )
 
     result = chat_service.answer("Bilgisayar Mühendisliği kaç öğrencisi var?", db=db)
 
-    second_request = fake.requests[1]
-    tool_messages = [m for m in second_request["messages"] if m.get("role") == "tool"]
+    assert fake.requests, "Model hiç çağrılmamış."
+    first_request = fake.requests[0]
+    tool_messages = [m for m in first_request["messages"] if m.get("role") == "tool"]
     assert tool_messages, "Araç sonucu modele geri verilmemiş."
 
     payload = json.loads(tool_messages[0]["content"])
     assert payload["student_count"] == 370
-    # Modelin cevabındaki sayı araç çıktısıyla aynı olmalı.
+    # Model yorumu araç sonucuyla aynı sayıyı taşımalı.
     assert "370" in result["answer"]
+    # Sonuç hazır olduğu için modele yeni araç sunulmamalı.
+    assert "tools" not in first_request
 
 
 def test_metadata_reports_turkish_data_sources(monkeypatch, db) -> None:
@@ -770,3 +785,218 @@ def test_frontend_does_not_display_technical_tool_names() -> None:
     # Kullanıcıya gösterilen başlık.
     assert "Kullanılan veriler" in code
     assert "data_sources" in code
+
+
+# ===========================================================================
+# SENARYO INTENT ROUTER VE DÖNEM POLİTİKASI
+#
+# Bu bölüm, canlı testte bulunan iki hatanın tekrar etmemesi için var:
+#   1. Model maaş senaryosu sorusuna get_financial_summary çağırdı.
+#   2. Sistem varsayılan akademik yıl olarak planlama dönemini (2026-2027) seçti.
+# ===========================================================================
+
+
+def test_salary_raise_is_classified_as_salary_scenario() -> None:
+    """Maaş zammı ifadesi staff_salary_scenario sınıfına girmeli."""
+    from app.services.assistant import query_policy
+
+    for message in (
+        "Akademik personel maaşlarına %2 zam yapılırsa bütçe nasıl etkilenir?",
+        "Personel ücretleri %5 artarsa ne olur?",
+        "Maaş giderleri azaltılırsa bütçe nasıl etkilenir?",
+    ):
+        intent = query_policy.classify(message)
+        assert intent.intent == query_policy.INTENT_STAFF_SALARY, message
+        assert intent.required_tool == "run_staff_salary_scenario", message
+
+
+def test_enrollment_change_is_classified_as_enrollment_scenario() -> None:
+    """Öğrenci artışı enrollment_change_scenario sınıfına girmeli."""
+    from app.services.assistant import query_policy
+
+    for message in (
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa mali durum nasıl etkilenir?",
+        "Kayıt sayısı azalırsa ne olur?",
+        "Program kontenjanı değişirse ne olur?",
+    ):
+        intent = query_policy.classify(message)
+        assert intent.intent == query_policy.INTENT_ENROLLMENT_CHANGE, message
+        assert intent.required_tool == "run_enrollment_change_scenario", message
+
+
+def test_current_state_questions_are_classified_correctly() -> None:
+    """Mevcut durum soruları current_state_query sınıfına girmeli.
+
+    Bir PROGRAMIN öğrenci göstergesi soruluyorsa araç yine bellidir; genel
+    kurum soruları serbest bırakılır.
+    """
+    from app.services.assistant import query_policy
+
+    for message in (
+        "Mevcut gelir ne kadar?",
+        "Laboratuvar kapasitesi kaç kişilik?",
+        "Akademik personel sayısı nedir?",
+        "Mekânların doluluk oranı ne kadar?",
+    ):
+        intent = query_policy.classify(message)
+        assert intent.intent == query_policy.INTENT_CURRENT_STATE, message
+        assert intent.required_tool is None, message
+        assert intent.institutional is True, message
+
+    program_question = "Bilgisayar Mühendisliği programının mevcut öğrenci sayısı nedir?"
+    intent = query_policy.classify(program_question)
+    assert intent.intent == query_policy.INTENT_CURRENT_STATE
+    assert intent.required_tool == "get_program_summary"
+    # Senaryo aracı ASLA seçilmemeli: mevcut durum soruluyor.
+    assert "scenario" not in (intent.required_tool or "")
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("maaşlara %2 zam", 2.0),
+        ("maaşlara yüzde 5 zam", 5.0),
+        ("öğrenci sayısı 15 oranında artarsa", 15.0),
+        ("maaşlara yüzde iki zam yapılırsa", 2.0),
+        ("öğrenci sayısı %10 azalırsa", -10.0),
+    ],
+)
+def test_percentage_extraction(message: str, expected: float) -> None:
+    """Yüzde değeri backend tarafında güvenli biçimde çıkarılmalı."""
+    from app.services.assistant import query_policy
+
+    assert query_policy.extract_percentage(message) == expected
+
+
+def test_default_year_is_current_not_planning(db) -> None:
+    """Kullanıcı yıl belirtmezse current dönem seçilmeli."""
+    from app.services.assistant import entity_resolver
+
+    year = entity_resolver.default_academic_year(db)
+    assert year == YEAR
+    types = entity_resolver.academic_year_types(db)
+    assert types[year] in ("current", "actual")
+
+
+def test_planning_period_is_never_the_default(db) -> None:
+    """Planlama dönemi varsayılan olarak SEÇİLMEMELİ.
+
+    2026-2027 bir planlama yılıdır; tutarları sıfırdır. Yalnızca "en büyük
+    yıl" mantığıyla seçildiğinde asistan "bu dönemde veri bulunamadı" diyor,
+    oysa kullanıcı gerçekleşmiş dönemi soruyordu.
+    """
+    from app.services.assistant import entity_resolver
+
+    types = entity_resolver.academic_year_types(db)
+    planning = [year for year, kind in types.items() if kind == "planning"]
+    assert planning, "Test anlamsız: veride planlama dönemi yok."
+
+    default = entity_resolver.default_academic_year(db)
+    assert default not in planning
+    # Yıl verilmeden çağrılan araçlar da planlama dönemine düşmemeli.
+    for name in ("get_financial_summary", "get_academic_staff_summary"):
+        tool = registry.get(name)
+        result = tool.handler(db, tool.input_model())
+        assert result.scope.academic_year not in planning, name
+
+
+def test_explicit_planning_year_is_allowed(db) -> None:
+    """Kullanıcı 2026-2027 derse planlama dönemi seçilebilmeli."""
+    from app.services.assistant import entity_resolver, query_policy
+
+    intent = query_policy.classify("2026-2027 döneminde maaşlara %2 zam yapılırsa?")
+    assert intent.explicit_academic_year == "2026-2027"
+
+    year = entity_resolver.resolve_academic_year(
+        db, intent.explicit_academic_year, allow_planning=intent.wants_planning_period
+    )
+    assert year == "2026-2027"
+
+
+def test_next_year_phrase_allows_planning_period(db) -> None:
+    """Kullanıcı 'gelecek yıl' derse planlama dönemine izin verilmeli."""
+    from app.services.assistant import entity_resolver, query_policy
+
+    intent = query_policy.classify("Gelecek yıl öğrenci sayısı %15 artarsa ne olur?")
+    assert intent.wants_planning_period is True
+    assert entity_resolver.mentions_planning_period("Gelecek yıl ne olur?") is True
+    assert entity_resolver.mentions_planning_period("Öğrenci sayısı artarsa?") is False
+
+
+def test_wrong_tool_is_not_accepted_for_a_salary_scenario(monkeypatch, db) -> None:
+    """Maaş senaryosunda get_financial_summary tek başına yeterli olmamalı.
+
+    Model bilinçli olarak yanlış aracı seçse bile backend doğru aracı kendisi
+    çalıştırır; cevaptaki araç listesi bunu gösterir.
+    """
+    script_ollama(monkeypatch, ["2025-2026 personel gideri arttı."])
+
+    result = chat_service.answer(
+        "Akademik personel maaşlarına %2 zam yapılırsa bütçe nasıl etkilenir?", db=db
+    )
+
+    names = {t["name"] for t in result["used_tools"]}
+    assert "run_staff_salary_scenario" in names, (
+        f"Zorunlu senaryo aracı çalıştırılmadı. Çağrılanlar: {names}"
+    )
+    assert result["academic_year"] == YEAR
+    assert result["data_source"] == "institutional_data"
+
+
+def test_enrollment_scenario_tool_is_mandatory(monkeypatch, db) -> None:
+    """Öğrenci senaryosunda run_enrollment_change_scenario zorunlu olmalı."""
+    script_ollama(monkeypatch, ["Öğrenci sayısı arttı."])
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa mali durum nasıl etkilenir?",
+        db=db,
+    )
+
+    names = {t["name"] for t in result["used_tools"]}
+    assert "run_enrollment_change_scenario" in names, (
+        f"Zorunlu senaryo aracı çalıştırılmadı. Çağrılanlar: {names}"
+    )
+    assert result["academic_year"] == YEAR
+    assert result["scope"]["program"] == "Bilgisayar Mühendisliği Lisans Programı"
+
+
+def test_final_answer_is_blocked_when_required_tool_fails(monkeypatch, db) -> None:
+    """Gerekli araç çalışmazsa modelin metni kullanıcıya gösterilmemeli."""
+    from app.services.assistant import query_policy
+    from app.services.assistant.tool_registry import ToolExecutionError
+
+    def failing(_db, _payload):
+        raise ToolExecutionError("Senaryo motoru kullanılamıyor.", kind="no_data")
+
+    tool = registry.get("run_staff_salary_scenario")
+    monkeypatch.setitem(registry._tools, "run_staff_salary_scenario", replace(tool, handler=failing))
+    script_ollama(monkeypatch, ["Bütçe yaklaşık 6 milyon USD artar."])
+
+    result = chat_service.answer(
+        "Akademik personel maaşlarına %2 zam yapılırsa bütçe nasıl etkilenir?", db=db
+    )
+
+    assert result["data_source"] == query_policy.SOURCE_UNAVAILABLE
+    assert result["answer"] == query_policy.NO_TOOL_RESULT_MESSAGE
+    assert "6 milyon" not in result["answer"]
+
+
+def test_forced_tool_arguments_come_from_the_message(db) -> None:
+    """Araç parametreleri metinden çıkarılmalı, modelden değil."""
+    from app.services.assistant import query_policy
+    from app.services.assistant.chat_service import _build_forced_arguments
+
+    intent = query_policy.classify(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?"
+    )
+    arguments = _build_forced_arguments(db, intent, intent_message())
+
+    assert arguments == {
+        "academic_year": YEAR,
+        "program": "CENG-BSC",
+        "student_change_percentage": 15.0,
+    }
+
+
+def intent_message() -> str:
+    return "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?"

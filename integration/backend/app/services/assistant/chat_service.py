@@ -33,7 +33,7 @@ from app.services.assistant.ollama_provider import (
     AssistantProviderError,
     OllamaProvider,
 )
-from app.services.assistant import query_policy
+from app.services.assistant import entity_resolver, query_policy
 from app.services.assistant import tools as _tools  # noqa: F401  (kayıt için)
 from app.services.assistant.tool_registry import registry
 from app.services.assistant.tool_runner import ToolSession
@@ -62,8 +62,9 @@ VERİ KULLANIMI — EN ÖNEMLİ KURALLAR
 
 NE ZAMAN SENARYO ÇALIŞTIRILIR
 
-6. Kullanıcı "artarsa", "azalırsa", "zam yapılırsa", "ne olur" gibi bir VARSAYIM soruyorsa ilgili senaryo aracını çağır.
+6. Kullanıcı "artarsa", "azalırsa", "zam yapılırsa", "ne olur" gibi bir VARSAYIM soruyorsa ilgili SENARYO aracını çağır. Mevcut durumu döndüren özet araçları (gelir, gider, öğrenci sayısı) bir senaryo sorusunu CEVAPLAMAZ; onlar değişimin etkisini hesaplamaz.
 7. Kullanıcı yalnızca mevcut durumu soruyorsa (kaç öğrenci var, bütçe ne kadar) SENARYO ÇALIŞTIRMA; yalnızca özet araçlarını kullan.
+7a. Bir senaryo sonucu sana hazır olarak verilmişse yeni araç çağırma; o sonucu yorumla.
 
 CEVAP BİÇİMİ
 
@@ -221,6 +222,101 @@ def answer(
         session = ToolSession(db=db, permissions=permissions, registry=registry)
         tool_schemas = registry.schemas(permissions)
 
+    # ------------------------------------------------------------------
+    # ZORUNLU SENARYO ARACI — karar modele bırakılmaz.
+    #
+    # Canlı testte model "maaşlara %2 zam yapılırsa" sorusuna mevcut bütçeyi
+    # döndüren aracı çağırdı; o araç zammın etkisini hesaplamaz. Araç seçimi
+    # bir muhakeme işi değil yönlendirme işidir: backend niyeti belirler,
+    # parametreleri metinden çıkarır ve aracı KENDİSİ çalıştırır. Model
+    # yalnızca sonucu yorumlar.
+    # ------------------------------------------------------------------
+    intent = query_policy.classify(user_content)
+    forced_tool: Optional[str] = None
+
+    # Kullanıcı adını verdiği bir birim sistemde yoksa MODELE HİÇ SORULMAZ.
+    # Aksi halde model soruyu alakasız bir araçla cevaplayabiliyor ve
+    # başarılı bir araç çağrısı olduğu için sistem bunu kabul ediyordu.
+    if session is not None and intent.institutional:
+        missing_unit = entity_resolver.unresolved_unit_in_text(db, user_content)
+        if missing_unit:
+            logger.info("Bulunamayan birim adi: %s", missing_unit)
+            message_text = (
+                f"'{missing_unit}' adında bir program, bölüm veya fakülte "
+                f"sistemde bulunamadı. Lütfen adı kontrol edip yeniden sorun."
+            )
+            _store.append(conversation, "user", user_content)
+            _store.append(conversation, "assistant", message_text)
+            return {
+                "conversation_id": conversation,
+                "answer": message_text,
+                "provider": provider.name,
+                "model": provider.model,
+                "used_tools": [],
+                "data_sources": [],
+                "academic_year": None,
+                "scope": {},
+                "data_source": query_policy.SOURCE_UNAVAILABLE,
+            }
+
+    # Program özeti zorunluluğu, cümlede GERÇEKTEN bir program adı geçmesine
+    # bağlıdır. "Mekânların doluluk oranı ne kadar?" bir program sorusu
+    # değildir; zorunlu kılınırsa model hiç cevaplayamaz.
+    if (
+        session is not None
+        and intent.required_tool == "get_program_summary"
+        and entity_resolver.find_in_text(db, "program", user_content) is None
+    ):
+        intent.required_tool = None
+
+    if session is not None and intent.required_tool:
+        forced_tool = intent.required_tool
+        arguments = _build_forced_arguments(db, intent, user_content)
+        if arguments is not None:
+            record = session.run(forced_tool, arguments)
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"function": {"name": forced_tool, "arguments": arguments}}
+                    ],
+                }
+            )
+            messages.append(
+                {"role": "tool", "name": record.name, "content": record.content}
+            )
+            if record.success:
+                # Sonuç hazır: modelden yalnızca yorum isteniyor, yeni araç değil.
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "Senaryo sonucu yukarıda hazır. Yeni araç çağırma; "
+                            "bu sonucu kullanıcıya Türkçe olarak yorumla. "
+                            "Kullandığın akademik yılı ve kapsamı belirt."
+                        ),
+                    }
+                )
+                tool_schemas = None
+        else:
+            # Parametreler metinden çıkarılamadı: modele YALNIZCA gerekli araç
+            # sunulur, başka araç seçemez.
+            logger.info("Zorunlu arac parametreleri cikarilamadi: %s", forced_tool)
+            tool_schemas = [
+                schema
+                for schema in (tool_schemas or [])
+                if schema["function"]["name"] == forced_tool
+            ]
+            messages.append(
+                {
+                    "role": "system",
+                    "content": query_policy.REQUIRED_TOOL_INSTRUCTION.format(
+                        tool=forced_tool
+                    ),
+                }
+            )
+
     started = time.monotonic()
     steps = 0
     visible = ""
@@ -296,8 +392,21 @@ def answer(
     academic_year = session.academic_year() if session else None
     tool_data_available = session is not None and session.any_success()
 
+    # ZORUNLU ARAÇ KONTROLÜ: gerekli senaryo aracı başarıyla çalışmadıysa
+    # modelin serbest metni kullanıcıya GÖSTERİLMEZ. Yanlış araçla üretilmiş
+    # bir "mevcut bütçe" özeti, senaryo sorusunun cevabı değildir.
+    required_tool_ran = True
+    if forced_tool is not None and session is not None:
+        required_tool_ran = any(
+            record.name == forced_tool and record.success for record in session.records
+        )
+        if not required_tool_ran:
+            logger.warning(
+                "Zorunlu arac calismadi (%s); model metni reddedildi.", forced_tool
+            )
+
     # Kurumsal soru + araç sonucu yok → modelin metni KULLANICIYA VERİLMEZ.
-    if institutional and not tool_data_available:
+    if institutional and (not tool_data_available or not required_tool_ran):
         logger.warning(
             "Kurumsal soru arac sonucu olmadan cevaplandi; model metni reddedildi."
         )
@@ -328,6 +437,54 @@ def answer(
         "scope": scope,
         "data_source": data_source,
     }
+
+
+def _build_forced_arguments(
+    db: Session, intent: "query_policy.QueryIntent", message: str
+) -> Optional[Dict[str, Any]]:
+    """Zorunlu senaryo aracının parametrelerini metinden çıkarır.
+
+    Hepsi çıkarılamazsa None döner ve karar modele bırakılır — ama model
+    yalnızca gerekli aracı görebilir, başkasını seçemez.
+
+    Akademik yıl POLİTİKAYLA belirlenir: kullanıcı açıkça yazmadıysa
+    `current` dönem seçilir, planlama dönemi seçilmez.
+    """
+    try:
+        year = entity_resolver.resolve_academic_year(
+            db,
+            intent.explicit_academic_year,
+            allow_planning=intent.wants_planning_period,
+        )
+    except entity_resolver.EntityResolutionError:
+        return None
+
+    if intent.intent == query_policy.INTENT_STAFF_SALARY:
+        percentage = intent.parameters.get("salary_change_percentage")
+        if percentage is None:
+            return None
+        return {"academic_year": year, "salary_change_percentage": percentage}
+
+    if intent.required_tool == "get_program_summary":
+        program = entity_resolver.find_in_text(db, "program", message)
+        if program is None:
+            return None
+        return {"academic_year": year, "program": program.code}
+
+    if intent.intent == query_policy.INTENT_ENROLLMENT_CHANGE:
+        percentage = intent.parameters.get("student_change_percentage")
+        if percentage is None:
+            return None
+        program = entity_resolver.find_in_text(db, "program", message)
+        if program is None:
+            return None
+        return {
+            "academic_year": year,
+            "program": program.code,
+            "student_change_percentage": percentage,
+        }
+
+    return None
 
 
 def stream_answer(

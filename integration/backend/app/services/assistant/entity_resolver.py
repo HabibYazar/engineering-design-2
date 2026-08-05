@@ -70,6 +70,17 @@ def _tokens(text: str) -> frozenset:
     return frozenset(w for w in normalize(text).split() if w and w not in _STOPWORDS)
 
 
+# Derece sözcükleri. AD ÇÖZÜMLEMEDE ayırt edicidir (Lisans / Yüksek Lisans),
+# ama SERBEST METİN aramasında değildir: kullanıcı "Bilgisayar Mühendisliği
+# öğrenci sayısı artarsa" derken "Lisans Programı" yazmaz.
+_DEGREE_WORDS = {"lisans", "onlisans", "yuksek", "bachelor", "master", "doktora"}
+
+
+def _core_tokens(text: str) -> frozenset:
+    """Derece sözcükleri çıkarılmış sözcük kümesi (serbest metin araması)."""
+    return frozenset(w for w in _tokens(text) if w not in _DEGREE_WORDS)
+
+
 class EntityResolutionError(Exception):
     """Birim adı çözülemedi.
 
@@ -233,6 +244,82 @@ def resolve(db: Session, kind: str, query: str) -> ResolvedEntity:
     )
 
 
+def find_in_text(db: Session, kind: str, message: str) -> Optional[ResolvedEntity]:
+    """Serbest bir cümle içinde geçen birimi bulur.
+
+    "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa…" cümlesinden
+    CENG-BSC'yi çıkarır. Böylece senaryo aracının program parametresi
+    modelden değil, METİNDEN deterministik olarak elde edilir.
+
+    Eşleşme yoksa veya birden fazla aday aynı güçte eşleşiyorsa None döner —
+    o durumda karar modele bırakılır ve model yanlış seçerse araç zaten
+    "belirsiz" hatası verir.
+    """
+    message_tokens = _tokens(message)
+    if not message_tokens:
+        return None
+
+    message_words = normalize(message).split()
+    best: List[Candidate] = []
+    best_size = 0
+
+    for candidate in _build_candidates(db, kind):
+        matched_size = 0
+        for alias in candidate.aliases:
+            alias_tokens = _core_tokens(alias)
+            if not alias_tokens or not alias_tokens.issubset(message_tokens):
+                continue
+            # Tek sözcüklü takma ad (kod) cümlede rastlantısal eşleşebilir;
+            # tam sözcük olarak geçmesi aranır.
+            if len(alias_tokens) < 2 and normalize(alias) not in message_words:
+                continue
+            matched_size = max(matched_size, len(alias_tokens))
+
+        if not matched_size:
+            continue
+        if matched_size > best_size:
+            best_size, best = matched_size, [candidate]
+        elif matched_size == best_size:
+            best.append(candidate)
+
+    # Tek aday varsa kesin; birden fazlaysa TAHMİN ETME.
+    if len(best) == 1:
+        return best[0].entity
+    return None
+
+
+# Kullanıcının bir organizasyon birimi adı yazdığını gösteren son ekler.
+# "Uzay Mühendisliği programında kaç öğrenci var?" cümlesinde kullanıcı açıkça
+# bir birim adı vermiştir; o birim sistemde yoksa bunu söylemek gerekir.
+_UNIT_PHRASE = re.compile(
+    r"([A-ZÇĞİÖŞÜ][\wçğıöşüÇĞİÖŞÜ]*(?:\s+[A-ZÇĞİÖŞÜ]?[\wçğıöşüÇĞİÖŞÜ]+){0,3}?"
+    r"\s+(?:Mühendisliği|Muhendisligi|Mühendislik|Bölümü|Bolumu|Programı|Programi|Fakültesi|Fakultesi))",
+)
+
+
+def named_units_in_text(message: str) -> List[str]:
+    """Cümlede geçen, birim adı gibi görünen ifadeleri döndürür."""
+    return [match.group(1).strip() for match in _UNIT_PHRASE.finditer(message or "")]
+
+
+def unresolved_unit_in_text(db: Session, message: str) -> Optional[str]:
+    """Kullanıcının adını verdiği ama sistemde bulunmayan birimi döndürür.
+
+    Kullanıcı "Uzay Mühendisliği" yazdıysa ve böyle bir program/bölüm yoksa,
+    modele soruyu başka bir araçla cevaplatmak yanlış olur: alakasız ama
+    başarılı bir araç çağrısı ("toplam gelir 50,4 milyon USD") kapıyı geçip
+    kullanıcıya cevap gibi sunulabiliyordu.
+    """
+    for phrase in named_units_in_text(message):
+        found = any(
+            find_in_text(db, kind, phrase) is not None
+            for kind in ("program", "department", "faculty")
+        )
+        if not found:
+            return phrase
+    return None
+
+
 def resolve_optional(db: Session, kind: str, query: Optional[str]) -> Optional[ResolvedEntity]:
     """Değer verilmişse çözer, verilmemişse None döndürür."""
     if query is None or not str(query).strip():
@@ -247,6 +334,18 @@ def resolve_optional(db: Session, kind: str, query: Optional[str]) -> Optional[R
 ACADEMIC_YEAR_PATTERN = re.compile(r"^(\d{4})\s*[-–/]\s*(\d{4})$")
 
 
+# Kullanıcı açıkça istemedikçe seçilmeyen dönem türleri.
+NON_DEFAULT_PERIOD_TYPES = frozenset({"planning", "forecast"})
+
+# Kullanıcının planlama dönemini kastettiğini gösteren ifadeler.
+PLANNING_HINTS = re.compile(
+    r"gelecek\s*(yıl|yil|dönem|donem|akademik)|"
+    r"önümüzdeki|onumuzdeki|planlama|plan\s*dönemi|plan\s*donemi|"
+    r"bütçe\s*planı|butce\s*plani|projeksiyon|öngörü|ongoru",
+    re.IGNORECASE,
+)
+
+
 def available_academic_years(db: Session) -> List[str]:
     """Veride bulunan akademik yıllar (yeniden eskiye)."""
     from app.models import FinancialPeriod
@@ -255,20 +354,79 @@ def available_academic_years(db: Session) -> List[str]:
     return sorted(set(rows), reverse=True)
 
 
-def resolve_academic_year(db: Session, value: Optional[str]) -> str:
-    """Akademik yılı doğrular; verilmemişse en güncel yılı döndürür.
+def academic_year_types(db: Session) -> Dict[str, str]:
+    """Akademik yıl → dönem türü eşlemesi."""
+    from app.models import FinancialPeriod
+
+    rows = db.execute(
+        select(FinancialPeriod.academic_year, FinancialPeriod.period_type)
+    ).all()
+    return {year: (period_type or "actual") for year, period_type in rows}
+
+
+def default_academic_year(db: Session, allow_planning: bool = False) -> str:
+    """Kullanıcı yıl belirtmediğinde kullanılacak dönem.
+
+    SIRALAMA — bu karar MODELE BIRAKILMAZ:
+      1. `current` dönem varsa o.
+      2. Yoksa en güncel `actual` dönem.
+      3. Planlama/tahmin dönemi ASLA varsayılan olarak seçilmez.
+
+    Neden: 2026-2027 bir planlama yılıdır ve tutarları sıfırdır. Yalnızca
+    "en büyük yıl" mantığıyla seçildiğinde asistan "bu dönemde veri
+    bulunamadı" diyor, oysa kullanıcı gerçekleşmiş dönemi soruyordu.
+    """
+    types = academic_year_types(db)
+    if not types:
+        raise EntityResolutionError("Sistemde tanımlı akademik yıl yok.", kind="not_found")
+
+    current = sorted(
+        (year for year, kind in types.items() if kind == "current"), reverse=True
+    )
+    if current:
+        return current[0]
+
+    actual = sorted(
+        (year for year, kind in types.items() if kind == "actual"), reverse=True
+    )
+    if actual:
+        return actual[0]
+
+    if allow_planning:
+        return sorted(types, reverse=True)[0]
+
+    raise EntityResolutionError(
+        "Gerçekleşmiş veri içeren bir akademik dönem bulunamadı. "
+        "Yalnızca planlama dönemi tanımlı.",
+        kind="not_found",
+    )
+
+
+def mentions_planning_period(message: str) -> bool:
+    """Kullanıcı planlama dönemini mi kastediyor?"""
+    return bool(PLANNING_HINTS.search(message or ""))
+
+
+def resolve_academic_year(
+    db: Session,
+    value: Optional[str] = None,
+    allow_planning: bool = False,
+) -> str:
+    """Akademik yılı doğrular; verilmemişse politikaya göre seçer.
 
     Model uydurma bir yıl ("2030-2031") gönderirse hata alır; sistem sessizce
     başka bir yılın verisini döndürmez.
+
+    Açıkça bir planlama yılı istenirse `allow_planning` gerekmez — kullanıcı
+    yılı yazmışsa niyeti bellidir. `allow_planning` yalnızca YIL VERİLMEDİĞİNDE
+    devreye girer.
     """
     years = available_academic_years(db)
     if not years:
-        raise EntityResolutionError(
-            "Sistemde tanımlı akademik yıl yok.", kind="not_found"
-        )
+        raise EntityResolutionError("Sistemde tanımlı akademik yıl yok.", kind="not_found")
 
     if value is None or not str(value).strip():
-        return years[0]
+        return default_academic_year(db, allow_planning=allow_planning)
 
     text = str(value).strip()
     match = ACADEMIC_YEAR_PATTERN.match(text)
@@ -289,6 +447,7 @@ def resolve_scope(
     faculty: Optional[str] = None,
     department: Optional[str] = None,
     program: Optional[str] = None,
+    allow_planning: bool = False,
 ) -> Tuple[str, Optional[ResolvedEntity], Optional[ResolvedEntity], Optional[ResolvedEntity]]:
     """Araçların ortak kapsam çözümlemesi.
 
@@ -296,7 +455,7 @@ def resolve_scope(
     modelin çelişkili bir kombinasyon göndermesi (X fakültesindeki Y programı,
     ama Y aslında Z fakültesinde) engellenir.
     """
-    year = resolve_academic_year(db, academic_year)
+    year = resolve_academic_year(db, academic_year, allow_planning=allow_planning)
 
     program_entity = resolve_optional(db, "program", program)
     department_entity = resolve_optional(db, "department", department)

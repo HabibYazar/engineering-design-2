@@ -567,6 +567,9 @@ def seed_finance(db: Session, counter: Counter) -> None:
             graduates = _graduates_for_year(year)
             period = FinancialPeriod(
                 academic_year=year,
+                # Dönem türü: varsayılan yıl seçimi buna bakar. Planlama yılı
+                # (tutarları sıfır) kullanıcı açıkça istemedikçe seçilmez.
+                period_type=row.get("period_type", "actual"),
                 total_students=row.get("total_students", 0),
                 total_graduates=(
                     row["total_graduates"]

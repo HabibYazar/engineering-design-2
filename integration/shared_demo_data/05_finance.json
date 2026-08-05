@@ -60,7 +60,8 @@
         "toplam_gelir_milyon_usd": 33.25,
         "toplam_gider_milyon_usd": 33.4,
         "denge_milyon_usd": -0.15
-      }
+      },
+      "period_type": "actual"
     },
     {
       "academic_year": "2022-2023",
@@ -98,7 +99,8 @@
         "toplam_gelir_milyon_usd": 37.39,
         "toplam_gider_milyon_usd": 36.91,
         "denge_milyon_usd": 0.48
-      }
+      },
+      "period_type": "actual"
     },
     {
       "academic_year": "2023-2024",
@@ -136,7 +138,8 @@
         "toplam_gelir_milyon_usd": 41.07,
         "toplam_gider_milyon_usd": 40.23,
         "denge_milyon_usd": 0.84
-      }
+      },
+      "period_type": "actual"
     },
     {
       "academic_year": "2024-2025",
@@ -174,7 +177,8 @@
         "toplam_gelir_milyon_usd": 45.72,
         "toplam_gider_milyon_usd": 43.81,
         "denge_milyon_usd": 1.91
-      }
+      },
+      "period_type": "actual"
     },
     {
       "academic_year": "2025-2026",
@@ -212,14 +216,16 @@
         "toplam_gelir_milyon_usd": 50.4,
         "toplam_gider_milyon_usd": 47.5,
         "denge_milyon_usd": 2.9
-      }
+      },
+      "period_type": "current"
     },
     {
       "_not": "2026-2027 planlama yilidir. Kalem yapisi acilir ancak tutarlar sifirdir; henuz gerceklesme yoktur. Buradaki sifir 'veri yok' degil, gercekten 'harcama yapilmadi' demektir.",
       "academic_year": "2026-2027",
       "total_students": 0,
       "total_graduates": 0,
-      "copy_categories_from": "2025-2026"
+      "copy_categories_from": "2025-2026",
+      "period_type": "planning"
     }
   ],
   "department_budgets": {
@@ -311,5 +317,6 @@
         "allocated_budget": 4.12
       }
     ]
-  }
+  },
+  "_donem_turu": "period_type: actual (gerceklesmis) | current (icinde bulunulan) | planning (planlama) | forecast (tahmin). Varsayilan yil secimi bu alana bakar; planlama donemi kullanici acikca istemedikce secilmez."
 }

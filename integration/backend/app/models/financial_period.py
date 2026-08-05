@@ -86,6 +86,21 @@ class FinancialPeriod(Base):
         MoneyType, default=Decimal("0"), nullable=False
     )
 
+    # DÖNEM TÜRÜ — varsayılan yıl seçiminin dayanağı.
+    #
+    # Neden gerekli: 2026-2027 bir PLANLAMA yılıdır; tutarları sıfırdır çünkü
+    # henüz gerçekleşme yoktur. Alfabetik/sayısal olarak "en güncel yıl" onu
+    # seçiyor ve "bu dönemde veri bulunamadı" gibi yanıltıcı cevaplar
+    # üretiyordu. Dönemin ne olduğu artık veride yazılı.
+    #
+    #   actual   → gerçekleşmiş, kapanmış dönem
+    #   current  → içinde bulunulan dönem (varsayılan seçim)
+    #   planning → henüz gerçekleşme olmayan planlama dönemi
+    #   forecast → tahmin dönemi
+    period_type: Mapped[str] = mapped_column(
+        String(20), default="actual", nullable=False, index=True
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
