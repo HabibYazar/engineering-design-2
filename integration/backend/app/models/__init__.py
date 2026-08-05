@@ -11,6 +11,10 @@ from app.models.benchmark_institution import BenchmarkInstitution
 from app.models.benchmark_metric_value import BenchmarkMetricValue
 from app.models.comparable_university_program import ComparableUniversityProgram
 from app.models.department import Department
+from app.models.program_allocation import (
+    ProgramAcademicStaffAllocation,
+    ProgramFacilityAllocation,
+)
 from app.models.engagement import (
     IndustryCollaborationRecord,
     RegionalContributionRecord,
@@ -84,4 +88,7 @@ __all__ = [
     # Sanayi iş birliği ve bölgesel katkı
     "IndustryCollaborationRecord",
     "RegionalContributionRecord",
+    # Program düzeyinde kaynak tahsisi
+    "ProgramAcademicStaffAllocation",
+    "ProgramFacilityAllocation",
 ]

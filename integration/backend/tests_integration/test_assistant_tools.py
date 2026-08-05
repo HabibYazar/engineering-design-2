@@ -13,6 +13,7 @@ Gerçek Ollama ile çalışan isteğe bağlı testler:
 """
 
 import json
+import os
 from dataclasses import replace
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -20,6 +21,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+
+from sqlalchemy import create_engine, text
 
 from app.database import SessionLocal
 from app.services import finance_service
@@ -1040,7 +1043,11 @@ def test_enrollment_facts_are_composed_by_the_backend(db) -> None:
     for expected in (
         "Üniversite toplam yıllık geliri",
         "Bu programdaki artışın ek gelir etkisi",
-        "Program için önerilen öğretim üyesi",
+        # Program kadrosu artık FTE cinsinden ve program tahsisinden geliyor.
+        "Program akademik kapasitesi",
+        "Gerekli akademik kapasite",
+        "Program derslik kapasitesi",
+        "Program haftalık derslik ihtiyacı",
         "Üniversite için önerilen kadro",
         "Üniversite laboratuvar kapasitesi",
         "Kapasite durumu",
@@ -1303,12 +1310,21 @@ def test_university_staff_is_not_labelled_as_program_staff(db) -> None:
     assert university_staff.scope_type == "university"
     assert university_staff.baseline == 180
 
-    # Program kadrosu verisi yoksa bu açıkça söylenmeli.
-    recommended = next(
-        m for m in output.scoped_metrics if m.key == "recommended_program_staff"
+    # Program kadrosu artık GERÇEK tahsisten geliyor; FTE cinsinden ve
+    # üniversite toplamından bağımsız.
+    required = next(
+        m for m in output.scoped_metrics if m.key == "program_required_fte"
     )
-    assert recommended.scope_type == "program"
-    assert "bulunamadı" in (recommended.note or "").lower()
+    assert required.scope_type == "program"
+    assert required.unit == "FTE"
+    assert required.formula and "hedef" in required.formula
+
+    program_fte = next(
+        m for m in output.scoped_metrics if m.key == "program_staff_fte"
+    )
+    assert program_fte.baseline < Decimal("180"), (
+        "Program FTE değeri üniversite toplamına yakın; tahsis kullanılmıyor."
+    )
 
     facts = response_composer.compose(
         "run_enrollment_change_scenario", output
@@ -1369,13 +1385,26 @@ def test_simultaneous_demand_unit_is_explicit(db) -> None:
     assert metric.formula, "Eş zamanlı talebin formülü yazılmamış."
     assert "0.35" in metric.formula or "0,35" in metric.formula
 
+    # Program derslik ihtiyacı artık ZAMAN BOYUTLU: koltuk-saat.
     program_metric = _scoped(db, "program_classroom_demand")
     assert program_metric.scope_type == "program"
-    assert program_metric.unit == "eş zamanlı kişi"
-    # Program talebi program öğrenci sayısından türetilmeli, kurum toplamından değil.
-    assert program_metric.scenario == 149, (
-        f"426 × 0,35 = 149 bekleniyordu, gelen: {program_metric.scenario}"
+    assert program_metric.unit == "koltuk-saat"
+    assert program_metric.formula and "haftalık ders saati" in program_metric.formula
+    # 426 öğrenci × 18 saat = 7.668 koltuk-saat.
+    assert program_metric.scenario == Decimal("7668.00"), (
+        f"426 × 18 = 7.668 bekleniyordu, gelen: {program_metric.scenario}"
     )
+
+    # Yoğun saat eş zamanlı talebi kapasite aracında, kendi birimiyle.
+    tool = registry.get("get_capacity_summary")
+    capacity = tool.handler(
+        db, tool.input_model(program="CENG-BSC", academic_year=YEAR)
+    )
+    peak = next(
+        m for m in capacity.scoped_metrics if m.key == "peak_concurrent_demand"
+    )
+    assert peak.unit == "eş zamanlı kişi"
+    assert peak.formula and "0.35" in peak.formula
 
 
 def test_program_revenue_effect_is_separated_from_university_total(db) -> None:
@@ -1433,3 +1462,212 @@ def test_capacity_gap_is_not_reported_as_a_change(db) -> None:
     assert demand.change == Decimal("20"), "Talep değişimi 1.420 − 1.400 = 20 olmalı."
     assert gap.scenario == Decimal("400"), "Açık 1.420 − 1.020 = 400 olmalı."
     assert gap.formula and "kapasite" in gap.formula
+
+
+# ===========================================================================
+# PROGRAM DÜZEYİNDE KAYNAK TAHSİSİ
+#
+# Önceki sürümde program–personel ve program–mekân ilişkisi yoktu; asistan
+# program sorularına üniversite geneli sayıları (180 öğretim üyesi, 1.020
+# koltuk) döndürmek zorunda kalıyordu.
+# ===========================================================================
+
+
+def test_staff_allocation_never_exceeds_one_hundred_percent(db) -> None:
+    """Bir kişinin bir yıldaki toplam tahsisi %100'ü aşamaz."""
+    from app.services import program_allocation_service as allocation
+
+    totals = allocation.validate_staff_allocation_totals(db, YEAR)
+    assert totals, "Hiç tahsis üretilmemiş."
+    for staff_id, total in totals.items():
+        assert total <= Decimal("100"), f"#{staff_id} toplam tahsisi %{total}"
+
+
+def test_university_fte_matches_staff_capacity(db) -> None:
+    """Toplam FTE, kişi sayısını aşamaz ve kurum kadrosuyla tutarlıdır."""
+    from app.services import program_allocation_service as allocation
+
+    total_fte = allocation.university_total_fte(db, YEAR)
+    headcount = allocation.allocated_staff_headcount(db, YEAR)
+
+    assert headcount > 0
+    # Her kişi en fazla %100 tahsis edilebildiği için FTE ≤ kişi sayısı.
+    assert total_fte <= Decimal(headcount), (
+        f"FTE toplamı ({total_fte}) kişi sayısını ({headcount}) aşıyor."
+    )
+    # Demo veride 180 akademik personelin tamamı tahsis edilmiş olmalı.
+    assert headcount == 180, f"Tahsisli kişi sayısı 180 değil: {headcount}"
+
+
+def test_facility_allocation_never_exceeds_available_hours(db) -> None:
+    """Bir mekânın haftalık toplam tahsisi kullanılabilir saati aşamaz."""
+    from app.models.program_allocation import WEEKLY_AVAILABLE_HOURS
+    from app.services import program_allocation_service as allocation
+
+    totals = allocation.validate_facility_allocation_hours(db, YEAR)
+    assert totals, "Hiç mekân tahsisi üretilmemiş."
+    for facility_id, hours in totals.items():
+        assert hours <= WEEKLY_AVAILABLE_HOURS, f"#{facility_id} → {hours} saat"
+
+
+def test_programs_without_laboratories_get_none(db) -> None:
+    """Laboratuvar gerektirmeyen programa mühendislik laboratuvarı atanmaz."""
+    from app.services.assistant import entity_resolver
+    from app.services import program_allocation_service as allocation
+
+    for code in ("BA-BSC", "IR-BSC", "ECON-BSC"):
+        program = entity_resolver.resolve(db, "program", code)
+        capacity = allocation.program_facility_capacity(
+            db, program.id, YEAR, allocation.LABORATORY_TYPES
+        )
+        assert capacity.facility_count == 0, (
+            f"{code} programına laboratuvar atanmış: {capacity.facility_codes}"
+        )
+
+    # Mimarlık stüdyo, Hemşirelik sağlık laboratuvarı kullanmalı.
+    architecture = entity_resolver.resolve(db, "program", "ARCH-BSC")
+    studios = allocation.program_facility_capacity(
+        db, architecture.id, YEAR, ("studio",)
+    )
+    assert studios.facility_count >= 1
+    assert all(code.startswith("STD-") for code in studios.facility_codes)
+
+    nursing = entity_resolver.resolve(db, "program", "NUR-BSC")
+    labs = allocation.program_facility_capacity(
+        db, nursing.id, YEAR, allocation.LABORATORY_TYPES
+    )
+    assert "LAB-NUR1" in labs.facility_codes
+
+
+def test_enrollment_scenario_uses_only_its_own_allocations(db) -> None:
+    """Bilgisayar Mühendisliği senaryosu yalnızca kendi tahsislerini kullanır."""
+    from app.services.assistant import entity_resolver
+    from app.services import program_allocation_service as allocation
+
+    program = entity_resolver.resolve(db, "program", "CENG-BSC")
+    report = allocation.build_program_capacity_report(db, program.id, YEAR, 370)
+
+    output = _enrollment_output(db)
+    metrics = {m.key: m for m in output.scoped_metrics}
+
+    assert metrics["program_staff_fte"].baseline == report.staff.fte
+    assert (
+        metrics["program_classroom_capacity"].baseline
+        == report.classroom.weekly_capacity_unit_hours
+    )
+    assert (
+        metrics["program_laboratory_capacity"].baseline
+        == report.laboratory.weekly_capacity_unit_hours
+    )
+    # Yalnızca CENG'e tahsisli mekânlar sayılmalı.
+    assert set(report.classroom.facility_codes) <= {"A101", "A102"}
+    assert set(report.laboratory.facility_codes) <= {"LAB-CE1", "LAB-CE2"}
+
+
+def test_university_total_is_not_shown_as_program_staff(db) -> None:
+    """Program personeli olarak üniversite toplamı 180 gösterilmez."""
+    output = _enrollment_output(db)
+
+    for metric in output.scoped_metrics:
+        if metric.scope_type != "program":
+            continue
+        for value in (metric.baseline, metric.scenario):
+            assert value != Decimal("180"), (
+                f"{metric.key}: üniversite toplamı program metriği olarak görünüyor"
+            )
+
+    headcount = next(
+        m for m in output.scoped_metrics if m.key == "program_staff_headcount"
+    )
+    assert headcount.scope_type == "program"
+    assert 0 < headcount.baseline < Decimal("180")
+
+
+def test_capacity_metrics_carry_a_time_dimension(db) -> None:
+    """Kapasite değerlerinde birim ve zaman boyutu bulunur."""
+    tool = registry.get("get_capacity_summary")
+    result = tool.handler(
+        db, tool.input_model(program="CENG-BSC", academic_year=YEAR)
+    )
+
+    assert result.weekly_classroom_capacity_seat_hours is not None
+    assert result.weekly_classroom_demand_seat_hours is not None
+    assert result.peak_concurrent_capacity is not None
+    assert result.peak_concurrent_demand is not None
+
+    units = {m.unit for m in result.scoped_metrics}
+    assert "koltuk-saat" in units, f"Zaman boyutlu birim yok: {units}"
+    assert "istasyon-saat" in units
+    assert "eş zamanlı kişi" in units
+    # Düz "kişi" tek başına kapasite birimi olarak kullanılmamalı.
+    assert "kişi" not in units
+
+    for metric in result.scoped_metrics:
+        if metric.unit in ("koltuk-saat", "istasyon-saat", "eş zamanlı kişi"):
+            assert metric.formula, f"{metric.key}: formül yazılmamış"
+
+
+def test_program_summary_separates_headcount_from_fte(db) -> None:
+    """Kişi sayısı ile FTE ayrı raporlanır."""
+    tool = registry.get("get_program_summary")
+    result = tool.handler(
+        db, tool.input_model(program="CENG-BSC", academic_year=YEAR)
+    )
+
+    assert result.allocated_staff_headcount is not None
+    assert result.allocated_staff_fte is not None
+    assert result.weekly_teaching_capacity_hours is not None
+    assert result.target_student_staff_ratio == Decimal("20")
+    # Üniversite toplamı sızmamalı.
+    assert result.allocated_staff_headcount < 180
+    # Oran FTE üzerinden hesaplanmalı.
+    from app.core.decimal_types import quantize_money
+
+    expected = quantize_money(
+        Decimal(result.student_count) / result.allocated_staff_fte
+    )
+    assert result.student_staff_ratio == expected
+
+
+def test_allocation_seed_is_idempotent() -> None:
+    """Seed iki kez çalıştırıldığında tahsis kayıtları çoğalmaz."""
+    import pathlib
+    import subprocess
+    import sys
+    import tempfile
+
+    backend_root = pathlib.Path(__file__).resolve().parents[1]
+    with tempfile.TemporaryDirectory(prefix="alloc_idempotent_") as temp_dir:
+        db_path = pathlib.Path(temp_dir) / "idempotent.db"
+        environment = dict(os.environ)
+        environment["DATABASE_URL"] = f"sqlite:///{db_path.as_posix()}"
+
+        def run_seed() -> None:
+            completed = subprocess.run(
+                [sys.executable, "seed_all_demo_data.py"],
+                cwd=str(backend_root), env=environment,
+                capture_output=True, text=True,
+            )
+            assert completed.returncode == 0, completed.stderr[-1500:]
+
+        def count_rows() -> tuple:
+            engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+            try:
+                with engine.connect() as connection:
+                    staff = connection.execute(
+                        text("SELECT COUNT(*) FROM program_academic_staff_allocations")
+                    ).scalar()
+                    facility = connection.execute(
+                        text("SELECT COUNT(*) FROM program_facility_allocations")
+                    ).scalar()
+                return staff, facility
+            finally:
+                engine.dispose()
+
+        run_seed()
+        first = count_rows()
+        run_seed()
+        second = count_rows()
+
+    assert first[0] > 0 and first[1] > 0, "Tahsis kaydı üretilmemiş."
+    assert first == second, f"Seed idempotent değil: {first} -> {second}"

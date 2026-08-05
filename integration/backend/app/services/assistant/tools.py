@@ -30,7 +30,9 @@ from app.models import AcademicProgram, Department, PhysicalFacility
 from app.models.financial_period import FinancialPeriod
 from app.schemas.scenarios import ScenarioInputCreate
 from app.services import academic_staff_service, finance_service
+from app.services import program_allocation_service as allocation
 from app.services import student_analytics_service as students
+from app.services import student_analytics_service as students_module
 from app.services.assistant import entity_resolver
 from app.services.assistant.entity_resolver import ResolvedEntity
 from app.services.assistant.tool_registry import (
@@ -196,24 +198,28 @@ def _handle_program_summary(db: Session, payload: ProgramSummaryInput) -> Progra
 
     row = rows[0]
     notes: List[str] = []
-
-    # Bölüm personeli program başına ayrıştırılmış değil; oran bölüm
-    # kadrosundan hesaplanır ve bu not cevaba taşınır.
-    staff_count = _staff_count(db, year, faculty, department)
-    if staff_count is None:
-        notes.append("Bu kapsam için akademik personel kaydı bulunamadı.")
-    else:
-        notes.append(
-            "Akademik personel sayısı bölüm düzeyinde tutulur; program başına "
-            "ayrı kadro kaydı yoktur."
-        )
-
     student_count = row.total_students or None
+
+    # PROGRAM DÜZEYİNDE kadro tahsisi. Artık üniversite veya bölüm toplamı
+    # program değeri gibi gösterilmiyor.
+    staff = allocation.program_staff_capacity(db, program.id, year)
+    notes.extend(staff.notes)
+
+    headcount = staff.headcount or None
+    fte = staff.fte if staff.headcount else None
+    # Oran FTE üzerinden: 12 kişinin yarısı bu programda ders veriyorsa
+    # gerçek kapasite 6 FTE'dir, 12 değil.
     ratio = (
-        quantize_money(Decimal(student_count) / Decimal(staff_count))
-        if student_count and staff_count
+        quantize_money(Decimal(student_count) / fte)
+        if student_count and fte and fte > 0
         else None
     )
+    if headcount and fte is not None and Decimal(headcount) != fte:
+        notes.append(
+            f"Programda {headcount} öğretim üyesi ders veriyor; tam zaman "
+            f"eşdeğeri {fte} FTE'dir. Öğrenci/öğretim üyesi oranı FTE "
+            "üzerinden hesaplanır."
+        )
 
     return ProgramSummaryOutput(
         scope=_scope_info(year, faculty, department, program),
@@ -223,8 +229,14 @@ def _handle_program_summary(db: Session, payload: ProgramSummaryInput) -> Progra
         occupancy_rate=_dec(row.occupancy_rate),
         graduation_rate=_dec(row.graduation_rate),
         dropout_rate=_dec(row.attrition_rate),
-        academic_staff_count=staff_count,
+        academic_staff_count=headcount,
+        allocated_staff_headcount=headcount,
+        allocated_staff_fte=fte,
+        weekly_teaching_capacity_hours=(
+            allocation.weekly_teaching_capacity_hours(fte) if fte else None
+        ),
         student_staff_ratio=ratio,
+        target_student_staff_ratio=allocation.TARGET_STUDENT_FTE_RATIO,
         notes=notes,
     )
 
@@ -330,6 +342,11 @@ def _handle_capacity_summary(
     year, faculty, department, program = _resolve(db, payload)
     notes: List[str] = []
 
+    # PROGRAM VERİLDİYSE program tahsislerinden cevap ver. Kurum geneli
+    # kapasiteyi program kapasitesi gibi göstermek yanıltıcıydı.
+    if program is not None:
+        return _program_capacity_summary(db, year, faculty, department, program)
+
     statement = select(PhysicalFacility).where(PhysicalFacility.is_active.is_(True))
     # Mekânlar bölüme bağlıdır; programa bağlı mekân kaydı yoktur.
     if department is not None:
@@ -410,6 +427,124 @@ def _handle_capacity_summary(
         capacity_gap=gap,
         capacity_status=status,
         notes=notes,
+    )
+
+
+def _program_capacity_summary(
+    db: Session, year: str, faculty, department, program
+) -> CapacitySummaryOutput:
+    """Program düzeyinde kapasite. Birimler zaman boyutu taşır."""
+    students = students_module.build_program_analytics(
+        db, academic_program_id=program.id, academic_year=year
+    )
+    student_count = int(students[0].total_students) if students else 0
+
+    report = allocation.build_program_capacity_report(
+        db, program.id, year, student_count
+    )
+    program_name = program.display_name
+
+    scoped = [
+        ScopedMetric(
+            key="weekly_classroom_capacity", label="Haftalık derslik kapasitesi",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="koltuk-saat",
+            baseline=report.classroom.weekly_capacity_unit_hours,
+            formula=(
+                "Σ(derslik koltuk sayısı × programa tahsisli haftalık saat "
+                "× paylaşım payı)"
+            ),
+            note="; ".join(report.classroom.notes) or None,
+        ),
+        ScopedMetric(
+            key="weekly_classroom_demand", label="Haftalık derslik ihtiyacı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="koltuk-saat",
+            baseline=report.weekly_classroom_demand,
+            formula=(
+                f"öğrenci sayısı × {allocation.WEEKLY_CLASSROOM_HOURS_PER_STUDENT} "
+                "(öğrenci başına haftalık yüz yüze ders saati)"
+            ),
+        ),
+        ScopedMetric(
+            key="classroom_utilization", label="Derslik kapasite kullanım oranı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+            baseline=report.classroom_utilization_percent,
+            formula="haftalık ihtiyaç / haftalık kapasite × 100",
+        ),
+        ScopedMetric(
+            key="peak_concurrent_capacity", label="Yoğun saatte barındırılabilen",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="eş zamanlı kişi",
+            baseline=Decimal(report.classroom.peak_concurrent_capacity),
+            formula="Σ(derslik koltuk sayısı × paylaşım payı)",
+        ),
+        ScopedMetric(
+            key="peak_concurrent_demand", label="Yoğun saatte eş zamanlı talep",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="eş zamanlı kişi",
+            baseline=Decimal(report.peak_classroom_demand),
+            formula=(
+                f"öğrenci sayısı × {allocation.PEAK_CLASSROOM_CONCURRENCY} "
+                "(yoğun saat eş zamanlılık katsayısı)"
+            ),
+        ),
+    ]
+
+    if report.laboratory.facility_count:
+        scoped.extend([
+            ScopedMetric(
+                key="weekly_laboratory_capacity", label="Haftalık laboratuvar kapasitesi",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="istasyon-saat",
+                baseline=report.laboratory.weekly_capacity_unit_hours,
+                formula=(
+                    "Σ(istasyon sayısı × programa tahsisli haftalık saat "
+                    "× paylaşım payı)"
+                ),
+                note="; ".join(report.laboratory.notes) or None,
+            ),
+            ScopedMetric(
+                key="weekly_laboratory_demand", label="Haftalık laboratuvar ihtiyacı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="istasyon-saat",
+                baseline=report.weekly_laboratory_demand,
+                formula=(
+                    f"öğrenci sayısı × "
+                    f"{allocation.WEEKLY_LABORATORY_HOURS_PER_STUDENT} "
+                    "(öğrenci başına haftalık laboratuvar saati)"
+                ),
+            ),
+            ScopedMetric(
+                key="laboratory_utilization", label="Laboratuvar kullanım oranı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+                baseline=report.laboratory_utilization_percent,
+                formula="haftalık ihtiyaç / haftalık kapasite × 100",
+            ),
+        ])
+
+    gap = report.peak_classroom_demand - report.classroom.peak_concurrent_capacity
+    status = "yetersiz" if gap > 0 else "yeterli"
+
+    return CapacitySummaryOutput(
+        scope=_scope_info(year, faculty, department, program),
+        scoped_metrics=scoped,
+        allocated_classrooms=report.classroom.facility_count or None,
+        allocated_laboratories=report.laboratory.facility_count or None,
+        weekly_classroom_capacity_seat_hours=report.classroom.weekly_capacity_unit_hours,
+        weekly_classroom_demand_seat_hours=report.weekly_classroom_demand,
+        weekly_laboratory_capacity_station_hours=(
+            report.laboratory.weekly_capacity_unit_hours
+            if report.laboratory.facility_count else None
+        ),
+        weekly_laboratory_demand_station_hours=(
+            report.weekly_laboratory_demand if report.laboratory.facility_count else None
+        ),
+        classroom_utilization_percent=report.classroom_utilization_percent,
+        laboratory_utilization_percent=report.laboratory_utilization_percent,
+        peak_concurrent_capacity=report.classroom.peak_concurrent_capacity or None,
+        peak_concurrent_demand=report.peak_classroom_demand or None,
+        capacity_gap=gap,
+        capacity_status=status,
+        notes=report.notes + [
+            "Kapasite değerleri zaman boyutu taşır: koltuk-saat ve "
+            "istasyon-saat. 'Kişi' tek başına kapasite birimi değildir.",
+            f"Tahsisli derslikler: {', '.join(report.classroom.facility_codes) or 'yok'}.",
+        ],
     )
 
 
@@ -695,6 +830,16 @@ def _handle_enrollment_scenario(
     program_name = program.display_name
     department_name = department.display_name if department else None
 
+    # PROGRAM DÜZEYİNDE KAYNAK RAPORU — mevcut ve senaryo öğrenci sayısıyla
+    # AYNI formülden geçirilir. Artık kurum toplamı program değeri gibi
+    # kullanılmıyor.
+    base_report = allocation.build_program_capacity_report(
+        db, program.id, year, program_students
+    )
+    scenario_report = allocation.build_program_capacity_report(
+        db, program.id, year, projected_program_students
+    )
+
     # Programın kendi eş zamanlı talebi, kurum geneliyle AYNI katsayıdan
     # türetilir. Kurum toplamını program talebi gibi göstermek yerine
     # programın payı ayrıca hesaplanır.
@@ -731,50 +876,115 @@ def _handle_enrollment_scenario(
             formula=f"mevcut öğrenci × (1 + %{change_percent} / 100)",
         ),
         ScopedMetric(
-            key="program_classroom_demand", label="Eş zamanlı derslik ihtiyacı",
-            scope_type=SCOPE_PROGRAM, scope_name=program_name,
-            unit="eş zamanlı kişi",
-            baseline=Decimal(baseline_program_classroom),
-            scenario=Decimal(program_classroom_demand),
-            change=Decimal(program_classroom_demand - baseline_program_classroom),
-            formula=(
-                f"program öğrenci sayısı × {SIMULTANEOUS_CLASSROOM_USE} "
-                "(eş zamanlı derslik kullanım katsayısı)"
-            ),
-            note=(
-                "Derslikler bölüm düzeyinde tahsis edilir; programa ayrılmış "
-                "derslik kapasitesi verisi yoktur. Yalnızca TALEP hesaplanabilir."
-            ),
-        ),
-        ScopedMetric(
-            key="program_laboratory_demand", label="Eş zamanlı laboratuvar ihtiyacı",
-            scope_type=SCOPE_PROGRAM, scope_name=program_name,
-            unit="eş zamanlı kişi",
-            baseline=Decimal(baseline_program_laboratory),
-            scenario=Decimal(program_laboratory_demand),
-            change=Decimal(program_laboratory_demand - baseline_program_laboratory),
-            formula=(
-                f"program öğrenci sayısı × {SIMULTANEOUS_LABORATORY_USE} "
-                "(eş zamanlı laboratuvar kullanım katsayısı)"
-            ),
-            note=(
-                "Laboratuvarlar bölüm düzeyinde tahsis edilir; programa ayrılmış "
-                "laboratuvar kapasitesi verisi yoktur."
-            ),
-        ),
-        ScopedMetric(
-            key="recommended_program_staff", label="Program için önerilen öğretim üyesi",
+            key="program_staff_headcount", label="Programda ders veren öğretim üyesi",
             scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="kişi",
-            scenario=Decimal(recommended_program_staff),
+            baseline=Decimal(base_report.staff.headcount),
+            formula="programa tahsis edilmiş tekil öğretim üyesi sayısı",
+            note="; ".join(base_report.staff.notes) or None,
+        ),
+        ScopedMetric(
+            key="program_staff_fte", label="Program akademik kapasitesi",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
+            baseline=base_report.staff.fte,
+            formula="Σ(tahsis yüzdesi / 100). Kişi sayısından farklıdır.",
+        ),
+        ScopedMetric(
+            key="program_required_fte", label="Gerekli akademik kapasite",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
+            baseline=base_report.required_fte,
+            scenario=scenario_report.required_fte,
+            change=scenario_report.required_fte - base_report.required_fte,
             formula=(
-                f"senaryo program öğrenci sayısı / {TARGET_STUDENT_STAFF_RATIO:.0f} "
-                "(hedef öğrenci-öğretim üyesi oranı)"
-            ),
-            note=(
-                "Program bazında akademik personel dağılımı bulunamadı; mevcut "
-                "program kadrosu ile karşılaştırma yapılamıyor."
+                f"öğrenci sayısı / {allocation.TARGET_STUDENT_FTE_RATIO:.0f} "
+                "(hedef öğrenci-FTE oranı)"
             ),
         ),
+        ScopedMetric(
+            key="program_fte_gap", label="Ek akademik kapasite ihtiyacı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="FTE",
+            baseline=base_report.fte_gap,
+            scenario=scenario_report.fte_gap,
+            change=scenario_report.fte_gap - base_report.fte_gap,
+            formula="gerekli FTE − mevcut FTE",
+        ),
+        ScopedMetric(
+            key="program_classroom_capacity", label="Program derslik kapasitesi",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="koltuk-saat",
+            baseline=base_report.classroom.weekly_capacity_unit_hours,
+            formula=(
+                "Σ(derslik koltuk sayısı × tahsisli haftalık saat × paylaşım payı)"
+            ),
+            note="; ".join(base_report.classroom.notes) or None,
+        ),
+        ScopedMetric(
+            key="program_classroom_demand", label="Program haftalık derslik ihtiyacı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="koltuk-saat",
+            baseline=base_report.weekly_classroom_demand,
+            scenario=scenario_report.weekly_classroom_demand,
+            change=(
+                scenario_report.weekly_classroom_demand
+                - base_report.weekly_classroom_demand
+            ),
+            formula=(
+                f"öğrenci sayısı × {allocation.WEEKLY_CLASSROOM_HOURS_PER_STUDENT} "
+                "(öğrenci başına haftalık ders saati)"
+            ),
+        ),
+        ScopedMetric(
+            key="program_classroom_utilization", label="Program derslik kullanım oranı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+            baseline=base_report.classroom_utilization_percent,
+            scenario=scenario_report.classroom_utilization_percent,
+            formula="haftalık ihtiyaç / haftalık kapasite × 100",
+        ),
+    ]
+
+    if base_report.laboratory.facility_count:
+        scoped.extend([
+            ScopedMetric(
+                key="program_laboratory_capacity", label="Program laboratuvar kapasitesi",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="istasyon-saat",
+                baseline=base_report.laboratory.weekly_capacity_unit_hours,
+                formula=(
+                    "Σ(istasyon sayısı × tahsisli haftalık saat × paylaşım payı)"
+                ),
+                note="; ".join(base_report.laboratory.notes) or None,
+            ),
+            ScopedMetric(
+                key="program_laboratory_demand", label="Program haftalık laboratuvar ihtiyacı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="istasyon-saat",
+                baseline=base_report.weekly_laboratory_demand,
+                scenario=scenario_report.weekly_laboratory_demand,
+                change=(
+                    scenario_report.weekly_laboratory_demand
+                    - base_report.weekly_laboratory_demand
+                ),
+                formula=(
+                    f"öğrenci sayısı × "
+                    f"{allocation.WEEKLY_LABORATORY_HOURS_PER_STUDENT}"
+                ),
+            ),
+            ScopedMetric(
+                key="program_laboratory_utilization", label="Program laboratuvar kullanım oranı",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="%",
+                baseline=base_report.laboratory_utilization_percent,
+                scenario=scenario_report.laboratory_utilization_percent,
+                formula="haftalık ihtiyaç / haftalık kapasite × 100",
+            ),
+        ])
+    else:
+        scoped.append(
+            ScopedMetric(
+                key="program_laboratory_capacity", label="Program laboratuvar kapasitesi",
+                scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="istasyon-saat",
+                note=(
+                    "Bu programa tahsis edilmiş laboratuvar yok; laboratuvar "
+                    "ihtiyacı hesaplanmadı."
+                ),
+            )
+        )
+
+    scoped.append(
         ScopedMetric(
             key="program_revenue_effect", label="Bu programdaki artışın ek gelir etkisi",
             scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="USD",
@@ -783,8 +993,8 @@ def _handle_enrollment_scenario(
                 "senaryo motorunun kurum geneli gelir farkı; artış yalnızca bu "
                 "programdan geldiği için tamamı programa atfedilir"
             ),
-        ),
-    ]
+        )
+    )
 
     if department_name is not None:
         scoped.append(
@@ -912,6 +1122,21 @@ def _handle_enrollment_scenario(
         net_balance_change_usd=balance.absolute_change if balance else None,
         baseline=ScenarioBaselineBlock(
             academic_year=year,
+            program_staff_headcount=base_report.staff.headcount or None,
+            program_staff_fte=base_report.staff.fte,
+            program_required_fte=base_report.required_fte,
+            program_classroom_capacity_seat_hours=(
+                base_report.classroom.weekly_capacity_unit_hours
+            ),
+            program_classroom_demand_seat_hours=base_report.weekly_classroom_demand,
+            program_laboratory_capacity_station_hours=(
+                base_report.laboratory.weekly_capacity_unit_hours
+                if base_report.laboratory.facility_count else None
+            ),
+            program_laboratory_demand_station_hours=(
+                base_report.weekly_laboratory_demand
+                if base_report.laboratory.facility_count else None
+            ),
             program_student_count=program_students,
             university_student_count=computation.baseline_student_count,
             total_revenue_usd=revenue.baseline_value if revenue else None,
@@ -924,6 +1149,21 @@ def _handle_enrollment_scenario(
             classroom_demand=_int(class_demand, "baseline_value"),
         ),
         scenario=ScenarioProjectionBlock(
+            program_staff_fte=scenario_report.staff.fte,
+            program_required_fte=scenario_report.required_fte,
+            program_fte_gap=scenario_report.fte_gap,
+            program_classroom_capacity_seat_hours=(
+                scenario_report.classroom.weekly_capacity_unit_hours
+            ),
+            program_classroom_demand_seat_hours=scenario_report.weekly_classroom_demand,
+            program_laboratory_capacity_station_hours=(
+                scenario_report.laboratory.weekly_capacity_unit_hours
+                if scenario_report.laboratory.facility_count else None
+            ),
+            program_laboratory_demand_station_hours=(
+                scenario_report.weekly_laboratory_demand
+                if scenario_report.laboratory.facility_count else None
+            ),
             program_student_count=projected_program_students,
             university_student_count=computation.projected_student_count,
             total_revenue_usd=revenue.projected_value if revenue else None,

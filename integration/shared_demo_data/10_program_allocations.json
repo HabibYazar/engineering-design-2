@@ -1,0 +1,188 @@
+{
+  "_aciklama": "Program duzeyinde kaynak tahsisi sartnamesi. Personel ve mekan tahsisleri buradan deterministik olarak uretilir; boylece 'programda kac ogretim uyesi var' ve 'programin derslik kapasitesi ne' sorulari kurum toplamina basvurmadan cevaplanabilir.",
+  "_neden": "Onceki surumde program-personel ve program-mekan iliskisi yoktu. Asistan program sorularina universite geneli sayilari (180 ogretim uyesi, 1.020 koltuk) donduruyordu.",
+  "random_seed": 20260805,
+  "academic_years": [
+    "2024-2025",
+    "2025-2026"
+  ],
+  "_personel_notu": "Her ogretim uyesi ana bolumundeki programlara tahsis edilir. Toplam tahsis %100'u asmaz. Bir kisi birden fazla programda ders verebilir; bu durumda tahsis bolusturulur.",
+  "staff_allocation": {
+    "primary_share_percent": 70,
+    "secondary_share_percent": 30,
+    "weekly_hours_per_full_allocation": 12,
+    "roles": [
+      "koordinatör",
+      "öğretim üyesi",
+      "öğretim üyesi",
+      "yardımcı öğretim elemanı"
+    ]
+  },
+  "_mekan_notu": "Her programa en az bir derslik tahsis edilir. Laboratuvar yalnizca gerektiren programlara verilir: Isletme ve Uluslararasi Iliskiler gibi programlara muhendislik laboratuvari ATANMAZ. Mimarlik studyo, Hemsirelik saglik laboratuvari kullanir.",
+  "_paylasim_notu": "Bir mekan birden fazla program tarafindan paylasilabilir. shared_usage_percent, kapasitenin o programa dusen payidir; toplam haftalik tahsis mekanin 40 saatlik penceresini asamaz.",
+  "program_facilities": {
+    "CENG-BSC": {
+      "classrooms": [
+        "A101",
+        "A102"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-CE1",
+          "type": "laboratory"
+        },
+        {
+          "code": "LAB-CE2",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "SWE-BSC": {
+      "classrooms": [
+        "A103",
+        "A102"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-SWE1",
+          "type": "laboratory"
+        },
+        {
+          "code": "LAB-CE1",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "SWE-MSC": {
+      "classrooms": [
+        "A104"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-CE2",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "EEE-BSC": {
+      "classrooms": [
+        "A201",
+        "A202"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-EEE1",
+          "type": "laboratory"
+        },
+        {
+          "code": "LAB-EEE2",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "ME-BSC": {
+      "classrooms": [
+        "B101",
+        "B102"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-ME1",
+          "type": "laboratory"
+        },
+        {
+          "code": "LAB-ME2",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "CE-BSC": {
+      "classrooms": [
+        "B201"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-CE3",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "IE-BSC": {
+      "classrooms": [
+        "B202"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-IE1",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "ARCH-BSC": {
+      "classrooms": [
+        "C101",
+        "C102"
+      ],
+      "laboratories": [
+        {
+          "code": "STD-ARCH1",
+          "type": "studio"
+        },
+        {
+          "code": "STD-ARCH2",
+          "type": "studio"
+        }
+      ]
+    },
+    "BA-BSC": {
+      "classrooms": [
+        "D101",
+        "D102"
+      ],
+      "laboratories": []
+    },
+    "BA-MSC": {
+      "classrooms": [
+        "D102"
+      ],
+      "laboratories": []
+    },
+    "ECON-BSC": {
+      "classrooms": [
+        "D201"
+      ],
+      "laboratories": []
+    },
+    "IR-BSC": {
+      "classrooms": [
+        "D202"
+      ],
+      "laboratories": []
+    },
+    "PSY-BSC": {
+      "classrooms": [
+        "E101",
+        "E102"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-PSY1",
+          "type": "laboratory"
+        }
+      ]
+    },
+    "NUR-BSC": {
+      "classrooms": [
+        "F101",
+        "F102"
+      ],
+      "laboratories": [
+        {
+          "code": "LAB-NUR1",
+          "type": "laboratory"
+        }
+      ]
+    }
+  },
+  "_tahsis_hesabi": "weekly_hours ve share_percent SEED tarafindan hesaplanir. Bir mekani kullanan programlar, o mekanin 40 saatlik haftalik penceresini ogrenci sayilariyla oranli paylasir. Elle yazilan saatler mekanin penceresini doldurmadigi icin kapasite kullanim orani gercekci olmayan degerler uretiyordu."
+}

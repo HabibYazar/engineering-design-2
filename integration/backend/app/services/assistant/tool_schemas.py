@@ -117,8 +117,20 @@ class ProgramSummaryOutput(BaseModel):
     dropout_rate: Optional[Decimal] = Field(default=None, description="Yüzde")
     academic_staff_count: Optional[int] = None
     student_staff_ratio: Optional[Decimal] = Field(
-        default=None, description="Öğrenci / öğretim üyesi"
+        default=None, description="Öğrenci / FTE öğretim üyesi"
     )
+    # --- Program düzeyinde kadro tahsisi ---
+    allocated_staff_headcount: Optional[int] = Field(
+        default=None, description="Bu programda ders veren kişi sayısı."
+    )
+    allocated_staff_fte: Optional[Decimal] = Field(
+        default=None,
+        description="Tam zaman eşdeğeri. 12 kişi 8,5 FTE olabilir; ikisi farklıdır.",
+    )
+    weekly_teaching_capacity_hours: Optional[Decimal] = Field(
+        default=None, description="Tahsisli kadronun haftalık ders verme kapasitesi."
+    )
+    target_student_staff_ratio: Optional[Decimal] = None
     notes: List[str] = Field(default_factory=list)
 
 
@@ -155,7 +167,28 @@ class CapacitySummaryInput(ScopeInput):
 
 
 class CapacitySummaryOutput(BaseModel):
+    """Kapasite özeti.
+
+    BİRİMLER ZAMAN BOYUTU TAŞIR. "Kişi" tek başına kapasite birimi değildir:
+    60 kişilik bir derslik haftada 40 saat açıksa kapasitesi 2.400
+    koltuk-saattir.
+    """
+
     scope: ScopeInfo
+    #: Kapsamı etiketlenmiş göstergeler.
+    scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
+    # --- Program düzeyinde tahsis (program verildiyse dolu) ---
+    allocated_classrooms: Optional[int] = None
+    allocated_laboratories: Optional[int] = None
+    weekly_classroom_capacity_seat_hours: Optional[Decimal] = None
+    weekly_classroom_demand_seat_hours: Optional[Decimal] = None
+    weekly_laboratory_capacity_station_hours: Optional[Decimal] = None
+    weekly_laboratory_demand_station_hours: Optional[Decimal] = None
+    classroom_utilization_percent: Optional[Decimal] = None
+    laboratory_utilization_percent: Optional[Decimal] = None
+    peak_concurrent_capacity: Optional[int] = None
+    peak_concurrent_demand: Optional[int] = None
+    # --- Kurum geneli mekân envanteri ---
     classroom_capacity: Optional[int] = None
     laboratory_capacity: Optional[int] = None
     current_usage: Optional[int] = None
@@ -265,6 +298,15 @@ class ScenarioBaselineBlock(BaseModel):
     """Senaryonun dayandığı mevcut durum."""
 
     academic_year: str
+    # --- Program düzeyinde kaynak durumu ---
+    program_staff_headcount: Optional[int] = None
+    program_staff_fte: Optional[Decimal] = None
+    program_required_fte: Optional[Decimal] = None
+    program_classroom_capacity_seat_hours: Optional[Decimal] = None
+    program_classroom_demand_seat_hours: Optional[Decimal] = None
+    program_laboratory_capacity_station_hours: Optional[Decimal] = None
+    program_laboratory_demand_station_hours: Optional[Decimal] = None
+
     program_student_count: Optional[int] = None
     university_student_count: Optional[int] = None
     total_revenue_usd: Optional[Decimal] = None
@@ -279,6 +321,15 @@ class ScenarioBaselineBlock(BaseModel):
 
 class ScenarioProjectionBlock(BaseModel):
     """Senaryo sonrası durum."""
+
+    # --- Program düzeyinde kaynak ihtiyacı ---
+    program_staff_fte: Optional[Decimal] = None
+    program_required_fte: Optional[Decimal] = None
+    program_fte_gap: Optional[Decimal] = None
+    program_classroom_capacity_seat_hours: Optional[Decimal] = None
+    program_classroom_demand_seat_hours: Optional[Decimal] = None
+    program_laboratory_capacity_station_hours: Optional[Decimal] = None
+    program_laboratory_demand_station_hours: Optional[Decimal] = None
 
     program_student_count: Optional[int] = None
     university_student_count: Optional[int] = None

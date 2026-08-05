@@ -141,6 +141,22 @@ def _number(value: Any) -> str:
     return text.replace(".", ",")
 
 
+# Ondalık basamağı anlam taşıyan birimler.
+_DECIMAL_UNITS = {"FTE", "oran", "koltuk-saat", "istasyon-saat"}
+
+
+def _decimal_with_unit(value: Any, unit: str) -> str:
+    """Ondalıklı değeri birimiyle yazar. Tam sayıysa ondalık gösterilmez."""
+    if value is None:
+        return MISSING
+    number = Decimal(str(value))
+    if number == number.to_integral_value():
+        text = f"{number:,.0f}".replace(",", ".")
+    else:
+        text = f"{number:,.2f}".replace(",", "#").replace(".", ",").replace("#", ".")
+    return f"{text} {unit}".strip()
+
+
 def _signed_usd(value: Any) -> str:
     if value is None:
         return MISSING
@@ -290,6 +306,10 @@ def _render_scoped(metric: Any) -> str:
         formatter = _usd
     elif metric.unit == "%":
         formatter = _percent
+    elif metric.unit in _DECIMAL_UNITS:
+        # FTE ve oran gibi birimlerde ondalık ANLAM TAŞIR: 18,50 FTE'yi
+        # "18 FTE" diye yuvarlamak yarım kadroluk farkı yok eder.
+        formatter = lambda v: _decimal_with_unit(v, metric.unit)  # noqa: E731
     else:
         formatter = lambda v: _count(v, metric.unit)  # noqa: E731
 
@@ -310,9 +330,13 @@ def _render_scoped(metric: Any) -> str:
 
     line = f"- {metric.label}: {value}"
     if metric.change is not None and metric.baseline is not None and metric.scenario is not None:
-        delta = _signed_usd(metric.change) if metric.unit == "USD" else _signed_count(
-            metric.change, metric.unit
-        )
+        if metric.unit == "USD":
+            delta = _signed_usd(metric.change)
+        elif metric.unit in _DECIMAL_UNITS:
+            sign = "+" if Decimal(str(metric.change)) > 0 else ""
+            delta = f"{sign}{_decimal_with_unit(metric.change, metric.unit)}"
+        else:
+            delta = _signed_count(metric.change, metric.unit)
         line += f" ({delta})"
     if metric.note:
         line += f"\n  - {metric.note}"

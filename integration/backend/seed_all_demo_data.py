@@ -43,12 +43,15 @@ from app.models import (
     IndustryCollaborationRecord,
     KpiFacultyValue,
     PhysicalFacility,
+    ProgramAcademicStaffAllocation,
     ProgramEnrollmentSnapshot,
+    ProgramFacilityAllocation,
     RegionalContributionRecord,
     StrategicKpi,
     Student,
     SystemUser,
 )
+from app.models.program_allocation import WEEKLY_AVAILABLE_HOURS
 from app.services.auth_service import hash_password
 
 # Ortak veri klasörü backend'in bir üstünde: integration/shared_demo_data/
@@ -689,6 +692,194 @@ def seed_finance(db: Session, counter: Counter) -> None:
 # ----------------------------------------------------------------------------
 
 
+
+def seed_program_allocations(db: Session, counter: Counter) -> None:
+    """Program düzeyinde personel ve mekân tahsislerini üretir.
+
+    NEDEN: program–personel ve program–mekân ilişkisi olmadan asistan
+    "Bilgisayar Mühendisliği'nde kaç öğretim üyesi var?" sorusuna üniversite
+    toplamını (180) döndürmek zorunda kalıyordu.
+
+    KURALLAR:
+      * Bir kişinin bir yıldaki toplam tahsisi %100'ü aşamaz.
+      * Bir mekânın haftalık toplam tahsisi 40 saati aşamaz.
+      * Laboratuvar yalnızca gerektiren programlara verilir.
+      * Idempotent: ikinci çalıştırmada yeni kayıt eklenmez.
+    """
+    spec = load("10_program_allocations.json")
+    staff_spec = spec["staff_allocation"]
+    facility_spec = spec["program_facilities"]
+
+    programs = {p.code: p for p in db.execute(select(AcademicProgram)).scalars()}
+    facilities = {f.code: f for f in db.execute(select(PhysicalFacility)).scalars()}
+
+    created_staff = existing_staff = 0
+    created_facility = existing_facility = 0
+
+    for academic_year in spec["academic_years"]:
+        # --- Personel tahsisi ---
+        existing_pairs = {
+            (row.program_id, row.academic_staff_id)
+            for row in db.execute(
+                select(ProgramAcademicStaffAllocation).where(
+                    ProgramAcademicStaffAllocation.academic_year == academic_year
+                )
+            ).scalars()
+        }
+
+        staff_rows = list(
+            db.execute(
+                select(AcademicStaff).where(
+                    AcademicStaff.academic_year == academic_year
+                )
+            ).scalars()
+        )
+        # Bölüm koduna göre o bölümün programları.
+        programs_by_department: Dict[int, List] = {}
+        for program in programs.values():
+            programs_by_department.setdefault(program.department_id, []).append(program)
+        for rows in programs_by_department.values():
+            rows.sort(key=lambda p: p.code)
+
+        rng = random.Random(spec["random_seed"])
+        roles = staff_spec["roles"]
+        primary_share = Decimal(str(staff_spec["primary_share_percent"]))
+        secondary_share = Decimal(str(staff_spec["secondary_share_percent"]))
+        full_hours = staff_spec["weekly_hours_per_full_allocation"]
+
+        for index, staff in enumerate(staff_rows):
+            department_programs = programs_by_department.get(staff.department_id, [])
+            if not department_programs:
+                continue
+
+            # Ana program: kişinin bölümündeki ilk (lisans) program.
+            # İkinci program varsa mesainin bir kısmı oraya ayrılır; böylece
+            # "bir kişi birden fazla programda ders verir" durumu modellenir.
+            targets = [(department_programs[0], primary_share, True)]
+            if len(department_programs) > 1 and index % 3 == 0:
+                targets.append((department_programs[1], secondary_share, False))
+            else:
+                # Tek programlı bölümde kişi mesaisinin tamamını oraya verir.
+                targets = [(department_programs[0], primary_share + secondary_share, True)]
+
+            for program, share, is_primary in targets:
+                if (program.id, staff.id) in existing_pairs:
+                    existing_staff += 1
+                    continue
+                db.add(
+                    ProgramAcademicStaffAllocation(
+                        academic_year=academic_year,
+                        program_id=program.id,
+                        academic_staff_id=staff.id,
+                        allocation_percent=quantize_money(share),
+                        weekly_course_hours=int(
+                            (Decimal(full_hours) * share / Decimal("100")).to_integral_value()
+                        ),
+                        role=rng.choice(roles) if not is_primary else "koordinatör"
+                        if index % 17 == 0
+                        else "öğretim üyesi",
+                        is_primary=is_primary,
+                    )
+                )
+                existing_pairs.add((program.id, staff.id))
+                created_staff += 1
+
+        # --- Mekân tahsisi ---
+        #
+        # Saatler ve paylaşım payları BURADA hesaplanır. Bir mekânı kullanan
+        # programlar, mekânın 40 saatlik haftalık penceresini öğrenci
+        # sayılarıyla ORANLI paylaşır. Elle yazılan saatler pencereyi
+        # doldurmadığı için kapasite kullanım oranı %500'ün üzerinde,
+        # gerçekçi olmayan değerler üretiyordu.
+        existing_facility_pairs = {
+            (row.program_id, row.facility_id)
+            for row in db.execute(
+                select(ProgramFacilityAllocation).where(
+                    ProgramFacilityAllocation.academic_year == academic_year
+                )
+            ).scalars()
+        }
+
+        # Program başına öğrenci sayısı (paylaşım ağırlığı).
+        student_weight: Dict[str, int] = {}
+        for program_code in facility_spec:
+            program = programs.get(program_code)
+            if program is None:
+                continue
+            snapshot = db.execute(
+                select(ProgramEnrollmentSnapshot).where(
+                    ProgramEnrollmentSnapshot.academic_program_id == program.id,
+                    ProgramEnrollmentSnapshot.academic_year == academic_year,
+                )
+            ).scalars().first()
+            student_weight[program_code] = (
+                snapshot.enrolled_student_count if snapshot else program.quota or 1
+            )
+
+        # Mekân → onu kullanan (program_kodu, tahsis_türü) listesi.
+        facility_users: Dict[str, List[tuple]] = {}
+        for program_code, allocation in facility_spec.items():
+            for code in allocation.get("classrooms", []):
+                facility_users.setdefault(code, []).append((program_code, "classroom"))
+            for row in allocation.get("laboratories", []):
+                facility_users.setdefault(row["code"], []).append(
+                    (program_code, row.get("type", "laboratory"))
+                )
+
+        for facility_code, users in facility_users.items():
+            facility = facilities.get(facility_code)
+            if facility is None:
+                continue
+
+            total_weight = sum(student_weight.get(code, 1) for code, _ in users) or 1
+            remaining_hours = WEEKLY_AVAILABLE_HOURS
+            remaining_share = Decimal("100")
+
+            for index, (program_code, allocation_type) in enumerate(users):
+                program = programs.get(program_code)
+                if program is None:
+                    continue
+
+                is_last = index == len(users) - 1
+                weight = student_weight.get(program_code, 1)
+                if is_last:
+                    # Son program artan payı alır: toplam tam 40 saat ve
+                    # tam %100 olsun, yuvarlama artığı kaybolmasın.
+                    hours = remaining_hours
+                    share = remaining_share
+                else:
+                    hours = max(1, round(WEEKLY_AVAILABLE_HOURS * weight / total_weight))
+                    hours = min(hours, remaining_hours - (len(users) - index - 1))
+                    share = quantize_money(
+                        Decimal(100) * Decimal(weight) / Decimal(total_weight)
+                    )
+                    share = min(share, remaining_share - Decimal("1"))
+                remaining_hours -= hours
+                remaining_share -= share
+
+                if (program.id, facility.id) in existing_facility_pairs:
+                    existing_facility += 1
+                    continue
+
+                db.add(
+                    ProgramFacilityAllocation(
+                        academic_year=academic_year,
+                        program_id=program.id,
+                        facility_id=facility.id,
+                        allocation_type=allocation_type,
+                        weekly_allocated_hours=hours,
+                        shared_usage_percent=quantize_money(share),
+                        priority_level=1 if len(users) == 1 else (2 if index == 0 else 3),
+                    )
+                )
+                existing_facility_pairs.add((program.id, facility.id))
+                created_facility += 1
+
+    db.commit()
+    counter.add("Program personel tahsisi", created_staff, existing_staff)
+    counter.add("Program mekan tahsisi", created_facility, existing_facility)
+
+
 def seed_kpis(db: Session, counter: Counter) -> None:
     """Stratejik KPI'ları ve fakülte kırılımlarını ekler."""
     data = load("06_kpis.json")
@@ -1033,6 +1224,7 @@ def main() -> None:
         seed_enrollment_snapshots(db, counter)
         seed_academic_staff(db, counter)
         seed_facilities(db, counter)
+        seed_program_allocations(db, counter)
         seed_finance(db, counter)
         seed_academic_success(db, counter)
         seed_engagement(db, counter)
