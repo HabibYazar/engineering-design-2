@@ -97,6 +97,16 @@ function check(label, condition, detail = "") {
   // jsdom'da fetch yok; Node'un fetch'ini bagliyoruz.
   w.fetch = (url, opts) => fetch(url.startsWith("http") ? url : BASE + url, opts);
 
+  // Hangi uç noktaların çağrıldığını kaydeder. "İlk yüklemede ayrıntı
+  // endpointleri çağrılmıyor" kriteri ancak böyle doğrulanabilir.
+  const requested = [];
+  const rawFetch = w.fetch;
+  w.fetch = (url, opts) => {
+    requested.push(String(url));
+    return rawFetch(url, opts);
+  };
+  const requestedSince = (mark) => requested.slice(mark);
+
   const jsErrors = [];
   w.console.error = (...a) => jsErrors.push(a.join(" "));
   w.addEventListener("error", (e) => jsErrors.push("window.error: " + e.message));
@@ -348,6 +358,160 @@ function check(label, condition, detail = "") {
       label
     );
   }
+
+  // ---------------- Yonetim Panosu yeniden tasarimi ----------------
+  console.log("\n--- Yonetim Panosu ---");
+
+  const mark = requested.length;
+  await openView("dashboard");
+  await sleep(1200);
+  view = $("#view");
+  let dashText = view.textContent;
+  const firstLoad = requestedSince(mark).join(" ");
+
+  // 1) Ilk acilista bolum/program listesi yok
+  check(
+    "pano: acilista bolum/program listesi yok",
+    !view.querySelector("[data-department]") && !view.querySelector("[data-program]"),
+    dashText.slice(0, 160)
+  );
+
+  // 2) "Bolum bazli gelir ve gider" uzun listesi universite genelinde yok
+  check(
+    "pano: bolum bazli gelir-gider listesi universite genelinde yok",
+    !/Bölüm bazlı gelir ve gider/.test(dashText) && /Gelir ve gider özeti/.test(dashText)
+  );
+
+  // 3-4) Ilk yuklemede bolum/program ayrinti uc noktalari cagrilmiyor
+  check(
+    "pano: ilk yuklemede bolum ayrinti ucu cagrilmiyor",
+    !/finance\/[^ ]*\/departments/.test(firstLoad),
+    firstLoad.slice(0, 300)
+  );
+  check(
+    "pano: ilk yuklemede program ayrinti ucu cagrilmiyor",
+    !/by-program|sustainability\/scores/.test(firstLoad),
+    firstLoad.slice(0, 300)
+  );
+
+  // 5) Yalnizca ilk 5 risk gosteriliyor
+  const riskItems = view.querySelectorAll("#dashRisks .risk-list li");
+  check("pano: en fazla 5 risk gosteriliyor", riskItems.length > 0 && riskItems.length <= 5,
+    "gosterilen: " + riskItems.length);
+  check("pano: riskler kategoriye gore gruplanmis",
+    view.querySelectorAll("#dashRisks .risk-summary tr").length >= 3,
+    "kategori satiri: " + view.querySelectorAll("#dashRisks .risk-summary tr").length);
+
+  // 6) "Tum riskleri incele" baglantisi
+  const allRisksLink = view.querySelector('[data-risk="all"]');
+  check("pano: tum riskleri incele baglantisi Erken Uyari sayfasina gidiyor",
+    !!allRisksLink && allRisksLink.getAttribute("href") === "#/alerts",
+    allRisksLink ? allRisksLink.getAttribute("href") : "baglanti yok");
+
+  // 8) Ingilizce program isimleri gorunmuyor
+  check("pano: ingilizce birim adi gorunmuyor",
+    !/Bachelor's Program|Faculty of |Business Administration/.test(dashText),
+    dashText.slice(0, 200));
+
+  // 9) Grafik legend'lari tekrarlanmiyor
+  const trendLegends = view.querySelectorAll("#dashTrend .legend, #dashTrendChart .legend");
+  check("pano: egilim grafiginde tek legend var", trendLegends.length === 1,
+    "legend sayisi: " + trendLegends.length);
+  const legendLabels = Array.from(view.querySelectorAll(".legend span span"))
+    .map((n) => (n.parentElement.textContent || "").trim());
+  check("pano: ayni legend etiketi iki kez yazilmamis",
+    new Set(legendLabels).size === legendLabels.length,
+    legendLabels.join(" | "));
+
+  // 10) Sol menu acilir gruplardan olusuyor
+  const navGroups = w.document.querySelectorAll("#navGroups .nav-group");
+  check("menu: acilir gruplardan olusuyor", navGroups.length === 6,
+    "grup sayisi: " + navGroups.length);
+  const openGroups = w.document.querySelectorAll("#navGroups .nav-group.open");
+  check("menu: ayni anda tek grup acik", openGroups.length === 1,
+    "acik grup: " + openGroups.length);
+  check("menu: bulunulan grup otomatik acildi",
+    openGroups[0] && openGroups[0].dataset.group === "Ana Sayfa",
+    openGroups[0] ? openGroups[0].dataset.group : "-");
+
+  // 11) Ozet kartlari drill-down
+  const cards = view.querySelectorAll("#dashCards .tile[data-card]");
+  check("pano: 6 ozet karti var", cards.length === 6, "kart: " + cards.length);
+  const cardTargets = Array.from(cards).map((c) => c.getAttribute("href"));
+  check("pano: kartlar ayrinti sayfalarina baglaniyor",
+    cardTargets.includes("#/students") && cardTargets.includes("#/finance") &&
+      cardTargets.includes("#/success") && cardTargets.includes("#/alerts"),
+    cardTargets.join(" "));
+
+  // 13) Breadcrumb universite genelinde tek seviye
+  check("pano: breadcrumb universite genelini gosteriyor",
+    (view.querySelector(".breadcrumb") || {}).textContent.trim() === "Üniversite Geneli",
+    (view.querySelector(".breadcrumb") || {}).textContent);
+  check("pano: universite genelinde donus dugmesi gizli",
+    view.querySelector('[data-scope="reset"]').hidden === true);
+  check("pano: bolum ve program alanlari cizilmemis",
+    !view.querySelector('[data-scope="department"]') &&
+      !view.querySelector('[data-scope="program"]'));
+
+  // --- Fakulteye in ---
+  const facultyMark = requested.length;
+  const facultyRow = view.querySelector("#dashFaculties [data-faculty]");
+  check("pano: fakulte karsilastirmasi cizildi", !!facultyRow);
+  facultyRow.click();
+  await sleep(2200);
+  view = $("#view");
+  dashText = view.textContent;
+
+  check("pano: fakulteye tiklayinca kapsam degisti",
+    /Fakültesi/.test((view.querySelector(".breadcrumb") || {}).textContent || ""),
+    (view.querySelector(".breadcrumb") || {}).textContent);
+  check("pano: fakulte secilince bolum alani cikti",
+    !!view.querySelector('[data-scope="department"]'));
+  check("pano: bolum secilmeden program alani cikmiyor",
+    !view.querySelector('[data-scope="program"]'));
+  check("pano: fakulte kapsaminda bolum karsilastirmasi yuklendi",
+    requestedSince(facultyMark).some((u) => /finance\/[^ ]*\/departments/.test(u)),
+    "istek yok");
+
+  // 7) Gelir ve gider ayni bolum icin TEK satirda
+  // Ana ekranda gorunen satirlar (acilir bolumdekiler haric) en fazla 5 olmali.
+  const unitRows = view.querySelectorAll("#dashUnits > .unit-row");
+  const hiddenUnitRows = view.querySelectorAll("#dashUnits details .unit-row");
+  check("pano: bolum karsilastirmasi en fazla 5 satir gosteriyor",
+    unitRows.length > 0 && unitRows.length <= 5, "satir: " + unitRows.length);
+  check("pano: kalan bolumler acilir bolumde",
+    hiddenUnitRows.length > 0 && !!view.querySelector("#dashUnits details"),
+    "gizli satir: " + hiddenUnitRows.length);
+  const firstUnit = unitRows[0];
+  check("pano: gelir ve gider ayni satirda",
+    /Gelir/.test(firstUnit.textContent) && /Gider/.test(firstUnit.textContent) &&
+      /Net/.test(firstUnit.textContent),
+    firstUnit.textContent.replace(/\s+/g, " ").slice(0, 120));
+  check("pano: bolum adlari kesilmemis (tam ad yaziyor)",
+    !/…|\.\.\./.test(firstUnit.querySelector(".unit-name").textContent),
+    firstUnit.querySelector(".unit-name").textContent);
+
+  // Bolume in -> program alani acilir
+  const scopeDepartment = view.querySelector('[data-scope="department"]');
+  const firstDept = Array.from(scopeDepartment.options).find((o) => o.value);
+  scopeDepartment.value = firstDept.value;
+  scopeDepartment.dispatchEvent(new w.Event("change"));
+  await sleep(2200);
+  view = $("#view");
+  check("pano: bolum secilince program alani cikti",
+    !!view.querySelector('[data-scope="program"]'));
+  check("pano: breadcrumb uc seviyeyi gosteriyor",
+    (view.querySelector(".breadcrumb") || {}).textContent.split("›").length === 3,
+    (view.querySelector(".breadcrumb") || {}).textContent);
+
+  // 12) Universite geneline donus
+  view.querySelector('[data-scope="reset"]').click();
+  await sleep(2200);
+  view = $("#view");
+  check("pano: universite geneline donus calisiyor",
+    (view.querySelector(".breadcrumb") || {}).textContent.trim() === "Üniversite Geneli" &&
+      !view.querySelector('[data-scope="department"]'),
+    (view.querySelector(".breadcrumb") || {}).textContent);
 
   console.log("\n--- JavaScript hatalari ---");
   check("konsolda JS hatasi yok", jsErrors.length === 0, jsErrors.slice(0, 3).join(" | "));

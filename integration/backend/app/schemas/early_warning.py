@@ -10,6 +10,10 @@ class AlertResponse(BaseModel):
 
     rule_key: str
     rule_name: str
+    risk_category: str = Field(
+        default="Diğer riskler",
+        description="Akademik / Mali / Öğrenci talebi / Kapasite / Stratejik risk grubu",
+    )
     pdf_condition: str = Field(description="Alarmın karşıladığı PDF Bölüm 11 maddesi")
     severity: str = Field(description="kritik | yuksek | orta | dusuk")
     scope: str = Field(description="program | university | unit")
@@ -45,6 +49,7 @@ class RuleCatalogResponse(BaseModel):
     key: str
     name: str
     pdf_condition: str
+    risk_category: str = "Diğer riskler"
     scope: str
     implemented: bool = Field(
         description="False ise kural tanımlı ancak veri kaynağı henüz bağlanmadı"

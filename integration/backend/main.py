@@ -27,6 +27,7 @@ from app.routers import (
     physical_resources,
     programs,
     ranking_evaluations,
+    reference,
     scenarios,
     student_analytics,
     students,
@@ -61,6 +62,8 @@ app.include_router(faculties.router)
 app.include_router(departments.router)
 app.include_router(programs.router)
 app.include_router(administrative_units.router)
+# Arayüzün ortak kullandığı Türkçe ad sözlüğü.
+app.include_router(reference.router)
 
 # Modül 13 - Data Integration (CSV / Excel / JSON toplu veri aktarımı)
 app.include_router(data_integration.router)

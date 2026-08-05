@@ -265,14 +265,48 @@ async function load(containerId, fetcher, renderer) {
 
 const ref = {
   _cache: {},
+
+  // Veritabanındaki fakülte/bölüm/program adları İngilizce ve modül kodlarıyla
+  // eşleşiyor; değiştirmek modüller arası eşleşmeyi bozardı. Bu yüzden görünen
+  // Türkçe adlar backend'deki sözlükten okunur ve listeler burada, TEK YERDE
+  // çevrilir. Böylece hiçbir ekran kendi çeviri tablosunu taşımaz.
+  async displayNames() {
+    return (this._cache.displayNames ??= api
+      .get("/api/reference/display-names")
+      .catch(() => ({ faculties: {}, departments: {}, programs: {} })));
+  },
+
+  async _translate(rows, kind) {
+    const names = await this.displayNames();
+    const table = (names && names[kind]) || {};
+    return rows.map((r) => ({ ...r, name: table[r.code] || r.name }));
+  },
+
+  /** Kod verilerek Türkçe ad döndürür; karşılığı yoksa yedek metni kullanır. */
+  async orgName(code, fallback = "") {
+    if (!code) return fallback;
+    const names = await this.displayNames();
+    for (const kind of ["programs", "departments", "faculties"]) {
+      const hit = names && names[kind] && names[kind][code];
+      if (hit) return hit;
+    }
+    return fallback || code;
+  },
+
   async faculties() {
-    return (this._cache.faculties ??= api.get("/api/faculties", { limit: 200 }));
+    return (this._cache.faculties ??= api
+      .get("/api/faculties", { limit: 200 })
+      .then((rows) => this._translate(rows, "faculties")));
   },
   async departments() {
-    return (this._cache.departments ??= api.get("/api/departments", { limit: 200 }));
+    return (this._cache.departments ??= api
+      .get("/api/departments", { limit: 200 })
+      .then((rows) => this._translate(rows, "departments")));
   },
   async programs() {
-    return (this._cache.programs ??= api.get("/api/programs", { limit: 200 }));
+    return (this._cache.programs ??= api
+      .get("/api/programs", { limit: 200 })
+      .then((rows) => this._translate(rows, "programs")));
   },
   async academicYears() {
     return (this._cache.years ??= api.get("/api/education-analytics/academic-years"));

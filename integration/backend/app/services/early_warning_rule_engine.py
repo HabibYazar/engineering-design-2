@@ -27,8 +27,31 @@ from app.services import education_analytics_service as analytics
 from app.services import sustainability_service as sustainability
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "early_warning_rules.json"
+DISPLAY_NAMES_PATH = Path(__file__).resolve().parent.parent / "config" / "display_names.json"
 
 SEVERITY_ORDER = {"kritik": 0, "yuksek": 1, "orta": 2, "dusuk": 3}
+
+
+def _load_display_names() -> Dict[str, str]:
+    """Kod → Türkçe ad sözlüğünü tek bir düzleştirilmiş haritaya indirger.
+
+    Veritabanındaki birim adları İngilizce; alarm metinlerinde kullanıcıya
+    "Business Administration Bachelor's Program" gösterilmemeli. Ad çevirisi
+    burada, alarm üretiminin tek çıkış noktasında yapılır.
+    """
+    try:
+        with DISPLAY_NAMES_PATH.open(encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, ValueError):
+        # Sözlük okunamazsa alarm üretimi durmaz; veritabanındaki ad kullanılır.
+        return {}
+    flat: Dict[str, str] = {}
+    for group in ("faculties", "departments", "programs"):
+        flat.update(raw.get(group, {}))
+    return flat
+
+
+_DISPLAY_NAMES: Dict[str, str] = _load_display_names()
 
 
 def load_rules() -> Dict:
@@ -69,15 +92,26 @@ def _alert(
     observed_value: float,
     threshold_value: Optional[float],
 ) -> Dict:
-    """Standart alarm kaydı üretir."""
+    """Standart alarm kaydı üretir.
+
+    Birim adı burada Türkçeleştirilir; mesaj metninde geçen İngilizce ad da
+    aynı karşılıkla değiştirilir. Çeviri tek noktada yapıldığı için alarmı
+    tüketen her ekran (pano, erken uyarı sayfası) aynı adı görür.
+    """
+    display_name = _DISPLAY_NAMES.get(scope_code, scope_name)
+    if display_name != scope_name and scope_name:
+        message = message.replace(scope_name, display_name)
+
     return {
         "rule_key": rule["key"],
         "rule_name": rule["name"],
+        # Panoda riskler tek tek değil kategori özetiyle gösteriliyor.
+        "risk_category": rule.get("risk_category", "Diğer riskler"),
         "pdf_condition": rule["pdf_condition"],
         "severity": severity,
         "scope": rule["scope"],
         "scope_code": scope_code,
-        "scope_name": scope_name,
+        "scope_name": display_name,
         "academic_year": academic_year,
         "message": message,
         "observed_value": round(observed_value, 2),
@@ -391,6 +425,7 @@ def get_rule_catalog() -> List[Dict]:
             "key": rule["key"],
             "name": rule["name"],
             "pdf_condition": rule["pdf_condition"],
+            "risk_category": rule.get("risk_category", "Diğer riskler"),
             "scope": rule["scope"],
             "implemented": rule.get("implemented", False),
             "data_source": rule["data_source"],

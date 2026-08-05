@@ -26,36 +26,45 @@ function toggleTheme() {
 /* ==================== navigation model ==================== */
 // Menü yapısı. Kullanıcıya iç geliştirme ifadeleri (modül numaraları, tablo
 // veya endpoint adları) GÖSTERİLMEZ; yalnızca işi anlatan başlıklar kullanılır.
+// İkonlar renkli emoji değil, tek renkli sade işaretlerdir: 16 ayrı emoji
+// menüyü bir simge duvarına çeviriyor ve hangi sayfada olduğunu okumayı
+// zorlaştırıyordu. Aynı aileden geometrik işaretler kullanılıyor.
 const NAV = [
-  { group: "Genel Bakış", items: [
-    ["dashboard", "Yönetim Panosu", "📊"],
-    ["assistant", "Akıllı Asistan", "✨"],
+  { group: "Ana Sayfa", items: [
+    ["dashboard", "Yönetim Panosu", "◧"],
+    ["assistant", "Akıllı Asistan", "◍"],
   ]},
-  { group: "Eğitim ve Öğrenci", items: [
-    ["students", "Öğrenci Analitiği", "🎓"],
-    ["success", "Akademik Başarı", "🏅"],
-    ["sustainability", "Program Sürdürülebilirliği", "🌱"],
+  { group: "Akademik Analizler", items: [
+    ["students", "Öğrenci Analitiği", "◔"],
+    ["success", "Akademik Başarı", "◈"],
+    ["staff", "Akademik Personel", "◇"],
+    ["sustainability", "Program Sürdürülebilirliği", "◎"],
   ]},
-  { group: "Kaynaklar", items: [
-    ["staff", "Akademik Personel", "🧑‍🏫"],
-    ["physical", "Fiziksel Kaynaklar", "🏛️"],
-    ["finance", "Finansal Analiz", "💰"],
+  { group: "Kaynak ve Finans", items: [
+    ["physical", "Fiziksel Kaynaklar", "▤"],
+    ["finance", "Finansal Analiz", "▦"],
   ]},
   { group: "Performans", items: [
-    ["kpi", "Performans Göstergeleri", "🎯"],
-    ["engagement", "Sanayi ve Bölgesel Katkı", "🤝"],
-    ["rankings", "Değerlendirme ve Kıyaslama", "🏆"],
+    ["kpi", "Performans Göstergeleri", "◉"],
+    ["engagement", "Sanayi ve Bölgesel Katkı", "◐"],
+    ["rankings", "Değerlendirme ve Kıyaslama", "◆"],
   ]},
   { group: "Planlama", items: [
-    ["scenarios", "Senaryo Analizi", "🧪"],
-    ["alerts", "Erken Uyarı", "⚠️"],
+    ["scenarios", "Senaryo Analizi", "◑"],
+    ["alerts", "Risk ve Erken Uyarı", "◭"],
   ]},
   { group: "Sistem", items: [
-    ["structure", "Üniversite Yapısı", "🏫"],
-    ["data-import", "Veri Aktarımı", "📥"],
-    ["users", "Kullanıcı ve Yetki", "👥"],
+    ["structure", "Üniversite Yapısı", "▥"],
+    ["data-import", "Veri Aktarımı", "▽"],
+    ["users", "Kullanıcı ve Yetki", "◌"],
   ]},
 ];
+
+/** Bir sayfanın hangi menü grubunda olduğunu döndürür. */
+function navGroupOf(routeName) {
+  const found = NAV.find((g) => g.items.some(([name]) => name === routeName));
+  return found ? found.group : NAV[0].group;
+}
 
 /* ==================== session ==================== */
 // Oturum bilgisi api.js icindeki auth nesnesinden okunur. Burada ayri bir
@@ -152,9 +161,20 @@ function ensureShell() {
         <div><b>Ankara Bilim Üniversitesi</b><span>Stratejik Yönetim ve Karar Destek</span></div>
         <button id="themeToggle" class="theme-btn" title="Gece modu">${isDark() ? "☀️" : "🌙"}</button>
       </div>
-      ${NAV.map(g => `<div class="group">${g.group}</div>` +
-        g.items.map(([name, label, ico]) =>
-          `<a href="#/${name}" data-route="${name}"><span class="ico">${ico}</span>${label}</a>`).join("")).join("")}
+      <nav id="navGroups">
+        ${NAV.map(g =>
+          `<div class="nav-group" data-group="${fmt.esc(g.group)}">
+             <button class="nav-group-head" type="button" data-toggle="${fmt.esc(g.group)}"
+                     aria-expanded="false">
+               <span>${fmt.esc(g.group)}</span><span class="caret">▾</span>
+             </button>
+             <div class="nav-group-items">
+               ${g.items.map(([name, label, ico]) =>
+                 `<a href="#/${name}" data-route="${name}"><span class="ico">${ico}</span>${label}</a>`
+               ).join("")}
+             </div>
+           </div>`).join("")}
+      </nav>
       <div class="foot">Gerçek API'ye bağlı · SQLite<br>2025–2026 akademik yılı</div>
     </aside>
     <div id="backdrop"></div>
@@ -185,6 +205,14 @@ function ensureShell() {
     if (e.target.closest("a")) document.body.classList.remove("menu-open");
   });
 
+  // Menü grupları akordeon: aynı anda yalnızca bir grup açık kalır. 16 bağlantı
+  // birden görününce menü kaydırma gerektiriyor ve hiyerarşi kayboluyordu.
+  $("navGroups").addEventListener("click", e => {
+    const head = e.target.closest(".nav-group-head");
+    if (!head) return;
+    openNavGroup(head.dataset.toggle, { toggle: true });
+  });
+
   // Backend gercekten ayakta mi? Ust barda canli durum gosterilir; boylece
   // bos bir ekran gorunce "veri mi yok, sunucu mu kapali" sorusu kalmaz.
   refreshApiStatus();
@@ -205,11 +233,30 @@ async function refreshApiStatus() {
   }
 }
 
+/**
+ * Bir menü grubunu açar. toggle=true ise açık grubu kapatır.
+ * Diğer gruplar her durumda kapanır: aynı anda tek grup açık kalsın.
+ */
+function openNavGroup(groupName, { toggle = false } = {}) {
+  const container = $("navGroups");
+  if (!container) return;
+  container.querySelectorAll(".nav-group").forEach(box => {
+    const isTarget = box.dataset.group === groupName;
+    const wasOpen = box.classList.contains("open");
+    const shouldOpen = isTarget && !(toggle && wasOpen);
+    box.classList.toggle("open", shouldOpen);
+    const head = box.querySelector(".nav-group-head");
+    if (head) head.setAttribute("aria-expanded", String(shouldOpen));
+  });
+}
+
 function renderApp(name, view) {
   ensureShell();
   document.body.classList.remove("menu-open");
   document.querySelectorAll("#sidebar a[data-route]").forEach(a =>
     a.classList.toggle("active", a.dataset.route === name));
+  // Kullanıcının bulunduğu grup otomatik açılır; kaybolmaz.
+  openNavGroup(navGroupOf(name));
   $("pageTitle").innerHTML = view.title;
   $("pageSub").innerHTML = view.subtitle || "";
   const el = $("view");
