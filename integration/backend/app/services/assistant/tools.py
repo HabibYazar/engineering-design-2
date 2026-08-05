@@ -39,6 +39,10 @@ from app.services.assistant.tool_registry import (
     registry,
 )
 from app.services.assistant.tool_schemas import (
+    SCOPE_DEPARTMENT,
+    SCOPE_PROGRAM,
+    SCOPE_UNIVERSITY,
+    ScopedMetric,
     AcademicStaffSummaryInput,
     AcademicStaffSummaryOutput,
     CapacitySummaryInput,
@@ -78,6 +82,8 @@ TARGET_STUDENT_STAFF_RATIO = Decimal("20")
 # Dönüşüm burada tek noktada yapılır; aksi halde model 50,4 milyon doları
 # "50 dolar" diye okur.
 MILLION = Decimal("1000000")
+
+MISSING_STATUS = "Veri bulunamadı"
 
 UNIVERSITY_WIDE_NOTE = (
     "Bu değer üniversite geneli kayıtlardan gelir; program veya bölüm başına "
@@ -677,8 +683,229 @@ def _handle_enrollment_scenario(
     )
     staff_gap = recommended_staff - computation.projected_staff_count
 
+    # ------------------------------------------------------------------
+    # KAPSAM ETİKETLİ GÖSTERGELER
+    #
+    # Aynı blokta program ve üniversite sayılarını etiketsiz yan yana
+    # göstermek yanıltıcıydı: 426 öğrencilik bir programın 1.420 kişilik
+    # derslik talebi ürettiği sanılıyordu. Her gösterge artık kapsamını,
+    # birimini ve formülünü kendisi taşır.
+    # ------------------------------------------------------------------
+    university_name = "Üniversite geneli"
+    program_name = program.display_name
+    department_name = department.display_name if department else None
+
+    # Programın kendi eş zamanlı talebi, kurum geneliyle AYNI katsayıdan
+    # türetilir. Kurum toplamını program talebi gibi göstermek yerine
+    # programın payı ayrıca hesaplanır.
+    program_classroom_demand = int(
+        (Decimal(projected_program_students) * SIMULTANEOUS_CLASSROOM_USE)
+        .to_integral_value()
+    )
+    program_laboratory_demand = int(
+        (Decimal(projected_program_students) * SIMULTANEOUS_LABORATORY_USE)
+        .to_integral_value()
+    )
+    baseline_program_classroom = int(
+        (Decimal(program_students) * SIMULTANEOUS_CLASSROOM_USE).to_integral_value()
+    )
+    baseline_program_laboratory = int(
+        (Decimal(program_students) * SIMULTANEOUS_LABORATORY_USE).to_integral_value()
+    )
+
+    # Program düzeyinde öğretim üyesi dağılımı VERİDE YOK. Bölüm kadrosu
+    # ayrı bir kapsam olarak, kendi etiketiyle verilir.
+    department_staff = _staff_count(db, year, faculty, department)
+    recommended_program_staff = int(
+        (Decimal(projected_program_students) / TARGET_STUDENT_STAFF_RATIO)
+        .to_integral_value(rounding="ROUND_CEILING")
+    )
+
+    scoped: List[ScopedMetric] = [
+        ScopedMetric(
+            key="program_student_count", label="Öğrenci sayısı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="öğrenci",
+            baseline=Decimal(program_students),
+            scenario=Decimal(projected_program_students),
+            change=Decimal(int(added_students)),
+            formula=f"mevcut öğrenci × (1 + %{change_percent} / 100)",
+        ),
+        ScopedMetric(
+            key="program_classroom_demand", label="Eş zamanlı derslik ihtiyacı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name,
+            unit="eş zamanlı kişi",
+            baseline=Decimal(baseline_program_classroom),
+            scenario=Decimal(program_classroom_demand),
+            change=Decimal(program_classroom_demand - baseline_program_classroom),
+            formula=(
+                f"program öğrenci sayısı × {SIMULTANEOUS_CLASSROOM_USE} "
+                "(eş zamanlı derslik kullanım katsayısı)"
+            ),
+            note=(
+                "Derslikler bölüm düzeyinde tahsis edilir; programa ayrılmış "
+                "derslik kapasitesi verisi yoktur. Yalnızca TALEP hesaplanabilir."
+            ),
+        ),
+        ScopedMetric(
+            key="program_laboratory_demand", label="Eş zamanlı laboratuvar ihtiyacı",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name,
+            unit="eş zamanlı kişi",
+            baseline=Decimal(baseline_program_laboratory),
+            scenario=Decimal(program_laboratory_demand),
+            change=Decimal(program_laboratory_demand - baseline_program_laboratory),
+            formula=(
+                f"program öğrenci sayısı × {SIMULTANEOUS_LABORATORY_USE} "
+                "(eş zamanlı laboratuvar kullanım katsayısı)"
+            ),
+            note=(
+                "Laboratuvarlar bölüm düzeyinde tahsis edilir; programa ayrılmış "
+                "laboratuvar kapasitesi verisi yoktur."
+            ),
+        ),
+        ScopedMetric(
+            key="recommended_program_staff", label="Program için önerilen öğretim üyesi",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="kişi",
+            scenario=Decimal(recommended_program_staff),
+            formula=(
+                f"senaryo program öğrenci sayısı / {TARGET_STUDENT_STAFF_RATIO:.0f} "
+                "(hedef öğrenci-öğretim üyesi oranı)"
+            ),
+            note=(
+                "Program bazında akademik personel dağılımı bulunamadı; mevcut "
+                "program kadrosu ile karşılaştırma yapılamıyor."
+            ),
+        ),
+        ScopedMetric(
+            key="program_revenue_effect", label="Bu programdaki artışın ek gelir etkisi",
+            scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="USD",
+            change=revenue.absolute_change if revenue else None,
+            formula=(
+                "senaryo motorunun kurum geneli gelir farkı; artış yalnızca bu "
+                "programdan geldiği için tamamı programa atfedilir"
+            ),
+        ),
+    ]
+
+    if department_name is not None:
+        scoped.append(
+            ScopedMetric(
+                key="department_staff_count", label="Bölüm akademik personeli",
+                scope_type=SCOPE_DEPARTMENT, scope_name=department_name, unit="kişi",
+                baseline=Decimal(department_staff) if department_staff else None,
+                note=(
+                    None if department_staff
+                    else "Bu bölüm için akademik personel kaydı bulunamadı."
+                ),
+            )
+        )
+
+    scoped.extend([
+        ScopedMetric(
+            key="university_total_revenue", label="Üniversite toplam yıllık geliri",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            baseline=revenue.baseline_value if revenue else None,
+            scenario=revenue.projected_value if revenue else None,
+            change=revenue.absolute_change if revenue else None,
+            formula="öğrenim ücreti (burs sonrası) + araştırma + diğer gelirler",
+        ),
+        ScopedMetric(
+            key="university_net_balance", label="Üniversite net bütçesi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            baseline=balance.baseline_value if balance else None,
+            scenario=balance.projected_value if balance else None,
+            change=balance.absolute_change if balance else None,
+            formula="toplam gelir − toplam gider",
+        ),
+        ScopedMetric(
+            key="university_staff_count", label="Üniversite akademik personeli",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=Decimal(computation.baseline_staff_count),
+            scenario=Decimal(computation.projected_staff_count),
+            change=Decimal(
+                computation.projected_staff_count - computation.baseline_staff_count
+            ),
+            formula="mali dönem bordro kadrosu",
+        ),
+        ScopedMetric(
+            key="university_recommended_staff", label="Üniversite için önerilen kadro",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            scenario=Decimal(recommended_staff),
+            change=Decimal(staff_gap),
+            formula=(
+                f"senaryo üniversite öğrenci sayısı / {TARGET_STUDENT_STAFF_RATIO:.0f} "
+                "(hedef öğrenci-öğretim üyesi oranı)"
+            ),
+        ),
+        ScopedMetric(
+            key="university_classroom_capacity", label="Üniversite derslik kapasitesi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=Decimal(class_capacity.baseline_value) if class_capacity else None,
+            scenario=Decimal(projected_class_capacity) if projected_class_capacity else None,
+            formula="aktif dersliklerin toplam koltuk sayısı",
+        ),
+        ScopedMetric(
+            key="university_classroom_demand", label="Üniversite eş zamanlı derslik talebi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
+            unit="eş zamanlı kişi",
+            baseline=Decimal(class_demand.baseline_value) if class_demand else None,
+            scenario=Decimal(projected_class_demand) if projected_class_demand else None,
+            # DEĞİŞİM, açık DEĞİLDİR. İkisi karıştırıldığında 1.400 → 1.420
+            # satırının yanında "+400" görünüyor ve değişim 400 sanılıyor.
+            change=(
+                Decimal(projected_class_demand) - Decimal(class_demand.baseline_value)
+                if class_demand and projected_class_demand is not None
+                else None
+            ),
+            formula=(
+                f"üniversite toplam öğrenci sayısı × {SIMULTANEOUS_CLASSROOM_USE}"
+            ),
+        ),
+        ScopedMetric(
+            key="university_classroom_gap", label="Üniversite derslik kapasite açığı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
+            unit="eş zamanlı kişi",
+            scenario=Decimal(class_gap) if class_gap is not None else None,
+            formula="eş zamanlı derslik talebi − derslik kapasitesi",
+        ),
+        ScopedMetric(
+            key="university_laboratory_capacity", label="Üniversite laboratuvar kapasitesi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=Decimal(lab_capacity.baseline_value) if lab_capacity else None,
+            scenario=Decimal(projected_lab_capacity) if projected_lab_capacity else None,
+            formula="aktif laboratuvarların toplam koltuk sayısı",
+        ),
+        ScopedMetric(
+            key="university_laboratory_demand", label="Üniversite eş zamanlı laboratuvar talebi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
+            unit="eş zamanlı kişi",
+            baseline=Decimal(lab_demand.baseline_value) if lab_demand else None,
+            scenario=Decimal(projected_lab_demand) if projected_lab_demand else None,
+            change=(
+                Decimal(projected_lab_demand) - Decimal(lab_demand.baseline_value)
+                if lab_demand and projected_lab_demand is not None
+                else None
+            ),
+            formula=(
+                f"üniversite toplam öğrenci sayısı × {SIMULTANEOUS_LABORATORY_USE}"
+            ),
+        ),
+        ScopedMetric(
+            key="university_laboratory_gap", label="Üniversite laboratuvar kapasite açığı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name,
+            unit="eş zamanlı kişi",
+            scenario=Decimal(lab_gap) if lab_gap is not None else None,
+            formula="eş zamanlı laboratuvar talebi − laboratuvar kapasitesi",
+        ),
+        ScopedMetric(
+            key="university_capacity_status", label="Kapasite durumu",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="durum",
+            note=capacity_status or MISSING_STATUS,
+        ),
+    ])
+
     return EnrollmentScenarioOutput(
         scope=_scope_info(year, faculty, department, program),
+        scoped_metrics=scoped,
         program_student_change=int(added_students),
         student_change_percentage=change_percent,
         revenue_change_usd=revenue.absolute_change if revenue else None,
@@ -763,8 +990,40 @@ def _handle_salary_scenario(
     balance = _find("balance")
     cost_per_student = _find("cost_per_student")
 
+    university_name = "Üniversite geneli"
+    percent = Decimal(str(payload.salary_change_percentage))
+    salary_scoped = [
+        ScopedMetric(
+            key="annual_staff_cost", label="Yıllık akademik personel gideri",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            baseline=personnel.baseline_value if personnel else None,
+            scenario=personnel.projected_value if personnel else None,
+            change=personnel.absolute_change if personnel else None,
+            formula=f"bordro kadrosu × ortalama maaş × (1 + %{percent} / 100)",
+        ),
+        ScopedMetric(
+            key="total_expenditure_change", label="Toplam gider etkisi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            change=expenditure.absolute_change if expenditure else None,
+            formula="senaryo toplam gideri − taban toplam gideri",
+        ),
+        ScopedMetric(
+            key="net_balance_change", label="Net bütçe etkisi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            change=balance.absolute_change if balance else None,
+            formula="senaryo dengesi − taban dengesi",
+        ),
+        ScopedMetric(
+            key="cost_per_student_change", label="Öğrenci başına maliyet etkisi",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            change=cost_per_student.absolute_change if cost_per_student else None,
+            formula="toplam gider / öğrenci sayısı farkı",
+        ),
+    ]
+
     return SalaryScenarioOutput(
         scope=_scope_info(year, faculty, department, None),
+        scoped_metrics=salary_scoped,
         salary_change_percentage=Decimal(str(payload.salary_change_percentage)),
         previous_annual_staff_cost_usd=personnel.baseline_value if personnel else None,
         new_annual_staff_cost_usd=personnel.projected_value if personnel else None,

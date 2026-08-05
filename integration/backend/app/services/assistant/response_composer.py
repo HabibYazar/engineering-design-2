@@ -60,6 +60,14 @@ REQUIRED_FIELDS: Dict[str, List[str]] = {
 }
 
 
+class ScopeConsistencyError(Exception):
+    """Cevapta kapsamlar karışıyor veya birim/formül açıklanmamış."""
+
+    def __init__(self, problems: List[str]) -> None:
+        super().__init__("; ".join(problems))
+        self.problems = problems
+
+
 class MissingMetricError(Exception):
     """Araç çıktısında zorunlu bir alan yok."""
 
@@ -125,6 +133,14 @@ def _percent(value: Any) -> str:
     return f"%{text}"
 
 
+def _number(value: Any) -> str:
+    """Yüzde gövdesi: 15 -> "15", 2.50 -> "2,5"."""
+    if value is None:
+        return MISSING
+    text = f"{Decimal(str(value)):.2f}".rstrip("0").rstrip(".")
+    return text.replace(".", ",")
+
+
 def _signed_usd(value: Any) -> str:
     if value is None:
         return MISSING
@@ -148,24 +164,46 @@ def _arrow(before: Any, after: Any, formatter) -> str:
     return f"{formatter(before)} → {formatter(after)}"
 
 
+def _plain(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _metric_from_scoped(metric: Any) -> Dict[str, Any]:
+    """structured_result kaydı. Kapsam, birim ve formül HER metrikte bulunur."""
+    return {
+        "key": metric.key,
+        "label": metric.label,
+        "scope_type": metric.scope_type,
+        "scope_name": metric.scope_name,
+        "unit": metric.unit,
+        "baseline": _plain(metric.baseline),
+        "scenario": _plain(metric.scenario),
+        "change": _plain(metric.change),
+        "formula": metric.formula,
+        "note": metric.note,
+    }
+
+
 def _metric(key: str, label: str, baseline: Any, scenario: Any,
-            change: Any, unit: str) -> Dict[str, Any]:
-    """structured_result için tek bir metrik kaydı."""
-
-    def _plain(value: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, Decimal):
-            return float(value)
-        return value
-
+            change: Any, unit: str, scope_type: str = "university",
+            scope_name: str = "Üniversite geneli",
+            formula: Optional[str] = None) -> Dict[str, Any]:
+    """Kapsam etiketli metrik kaydı (kapsam listesi olmayan araçlar için)."""
     return {
         "key": key,
         "label": label,
+        "scope_type": scope_type,
+        "scope_name": scope_name,
+        "unit": unit,
         "baseline": _plain(baseline),
         "scenario": _plain(scenario),
         "change": _plain(change),
-        "unit": unit,
+        "formula": formula,
+        "note": None,
     }
 
 
@@ -180,66 +218,155 @@ def _validate(tool_name: str, payload: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Kapsam uyumluluk kontrolü
+# ---------------------------------------------------------------------------
+
+SCOPE_LABELS = {
+    "program": "Program kapsamındaki sonuçlar",
+    "department": "Bölüm kapsamındaki sonuçlar",
+    "faculty": "Fakülte kapsamındaki sonuçlar",
+    "university": "Üniversite bütçesine ve kaynaklarına etkisi",
+}
+
+SCOPE_ORDER = ["program", "department", "faculty", "university"]
+
+# Bir talep değeri, kapsamın öğrenci sayısından büyükse birim ve formül
+# mutlaka açıklanmalıdır. Aksi halde "426 öğrenci için 1.420 kişi" gibi
+# okunuyor.
+_PLAIN_PERSON_UNITS = {"kişi", "öğrenci"}
+
+
+def check_scope_consistency(metrics: List[Any]) -> None:
+    """Kapsam, birim ve formül tutarlılığını denetler.
+
+    Kontroller:
+      1. Her göstergenin kapsamı ve birimi yazılı mı?
+      2. Bir göstergenin taban ve senaryo değeri aynı kapsama mı ait?
+         (Aynı ScopedMetric içinde olduğu için kapsam zaten tektir; burada
+         kapsamın boş bırakılmadığı doğrulanır.)
+      3. Talep değeri kapsamın öğrenci sayısından büyükse birim düz "kişi"
+         olamaz; eş zamanlı/kişi-oturum gibi bir birim ve formül gerekir.
+
+    Uyumsuzluk varsa ScopeConsistencyError fırlar ve cevap başarı sayılmaz.
+    """
+    problems: List[str] = []
+
+    students_by_scope: Dict[str, Decimal] = {}
+    for metric in metrics:
+        if metric.key.endswith("student_count") and metric.scenario is not None:
+            students_by_scope[metric.scope_type] = Decimal(str(metric.scenario))
+
+    for metric in metrics:
+        if not metric.scope_type or not metric.scope_name:
+            problems.append(f"{metric.key}: kapsam etiketi yok")
+            continue
+        if metric.scope_type not in SCOPE_ORDER:
+            problems.append(f"{metric.key}: bilinmeyen kapsam '{metric.scope_type}'")
+        if not metric.unit:
+            problems.append(f"{metric.key}: birim yazılmamış")
+            continue
+
+        # Talep göstergeleri: öğrenci sayısını aşıyorsa birim açıklanmalı.
+        if "demand" not in metric.key or metric.scenario is None:
+            continue
+        reference = students_by_scope.get(metric.scope_type)
+        if reference is None or Decimal(str(metric.scenario)) <= reference:
+            continue
+        if metric.unit in _PLAIN_PERSON_UNITS or not metric.formula:
+            problems.append(
+                f"{metric.key}: talep ({metric.scenario}) kapsamın öğrenci "
+                f"sayısından ({reference}) büyük ama birim '{metric.unit}' ve "
+                "formül açıklanmamış"
+            )
+
+    if problems:
+        logger.error("Kapsam uyumsuzlugu: %s", problems)
+        raise ScopeConsistencyError(problems)
+
+
+def _render_scoped(metric: Any) -> str:
+    """Tek bir kapsam etiketli göstergeyi satıra çevirir."""
+    if metric.unit == "USD":
+        formatter = _usd
+    elif metric.unit == "%":
+        formatter = _percent
+    else:
+        formatter = lambda v: _count(v, metric.unit)  # noqa: E731
+
+    if metric.baseline is not None and metric.scenario is not None:
+        value = f"{formatter(metric.baseline)} → {formatter(metric.scenario)}"
+    elif metric.scenario is not None:
+        value = formatter(metric.scenario)
+    elif metric.change is not None:
+        value = _signed_usd(metric.change) if metric.unit == "USD" else formatter(metric.change)
+    elif metric.baseline is not None:
+        value = formatter(metric.baseline)
+    else:
+        value = MISSING
+
+    # Değeri olmayan, yalnızca durum bildiren gösterge (ör. "yetersiz").
+    if value == MISSING and metric.note:
+        return f"- {metric.label}: {metric.note}"
+
+    line = f"- {metric.label}: {value}"
+    if metric.change is not None and metric.baseline is not None and metric.scenario is not None:
+        delta = _signed_usd(metric.change) if metric.unit == "USD" else _signed_count(
+            metric.change, metric.unit
+        )
+        line += f" ({delta})"
+    if metric.note:
+        line += f"\n  - {metric.note}"
+    return line
+
+
+def _render_scope_groups(metrics: List[Any]) -> List[str]:
+    """Göstergeleri kapsamlarına göre başlıklandırarak yazar."""
+    lines: List[str] = []
+    for scope_type in SCOPE_ORDER:
+        group = [m for m in metrics if m.scope_type == scope_type]
+        if not group:
+            continue
+        scope_name = group[0].scope_name
+        heading = SCOPE_LABELS[scope_type]
+        lines.append("")
+        lines.append(f"### {heading} — {scope_name}")
+        lines.extend(_render_scoped(metric) for metric in group)
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # Öğrenci sayısı değişimi senaryosu
 # ---------------------------------------------------------------------------
 
 
 def _compose_enrollment(payload: Any) -> ComposedResponse:
-    scope = payload.scope
-    base = payload.baseline
-    scen = payload.scenario
+    """Öğrenci senaryosunu KAPSAMLARA AYIRARAK yazar.
 
-    metrics = [
-        _metric("program_student_count", "Öğrenci sayısı",
-                base.program_student_count, scen.program_student_count,
-                payload.program_student_change, "öğrenci"),
-        _metric("university_student_count", "Üniversite geneli öğrenci",
-                base.university_student_count, scen.university_student_count,
-                None, "öğrenci"),
-        _metric("total_revenue_usd", "Yıllık gelir",
-                base.total_revenue_usd, scen.total_revenue_usd,
-                payload.revenue_change_usd, "USD"),
-        _metric("net_balance_usd", "Net bütçe",
-                base.net_balance_usd, scen.net_balance_usd,
-                payload.net_balance_change_usd, "USD"),
-        _metric("academic_staff_count", "Akademik personel",
-                base.academic_staff_count, scen.academic_staff_count, None, "kişi"),
-        _metric("recommended_staff_count", "Önerilen personel",
-                None, scen.recommended_staff_count, scen.staff_gap, "kişi"),
-        _metric("laboratory_capacity", "Laboratuvar kapasitesi",
-                base.laboratory_capacity, scen.laboratory_capacity, None, "kişi"),
-        _metric("laboratory_demand", "Laboratuvar talebi",
-                base.laboratory_demand, scen.laboratory_demand, scen.laboratory_gap, "kişi"),
-    ]
+    Program göstergeleri ile üniversite göstergeleri ayrı başlıklar altında
+    durur. Kurum geneli bir sayı asla program sayısı gibi sunulmaz.
+    """
+    scope = payload.scope
+    scoped = list(payload.scoped_metrics)
+
+    # Kapsam, birim ve formül tutarlılığı denetlenir; uyumsuzlukta cevap
+    # başarı sayılmaz.
+    check_scope_consistency(scoped)
 
     lines = [
         f"**{scope.academic_year} — {scope.program}**",
         "",
-        "### Hesaplanan sonuçlar",
-        f"- Öğrenci sayısı: {_arrow(base.program_student_count, scen.program_student_count, lambda v: _count(v))}",
-        f"- Değişim: {_signed_count(payload.program_student_change, 'öğrenci')} "
-        f"({_percent(payload.student_change_percentage)})",
-        f"- Yıllık gelir: {_arrow(base.total_revenue_usd, scen.total_revenue_usd, _usd)}",
-        f"- Gelir etkisi: {_signed_usd(payload.revenue_change_usd)}",
-        f"- Net bütçe: {_arrow(base.net_balance_usd, scen.net_balance_usd, _usd)}",
-        f"- Bütçe etkisi: {_signed_usd(payload.net_balance_change_usd)}",
-        f"- Akademik personel: {_count(base.academic_staff_count, 'kişi')}",
-        f"- Önerilen personel: {_count(scen.recommended_staff_count, 'kişi')}",
-        f"- Ek personel ihtiyacı: {_signed_count(scen.staff_gap, 'kişi')}",
-        f"- Laboratuvar kapasitesi: {_count(scen.laboratory_capacity, 'kişi')}",
-        f"- Senaryo laboratuvar talebi: {_count(scen.laboratory_demand, 'kişi')}",
-        f"- Laboratuvar kapasite farkı: {_signed_count(scen.laboratory_gap, 'kişi')}",
-        f"- Derslik kapasitesi: {_count(scen.classroom_capacity, 'kişi')}",
-        f"- Senaryo derslik talebi: {_count(scen.classroom_demand, 'kişi')}",
-        f"- Derslik kapasite farkı: {_signed_count(scen.classroom_gap, 'kişi')}",
-        f"- Kapasite durumu: {scen.capacity_status or MISSING}",
+        f"Senaryo: program öğrenci sayısında %{_number(payload.student_change_percentage)} "
+        f"değişim ({_signed_count(payload.program_student_change, 'öğrenci')}).",
     ]
+    lines.extend(_render_scope_groups(scoped))
 
     risks = list(getattr(payload, "risks", []) or [])
     if risks:
         lines.append("")
-        lines.append("### Tespit edilen riskler")
+        lines.append("### Tespit edilen riskler (üniversite geneli)")
         lines.extend(f"- {risk}" for risk in risks[:5])
+
+    metrics = [_metric_from_scoped(metric) for metric in scoped]
 
     return ComposedResponse(
         facts_markdown="\n".join(lines),
@@ -268,38 +395,23 @@ def _compose_enrollment(payload: Any) -> ComposedResponse:
 
 def _compose_salary(payload: Any) -> ComposedResponse:
     scope = payload.scope
-
-    metrics = [
-        _metric("annual_staff_cost_usd", "Yıllık personel gideri",
-                payload.previous_annual_staff_cost_usd,
-                payload.new_annual_staff_cost_usd,
-                payload.cost_change_usd, "USD"),
-        _metric("total_expenditure_change_usd", "Toplam gider etkisi",
-                None, None, payload.total_expenditure_change_usd, "USD"),
-        _metric("net_balance_change_usd", "Net bütçe etkisi",
-                None, None, payload.net_balance_change_usd, "USD"),
-        _metric("cost_per_student_change_usd", "Öğrenci başına maliyet etkisi",
-                None, None, payload.cost_per_student_change_usd, "USD"),
-    ]
+    scoped = list(payload.scoped_metrics)
+    check_scope_consistency(scoped)
 
     lines = [
         f"**{scope.academic_year} — {scope.label}**",
         "",
-        "### Hesaplanan sonuçlar",
-        f"- Maaş değişimi: {_percent(payload.salary_change_percentage)}",
-        f"- Yıllık personel gideri: "
-        f"{_arrow(payload.previous_annual_staff_cost_usd, payload.new_annual_staff_cost_usd, _usd)}",
-        f"- Gider değişimi: {_signed_usd(payload.cost_change_usd)}",
-        f"- Toplam gider etkisi: {_signed_usd(payload.total_expenditure_change_usd)}",
-        f"- Net bütçe etkisi: {_signed_usd(payload.net_balance_change_usd)}",
-        f"- Öğrenci başına maliyet etkisi: {_signed_usd(payload.cost_per_student_change_usd)}",
+        f"Senaryo: akademik personel maaşlarında %{_number(payload.salary_change_percentage)} değişim.",
     ]
+    lines.extend(_render_scope_groups(scoped))
 
     risks = list(getattr(payload, "risks", []) or [])
     if risks:
         lines.append("")
-        lines.append("### Tespit edilen riskler")
+        lines.append("### Tespit edilen riskler (üniversite geneli)")
         lines.extend(f"- {risk}" for risk in risks[:5])
+
+    metrics = [_metric_from_scoped(metric) for metric in scoped]
 
     return ComposedResponse(
         facts_markdown="\n".join(lines),
@@ -329,13 +441,19 @@ def _compose_salary(payload: Any) -> ComposedResponse:
 def _compose_program_summary(payload: Any) -> ComposedResponse:
     scope = payload.scope
 
+    program_scope = ("program", payload.program_name)
     metrics = [
-        _metric("student_count", "Öğrenci sayısı", None, payload.student_count, None, "öğrenci"),
-        _metric("quota", "Kontenjan", None, payload.quota, None, "öğrenci"),
-        _metric("occupancy_rate", "Doluluk oranı", None, payload.occupancy_rate, None, "%"),
-        _metric("graduation_rate", "Mezuniyet oranı", None, payload.graduation_rate, None, "%"),
+        _metric("student_count", "Öğrenci sayısı", None, payload.student_count, None,
+                "öğrenci", *program_scope),
+        _metric("quota", "Kontenjan", None, payload.quota, None, "öğrenci", *program_scope),
+        _metric("occupancy_rate", "Doluluk oranı", None, payload.occupancy_rate, None,
+                "%", *program_scope, formula="kayıtlı öğrenci / kontenjan × 100"),
+        _metric("graduation_rate", "Mezuniyet oranı", None, payload.graduation_rate, None,
+                "%", *program_scope),
         _metric("student_staff_ratio", "Öğrenci / öğretim üyesi",
-                None, payload.student_staff_ratio, None, "oran"),
+                None, payload.student_staff_ratio, None, "oran", "department",
+                payload.scope.department or "Bölüm",
+                formula="bölüm öğrenci sayısı / bölüm öğretim üyesi sayısı"),
     ]
 
     lines = [
@@ -372,12 +490,21 @@ def _compose_program_summary(payload: Any) -> ComposedResponse:
 def _compose_financial_summary(payload: Any) -> ComposedResponse:
     scope = payload.scope
 
+    scope_pair = (
+        ("department", payload.scope.department)
+        if payload.scope.department
+        else ("university", "Üniversite geneli")
+    )
     metrics = [
-        _metric("total_revenue_usd", "Toplam gelir", None, payload.total_revenue_usd, None, "USD"),
-        _metric("total_expenditure_usd", "Toplam gider", None, payload.total_expenditure_usd, None, "USD"),
-        _metric("net_balance_usd", "Net denge", None, payload.net_balance_usd, None, "USD"),
+        _metric("total_revenue_usd", "Toplam gelir", None, payload.total_revenue_usd,
+                None, "USD", *scope_pair),
+        _metric("total_expenditure_usd", "Toplam gider", None,
+                payload.total_expenditure_usd, None, "USD", *scope_pair),
+        _metric("net_balance_usd", "Net denge", None, payload.net_balance_usd,
+                None, "USD", *scope_pair, formula="toplam gelir − toplam gider"),
         _metric("cost_per_student_usd", "Öğrenci başına maliyet",
-                None, payload.cost_per_student_usd, None, "USD"),
+                None, payload.cost_per_student_usd, None, "USD", *scope_pair,
+                formula="toplam gider / öğrenci sayısı"),
     ]
 
     lines = [

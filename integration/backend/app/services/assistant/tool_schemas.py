@@ -51,6 +51,44 @@ class ScopeInfo(BaseModel):
     label: str
 
 
+# Bir metriğin ait olduğu organizasyon kapsamı.
+SCOPE_UNIVERSITY = "university"
+SCOPE_FACULTY = "faculty"
+SCOPE_DEPARTMENT = "department"
+SCOPE_PROGRAM = "program"
+
+
+class ScopedMetric(BaseModel):
+    """Kapsamı, birimi ve formülü açıkça yazılmış tek bir gösterge.
+
+    NEDEN GEREKLİ
+    -------------
+    Canlı testte tek bir cevap bloğunda program öğrenci sayısı (370 → 426)
+    ile üniversite geneli personel (180) ve derslik talebi (1.420) etiketsiz
+    yan yana gösterildi. Okuyan yönetici 426 öğrencilik bir programın
+    1.420 kişilik derslik talebi ürettiğini sanıyor.
+
+    Her gösterge artık hangi kapsama ait olduğunu, hangi birimde ölçüldüğünü
+    ve nasıl hesaplandığını kendisi taşır. Kapsamı belirsiz bir sayı
+    gösterilmez.
+    """
+
+    key: str
+    label: str
+    scope_type: str = Field(description="university | faculty | department | program")
+    scope_name: str = Field(description="Kapsamın görünen adı.")
+    unit: str = Field(description="öğrenci | kişi | eş zamanlı kişi | USD | %")
+    baseline: Optional[Decimal] = None
+    scenario: Optional[Decimal] = None
+    change: Optional[Decimal] = None
+    formula: Optional[str] = Field(
+        default=None, description="Değerin nasıl hesaplandığı."
+    )
+    note: Optional[str] = Field(
+        default=None, description="Veri yoksa veya kapsam sınırlıysa açıklama."
+    )
+
+
 # ---------------------------------------------------------------------------
 # 1) Program özeti
 # ---------------------------------------------------------------------------
@@ -69,6 +107,8 @@ class ProgramSummaryInput(BaseModel):
 
 class ProgramSummaryOutput(BaseModel):
     scope: ScopeInfo
+    #: Kapsamı etiketlenmiş göstergeler.
+    scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
     program_name: str
     student_count: Optional[int] = None
     quota: Optional[int] = None
@@ -93,6 +133,8 @@ class FinancialSummaryInput(ScopeInput):
 
 class FinancialSummaryOutput(BaseModel):
     scope: ScopeInfo
+    #: Kapsamı etiketlenmiş göstergeler.
+    scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
     total_revenue_usd: Optional[Decimal] = None
     total_expenditure_usd: Optional[Decimal] = None
     net_balance_usd: Optional[Decimal] = None
@@ -275,6 +317,8 @@ class EnrollmentScenarioOutput(BaseModel):
     revenue_change_usd: Optional[Decimal] = None
     #: Bütçe dengesindeki mutlak değişim (USD).
     net_balance_change_usd: Optional[Decimal] = None
+    #: Kapsamı etiketlenmiş göstergeler. Cevap oluşturucu BU listeden yazar.
+    scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
     absolute_change: List[MetricChange] = Field(default_factory=list)
     percentage_change: List[MetricChange] = Field(default_factory=list)
     affected_metrics: List[MetricChange] = Field(default_factory=list)
@@ -307,6 +351,8 @@ class SalaryScenarioOutput(BaseModel):
     """Maaş değişimi senaryosunun sonucu. Zorunlu metrikler alan olarak taşınır."""
 
     scope: ScopeInfo
+    #: Kapsamı etiketlenmiş göstergeler.
+    scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
     salary_change_percentage: Optional[Decimal] = None
     previous_annual_staff_cost_usd: Optional[Decimal] = None
     new_annual_staff_cost_usd: Optional[Decimal] = None

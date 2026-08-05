@@ -1030,13 +1030,21 @@ def test_enrollment_facts_are_composed_by_the_backend(db) -> None:
     )
 
     facts = composed.facts_markdown
-    assert "### Hesaplanan sonuçlar" in facts
-    assert "Öğrenci sayısı: 370 → 426" in facts
+    # Kapsamlar ayrı başlıklar altında.
+    assert "### Program kapsamındaki sonuçlar" in facts
+    assert "### Üniversite bütçesine ve kaynaklarına etkisi" in facts
+    assert "370 öğrenci → 426 öğrenci" in facts
     assert "+56 öğrenci" in facts
     assert "%15" in facts
     # Mali, personel ve kapasite metrikleri de zorunlu.
-    for expected in ("Yıllık gelir", "Önerilen personel", "Laboratuvar kapasitesi",
-                     "Kapasite durumu"):
+    for expected in (
+        "Üniversite toplam yıllık geliri",
+        "Bu programdaki artışın ek gelir etkisi",
+        "Program için önerilen öğretim üyesi",
+        "Üniversite için önerilen kadro",
+        "Üniversite laboratuvar kapasitesi",
+        "Kapasite durumu",
+    ):
         assert expected in facts, f"Zorunlu satır eksik: {expected}"
 
 
@@ -1058,7 +1066,7 @@ def test_student_numbers_survive_when_the_model_skips_them(monkeypatch, db) -> N
 
     assert "370" in result["answer"], "Mevcut öğrenci sayısı cevapta yok."
     assert "426" in result["answer"], "Senaryo öğrenci sayısı cevapta yok."
-    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    assert "370 öğrenci → 426 öğrenci" in result["answer"]
     # Modelin yorumu da korunmalı.
     assert "Gelir artışı" in result["answer"]
 
@@ -1075,7 +1083,7 @@ def test_model_cannot_overwrite_the_composed_facts(monkeypatch, db) -> None:
     )
 
     # Zorunlu bölüm doğru sayıları taşır…
-    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    assert "370 öğrenci → 426 öğrenci" in result["answer"]
     # …ve makine okunur sonuç modelin uydurduğu sayıdan etkilenmez.
     metrics = {m["key"]: m for m in result["structured_result"]["metrics"]}
     assert metrics["program_student_count"]["baseline"] == 370
@@ -1099,14 +1107,13 @@ def test_structured_result_contains_baseline_and_scenario(db, monkeypatch) -> No
     student_metric = next(
         m for m in structured["metrics"] if m["key"] == "program_student_count"
     )
-    assert student_metric == {
-        "key": "program_student_count",
-        "label": "Öğrenci sayısı",
-        "baseline": 370,
-        "scenario": 426,
-        "change": 56,
-        "unit": "öğrenci",
-    }
+    assert student_metric["baseline"] == 370
+    assert student_metric["scenario"] == 426
+    assert student_metric["change"] == 56
+    assert student_metric["unit"] == "öğrenci"
+    # Kapsam etiketi zorunlu.
+    assert student_metric["scope_type"] == "program"
+    assert student_metric["scope_name"] == "Bilgisayar Mühendisliği Lisans Programı"
 
 
 def test_money_values_keep_the_usd_unit(db) -> None:
@@ -1127,6 +1134,9 @@ def test_money_values_keep_the_usd_unit(db) -> None:
             assert abs(metric["baseline"]) > 1000, (
                 f"{metric['key']} milyon cinsinden görünüyor: {metric['baseline']}"
             )
+    # Gelir üniversite kapsamında etiketlenmiş olmalı.
+    revenue = next(m for m in composed.metrics if m["key"] == "university_total_revenue")
+    assert revenue["scope_type"] == "university"
 
 
 def test_facts_are_returned_even_with_an_empty_model_interpretation(
@@ -1139,7 +1149,7 @@ def test_facts_are_returned_even_with_an_empty_model_interpretation(
         "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
     )
 
-    assert "Öğrenci sayısı: 370 → 426" in result["answer"]
+    assert "370 öğrenci → 426 öğrenci" in result["answer"]
     assert result["data_source"] == "institutional_data"
 
 
@@ -1186,9 +1196,9 @@ def test_salary_scenario_required_metrics_appear_in_the_answer(monkeypatch, db) 
 
     answer = result["answer"]
     for expected in (
-        "Maaş değişimi: %2",
-        "Yıllık personel gideri: 6.120.000 USD → 6.242.400 USD",
-        "Gider değişimi: +122.400 USD",
+        "%2 değişim",
+        "Yıllık akademik personel gideri: 6.120.000 USD → 6.242.400 USD",
+        "Toplam gider etkisi: +122.400 USD",
         "Net bütçe etkisi: -122.400 USD",
     ):
         assert expected in answer, f"Zorunlu satır eksik: {expected}"
@@ -1211,10 +1221,14 @@ def test_composer_only_formats_and_never_calculates(db) -> None:
     assert metrics["program_student_count"]["baseline"] == output.baseline.program_student_count
     assert metrics["program_student_count"]["scenario"] == output.scenario.program_student_count
     assert metrics["program_student_count"]["change"] == output.program_student_change
-    assert metrics["total_revenue_usd"]["baseline"] == float(output.baseline.total_revenue_usd)
-    assert metrics["total_revenue_usd"]["change"] == float(output.revenue_change_usd)
-    assert metrics["recommended_staff_count"]["scenario"] == output.scenario.recommended_staff_count
-    assert metrics["laboratory_demand"]["change"] == output.scenario.laboratory_gap
+    assert metrics["university_total_revenue"]["baseline"] == float(
+        output.baseline.total_revenue_usd
+    )
+    assert metrics["university_total_revenue"]["change"] == float(output.revenue_change_usd)
+    assert metrics["university_recommended_staff"]["scenario"] == (
+        output.scenario.recommended_staff_count
+    )
+    assert metrics["university_laboratory_gap"]["scenario"] == output.scenario.laboratory_gap
 
 
 def test_same_number_is_never_shown_in_two_units(db) -> None:
@@ -1232,8 +1246,10 @@ def test_same_number_is_never_shown_in_two_units(db) -> None:
     assert "milyon USD" not in facts
     # Aynı tutar iki farklı ölçekte yazılmamalı.
     assert facts.count("35.960.000") == 1
-    # Öğrenci sayısı yalnızca bir kez, adet olarak geçmeli.
-    assert facts.count("370 →") == 1
+    # Öğrenci sayısı yalnızca bir kez, birimiyle birlikte geçmeli.
+    assert facts.count("370 öğrenci →") == 1
+    # Aynı sayı "kişi" birimiyle ikinci kez yazılmamalı.
+    assert "370 kişi" not in facts
 
 
 def test_missing_tool_field_is_written_as_veri_bulunamadi(db) -> None:
@@ -1241,9 +1257,179 @@ def test_missing_tool_field_is_written_as_veri_bulunamadi(db) -> None:
     from app.services.assistant import response_composer
 
     output = _enrollment_output(db)
-    output.scenario.laboratory_capacity = None
-    output.scenario.laboratory_gap = None
+    for metric in output.scoped_metrics:
+        if metric.key == "university_laboratory_capacity":
+            metric.baseline = None
+            metric.scenario = None
 
     composed = response_composer.compose("run_enrollment_change_scenario", output)
-    assert "Laboratuvar kapasitesi: Veri bulunamadı" in composed.facts_markdown
-    assert "Laboratuvar kapasite farkı: Veri bulunamadı" in composed.facts_markdown
+    assert "Üniversite laboratuvar kapasitesi: Veri bulunamadı" in composed.facts_markdown
+
+
+# ===========================================================================
+# KAPSAM (SCOPE) TUTARLILIĞI
+#
+# Canlı cevapta program öğrenci sayısı (370 → 426) ile üniversite geneli
+# personel (180) ve derslik talebi (1.420) etiketsiz yan yana gösterildi.
+# Okuyan yönetici 426 öğrencilik bir programın 1.420 kişilik derslik talebi
+# ürettiğini sanıyordu.
+# ===========================================================================
+
+
+def _scoped(db, key: str):
+    """Kayıt senaryosundan tek bir kapsam etiketli gösterge."""
+    output = _enrollment_output(db)
+    return next(m for m in output.scoped_metrics if m.key == key)
+
+
+def test_university_staff_is_not_labelled_as_program_staff(db) -> None:
+    """180 üniversite personeli program metriği olarak GÖSTERİLMEZ."""
+    from app.services.assistant import response_composer
+
+    output = _enrollment_output(db)
+    program_metrics = [m for m in output.scoped_metrics if m.scope_type == "program"]
+
+    # Program kapsamında 180 değeri hiç bulunmamalı.
+    for metric in program_metrics:
+        for value in (metric.baseline, metric.scenario):
+            assert value != 180, (
+                f"Üniversite personel sayısı program metriği olarak görünüyor: {metric.key}"
+            )
+
+    # Üniversite personeli açıkça üniversite kapsamında etiketlenmiş olmalı.
+    university_staff = next(
+        m for m in output.scoped_metrics if m.key == "university_staff_count"
+    )
+    assert university_staff.scope_type == "university"
+    assert university_staff.baseline == 180
+
+    # Program kadrosu verisi yoksa bu açıkça söylenmeli.
+    recommended = next(
+        m for m in output.scoped_metrics if m.key == "recommended_program_staff"
+    )
+    assert recommended.scope_type == "program"
+    assert "bulunamadı" in (recommended.note or "").lower()
+
+    facts = response_composer.compose(
+        "run_enrollment_change_scenario", output
+    ).facts_markdown
+    program_section = facts.split("### Bölüm kapsamındaki")[0]
+    assert "180" not in program_section, (
+        "Program bölümünde üniversite personel sayısı görünüyor."
+    )
+
+
+def test_every_metric_is_labelled_with_scope_and_unit(db, monkeypatch) -> None:
+    """Her structured_result metriğinde scope_type, scope_name ve unit bulunur."""
+    script_ollama(monkeypatch, ["### Yönetim değerlendirmesi\n- Değerlendirme."])
+
+    result = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )
+
+    metrics = result["structured_result"]["metrics"]
+    assert metrics
+    for metric in metrics:
+        for field_name in ("scope_type", "scope_name", "unit"):
+            assert metric.get(field_name), f"{metric['key']}: {field_name} eksik"
+        assert metric["scope_type"] in (
+            "university", "faculty", "department", "program"
+        ), metric
+
+
+def test_demand_above_student_count_must_declare_unit_and_formula(db) -> None:
+    """426 öğrenciye karşı 1.420 'kişi' talebi kabul edilmez."""
+    from app.services.assistant import response_composer
+    from app.services.assistant.tool_schemas import ScopedMetric
+
+    bad = [
+        ScopedMetric(
+            key="program_student_count", label="Öğrenci sayısı",
+            scope_type="program", scope_name="X Programı", unit="öğrenci",
+            baseline=Decimal("370"), scenario=Decimal("426"),
+        ),
+        ScopedMetric(
+            key="program_classroom_demand", label="Derslik talebi",
+            scope_type="program", scope_name="X Programı",
+            # Birim düz "kişi" ve formül yok: 426 öğrenci için 1.420 kişi.
+            unit="kişi", scenario=Decimal("1420"),
+        ),
+    ]
+
+    with pytest.raises(response_composer.ScopeConsistencyError) as exc:
+        response_composer.check_scope_consistency(bad)
+    assert any("program_classroom_demand" in p for p in exc.value.problems)
+
+
+def test_simultaneous_demand_unit_is_explicit(db) -> None:
+    """Eş zamanlı talep birimi düz 'kişi' olamaz; formülü de yazılmalı."""
+    metric = _scoped(db, "university_classroom_demand")
+
+    assert metric.unit == "eş zamanlı kişi"
+    assert metric.formula, "Eş zamanlı talebin formülü yazılmamış."
+    assert "0.35" in metric.formula or "0,35" in metric.formula
+
+    program_metric = _scoped(db, "program_classroom_demand")
+    assert program_metric.scope_type == "program"
+    assert program_metric.unit == "eş zamanlı kişi"
+    # Program talebi program öğrenci sayısından türetilmeli, kurum toplamından değil.
+    assert program_metric.scenario == 149, (
+        f"426 × 0,35 = 149 bekleniyordu, gelen: {program_metric.scenario}"
+    )
+
+
+def test_program_revenue_effect_is_separated_from_university_total(db) -> None:
+    """Program gelir etkisi ile üniversite toplam geliri ayrı gösterilir."""
+    from app.services.assistant import response_composer
+
+    output = _enrollment_output(db)
+    program_effect = next(
+        m for m in output.scoped_metrics if m.key == "program_revenue_effect"
+    )
+    university_total = next(
+        m for m in output.scoped_metrics if m.key == "university_total_revenue"
+    )
+
+    assert program_effect.scope_type == "program"
+    assert program_effect.change == Decimal("329840.00")
+    # Program etkisinde kurum toplamı TABAN olarak GÖSTERİLMEZ.
+    assert program_effect.baseline is None
+
+    assert university_total.scope_type == "university"
+    assert university_total.baseline == Decimal("35960000.00")
+
+    facts = response_composer.compose(
+        "run_enrollment_change_scenario", output
+    ).facts_markdown
+    assert "Üniversite toplam yıllık geliri: 35.960.000 USD → 36.289.840 USD" in facts
+    assert "Bu programdaki artışın ek gelir etkisi: +329.840 USD" in facts
+
+
+def test_answer_is_grouped_by_scope(db, monkeypatch) -> None:
+    """Cevap program ve üniversite başlıkları altında ayrılmış olmalı."""
+    script_ollama(monkeypatch, ["### Yönetim değerlendirmesi\n- Değerlendirme."])
+
+    answer = chat_service.answer(
+        "Bilgisayar Mühendisliği öğrenci sayısı %15 artarsa ne olur?", db=db
+    )["answer"]
+
+    assert "### Program kapsamındaki sonuçlar" in answer
+    assert "### Üniversite bütçesine ve kaynaklarına etkisi" in answer
+    # Program bölümü üniversite bölümünden ÖNCE gelmeli.
+    assert answer.index("Program kapsamındaki") < answer.index("Üniversite bütçesine")
+    # Zorunlu öğrenci metriği hâlâ yerinde.
+    assert "370 öğrenci → 426 öğrenci" in answer
+
+
+def test_capacity_gap_is_not_reported_as_a_change(db) -> None:
+    """Kapasite açığı, talepteki değişim olarak gösterilmemeli.
+
+    1.400 → 1.420 satırının yanında "+400" yazıyordu; okuyan kişi talebin
+    400 arttığını sanıyordu. Açık ayrı bir gösterge.
+    """
+    demand = _scoped(db, "university_classroom_demand")
+    gap = _scoped(db, "university_classroom_gap")
+
+    assert demand.change == Decimal("20"), "Talep değişimi 1.420 − 1.400 = 20 olmalı."
+    assert gap.scenario == Decimal("400"), "Açık 1.420 − 1.020 = 400 olmalı."
+    assert gap.formula and "kapasite" in gap.formula
