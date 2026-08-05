@@ -41,6 +41,34 @@ class StrategicKpiCreate(BaseModel):
     corrective_action: Optional[str] = Field(
         default=None, examples=["Mevcut öğretim destek programları sürdürülecek."]
     )
+
+    # Göstergenin künyesi. Bu alanlar olmadan ekrandaki sayı ("52.2") neyi
+    # ölçtüğü belirsiz bir rakamdan ibaret kalıyordu.
+    description: Optional[str] = Field(
+        default=None,
+        description="Göstergenin ne ölçtüğünün sade dille açıklaması",
+        examples=["Öğrencilerin ders değerlendirme anketlerinde verdiği ortalama puan."],
+    )
+    formula: Optional[str] = Field(
+        default=None,
+        description="Değerin nasıl hesaplandığı",
+        examples=["Tüm derslerin anket puan ortalaması (5 üzerinden)"],
+    )
+    data_source: Optional[str] = Field(
+        default=None,
+        description="Verinin hangi sistemden/modülden geldiği",
+        examples=["Öğrenci Bilgi Sistemi — dönem sonu anketleri"],
+    )
+    higher_is_better: bool = Field(
+        default=True,
+        description=(
+            "Değerin yükselmesi kurum için iyi mi? Öğrenci başına maliyet gibi "
+            "göstergelerde düşmek iyidir; bu bayrak olmadan arayüz her artışı "
+            "olumlu gösterirdi."
+        ),
+        examples=[True],
+    )
+
     faculty_values: List[KpiFacultyValueInput] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -68,6 +96,10 @@ class StrategicKpiUpdate(BaseModel):
     on_track_threshold: Optional[Decimal] = Field(default=None, gt=0, le=200)
     at_risk_threshold: Optional[Decimal] = Field(default=None, gt=0, le=200)
     corrective_action: Optional[str] = None
+    description: Optional[str] = None
+    formula: Optional[str] = None
+    data_source: Optional[str] = None
+    higher_is_better: Optional[bool] = None
 
 
 class KpiMeasurement(BaseModel):
@@ -112,6 +144,28 @@ class StrategicKpiResponse(BaseModel):
         examples=[Decimal("0.20")],
     )
     corrective_action: Optional[str] = None
+
+    # Göstergenin künyesi
+    description: Optional[str] = Field(default=None, examples=["Ne ölçtüğü"])
+    formula: Optional[str] = Field(default=None, examples=["Nasıl hesaplandığı"])
+    data_source: Optional[str] = Field(default=None, examples=["Verinin kaynağı"])
+    higher_is_better: bool = Field(
+        default=True, description="Yükselmesi iyi mi?", examples=[True]
+    )
+    value_source: str = Field(
+        default="manual",
+        description=(
+            "manual = değer elle girildi; derived = sistem verisinden formülle "
+            "hesaplandı ve elle değiştirilemez."
+        ),
+        examples=["derived"],
+    )
+    direction_label: str = Field(
+        default="",
+        description="Değişimin sade dille yorumu (ör. 'geçen yıla göre iyileşti')",
+        examples=["geçen yıla göre iyileşti"],
+    )
+
     faculty_values: List[KpiFacultyValueItem] = Field(default_factory=list)
     is_active: bool
 

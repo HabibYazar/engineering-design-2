@@ -25,6 +25,8 @@ from app.models import (
 )
 from app.schemas.student_analytics import StudentDataSyncResponse
 from app.schemas.scenarios import (
+    MetricComparisonResponse,
+    ScenarioComparisonReport,
     FinancialBreakdown,
     RiskItem,
     RiskLevel,
@@ -43,7 +45,12 @@ from app.schemas.scenarios import (
     SimulationResponse,
 )
 from app.services.crud_helpers import apply_updates, get_object_or_404
+from app.services.scenario_baseline_builder import (
+    available_periods,
+    build_from_financial_period,
+)
 from app.services.scenario_engine import (
+    build_comparison,
     ScenarioComputation,
     ScenarioValidationError,
     calculate,
@@ -122,6 +129,29 @@ def _run_simulation(
     risks, risk_level = evaluate(computation)
     recommendation: str = build_recommendation(computation, risks, risk_level)
     return computation, risks, risk_level, recommendation
+
+
+def _build_comparison_report(computation: ScenarioComputation) -> ScenarioComparisonReport:
+    """Hesaplama sonucunu API'nin karşılaştırma bloğuna dönüştürür.
+
+    Fark ve yüzde hesabı servis katmanında yapılır; burada yalnızca şemaya
+    çevriliyor. Arayüz kendi farkını hesaplamaz.
+    """
+    report = build_comparison(computation)
+    to_schema = lambda m: MetricComparisonResponse(
+        key=m.key, label=m.label, unit=m.unit,
+        baseline_value=m.baseline_value, projected_value=m.projected_value,
+        absolute_change=m.absolute_change, percent_change=m.percent_change,
+        direction=m.direction, is_favorable=m.is_favorable,
+        group=m.group, description=m.description,
+    )
+    return ScenarioComparisonReport(
+        currency="USD",
+        financial=[to_schema(m) for m in report.financial],
+        academic=[to_schema(m) for m in report.academic],
+        capacity=[to_schema(m) for m in report.capacity],
+        most_significant=[to_schema(m) for m in report.most_significant(5)],
+    )
 
 
 def _build_metrics(computation: ScenarioComputation) -> SimulationMetrics:
@@ -333,18 +363,34 @@ def deactivate_baseline(baseline_id: int, db: Session = Depends(get_db)) -> Scen
 )
 def preview_simulation(
     payload: ScenarioInputCreate,
+    financial_period: Optional[str] = Query(
+        default=None,
+        description=(
+            "Senaryo tabanının alınacağı mali dönem (örn. 2024-2025). Verilirse o dönemin "
+            "GERÇEK gelir/gider verisinden taban üretilir. Boş bırakılırsa kayıtlı aktif "
+            "baseline kullanılır. Seçilebilecek dönemler: GET /api/scenarios/financial-periods"
+        ),
+        examples=["2025-2026"],
+    ),
     use_live_student_data: bool = Query(
         default=False,
         description=(
-            "true ise başlangıç öğrenci sayısı Modül 2'deki aktif öğrenci sayısından alınır. "
-            "Varsayılan false: baseline.student_count kullanılır."
+            "true ise başlangıç öğrenci sayısı canlı öğrenci verisinden alınır. "
+            "Varsayılan false: seçilen tabanın öğrenci sayısı kullanılır."
         ),
     ),
     db: Session = Depends(get_db),
 ) -> SimulationResponse:
-    """Aktif baseline ile hesaplama yapar ama veritabanına hiçbir kayıt yazmaz."""
+    """Hesaplama yapar ama veritabanına hiçbir kayıt yazmaz.
+
+    Mali dönem seçilirse taban o dönemin gerçek verisinden üretilir; böylece
+    senaryo ekranındaki rakamlar mali analiz ekranıyla birebir aynı olur.
+    """
     # Yönetici farklı değerleri hızlıca deneyip veritabanını kalabalıklaştırmasın diye eklendi.
-    baseline: ScenarioBaseline = _get_active_baseline(db)
+    if financial_period:
+        baseline: ScenarioBaseline = build_from_financial_period(db, financial_period)
+    else:
+        baseline = _get_active_baseline(db)
     override, source, live_count = _resolve_student_source(db, use_live_student_data)
     computation, risks, risk_level, recommendation = _run_simulation(
         baseline, payload, student_count_override=override
@@ -354,12 +400,14 @@ def preview_simulation(
         scenario_id=None,
         scenario_name=None,
         scenario_type=None,
-        baseline_id=baseline.id,
+        # Mali dönemden türetilen taban veritabanına yazılmadığı için id'si yoktur.
+        baseline_id=baseline.id or 0,
         baseline_name=baseline.name,
         preview=True,
         inputs=payload,
         result=_build_metrics(computation),
         breakdown=_build_breakdown(computation),
+        comparison=_build_comparison_report(computation),
         risks=risks,
         risk_level=risk_level,
         recommendation=recommendation,
@@ -368,6 +416,219 @@ def preview_simulation(
         student_data_source=source,
         live_active_student_count=live_count,
     )
+
+
+# ===========================================================================
+# SENARYO KATALOĞU VE MALİ DÖNEM SEÇİMİ
+# ===========================================================================
+
+
+@router.get(
+    "/catalog",
+    summary="Desteklenen senaryo türleri ve parametreleri",
+)
+def get_scenario_catalog() -> List[dict]:
+    """Arayüzün senaryo formunu oluşturmak için kullandığı katalog.
+
+    Alan adları ve sınırlar arayüzde elle yazılırsa, backend şeması
+    değiştiğinde sessizce uyumsuz hale gelir. Nitekim önceki sürümde tam
+    olarak bu olmuş, arayüz "staff_count_change" gönderirken backend
+    "academic_staff_change" beklemiş ve hiçbir parametre uygulanmamıştı.
+    Katalog sunucudan geldiği için bu uyumsuzluk artık mümkün değil.
+    """
+    return [
+        {
+            "key": "academic-staffing",
+            "label": "Akademik personel maaşlarına zam",
+            "question": "Akademik personel maaşlarına %2 zam yapılırsa ne olur?",
+            "description": (
+                "Personel sayısı sabit kalır, ortalama maaş değişir. Toplam personel "
+                "gideri, bütçe dengesi ve öğrenci başına maliyet yeniden hesaplanır."
+            ),
+            "fields": [
+                {"name": "academic_salary_change_percent", "label": "Akademik maaş değişimi",
+                 "unit": "%", "default": 2, "min": -100, "max": 1000, "step": 0.5},
+            ],
+        },
+        {
+            "key": "academic-staffing-headcount",
+            "label": "Akademik personel sayısı değişikliği",
+            "question": "10 yeni öğretim üyesi alınırsa bütçe nasıl etkilenir?",
+            "description": (
+                "Kadro sayısı değişir, ortalama maaş sabit kalır. Öğrenci/öğretim üyesi "
+                "oranı ve personel gideri yeniden hesaplanır."
+            ),
+            "fields": [
+                {"name": "academic_staff_change", "label": "Akademik personel değişimi",
+                 "unit": "kişi", "default": 10, "min": -5000, "max": 5000, "step": 1},
+                {"name": "administrative_staff_change", "label": "İdari personel değişimi",
+                 "unit": "kişi", "default": 0, "min": -5000, "max": 5000, "step": 1},
+            ],
+        },
+        {
+            "key": "student-enrollment",
+            "label": "Öğrenci sayısı değişikliği",
+            "question": "Öğrenci sayısı %10 artarsa gelir ve kapasite nasıl etkilenir?",
+            "description": (
+                "Öğrenci sayısı doğrudan değişir. Öğrenim ücreti geliri, eğitim gideri, "
+                "öğrenci başına maliyet ve kapasite talebi yeniden hesaplanır."
+            ),
+            "fields": [
+                {"name": "student_change_percent", "label": "Öğrenci sayısı değişimi",
+                 "unit": "%", "default": 10, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "quota-change",
+            "label": "Kontenjan değişikliği",
+            "question": "Kontenjanlar %15 artırılırsa ne olur?",
+            "description": (
+                "Kontenjan artışının tamamı öğrenciye dönüşmez; mevcut doluluk esnekliği "
+                "(0,85) kadarı yerleşir. Boş kontenjan gelir üretmez."
+            ),
+            "fields": [
+                {"name": "quota_change_percent", "label": "Kontenjan değişimi",
+                 "unit": "%", "default": 15, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "tuition-scholarship",
+            "label": "Öğrenim ücreti değişikliği",
+            "question": "Öğrenim ücreti %10 artarsa gelir ne kadar artar?",
+            "description": (
+                "Brüt öğrenim ücreti geliri değişir; burs indirimi yeni brüt tutar "
+                "üzerinden hesaplanır."
+            ),
+            "fields": [
+                {"name": "tuition_change_percent", "label": "Öğrenim ücreti değişimi",
+                 "unit": "%", "default": 10, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "scholarship-policy",
+            "label": "Burs oranı değişikliği",
+            "question": "Burs oranı 5 puan artırılırsa gelire etkisi ne olur?",
+            "description": (
+                "Mevcut burs oranına YÜZDE PUANI eklenir (%38 + 5 puan = %43). "
+                "Sonuç %0-%100 aralığı dışına çıkarsa istek reddedilir."
+            ),
+            "fields": [
+                {"name": "scholarship_change_percent", "label": "Burs oranı değişimi",
+                 "unit": "puan", "default": 5, "min": -100, "max": 100, "step": 0.5},
+            ],
+        },
+        {
+            "key": "investment",
+            "label": "Derslik / laboratuvar kapasitesi değişikliği",
+            "question": "300 kişilik ek derslik kapasitesi yeterli olur mu?",
+            "description": (
+                "Kapasite yeterliliği eş zamanlı kullanım katsayısıyla değerlendirilir: "
+                "öğrencilerin %35'i aynı anda derslikte, %18'i laboratuvarda kabul edilir."
+            ),
+            "fields": [
+                {"name": "classroom_capacity_change", "label": "Derslik kapasitesi değişimi",
+                 "unit": "kişi", "default": 300, "min": -100000, "max": 100000, "step": 10},
+                {"name": "laboratory_capacity_change", "label": "Laboratuvar kapasitesi değişimi",
+                 "unit": "kişi", "default": 50, "min": -100000, "max": 100000, "step": 10},
+            ],
+        },
+        {
+            "key": "revenue-item",
+            "label": "Gelir kaleminde değişiklik",
+            "question": "Sanayi iş birliği geliri %20 artarsa bütçe dengesi ne olur?",
+            "description": "Seçilen tek bir gelir kaleminde yüzdesel değişiklik uygulanır.",
+            "fields": [
+                {"name": "target_revenue_category", "label": "Gelir kalemi",
+                 "unit": "", "type": "revenue_category", "default": ""},
+                {"name": "revenue_item_change_percent", "label": "Değişim",
+                 "unit": "%", "default": 20, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "expense-item",
+            "label": "Gider kaleminde değişiklik",
+            "question": "Enerji giderini %15 düşürürsek ne kazanırız?",
+            "description": "Seçilen tek bir gider kaleminde yüzdesel değişiklik uygulanır.",
+            "fields": [
+                {"name": "target_expense_category", "label": "Gider kalemi",
+                 "unit": "", "type": "expense_category", "default": ""},
+                {"name": "expense_item_change_percent", "label": "Değişim",
+                 "unit": "%", "default": -15, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "economic-risk",
+            "label": "Ekonomik risk (enflasyon ve kur)",
+            "question": "Enflasyon %30, kur %20 artarsa giderler nereye gider?",
+            "description": (
+                "Enflasyon eğitim, Ar-Ge, bina-enerji ve teknoloji giderlerini; kur ise "
+                "ağırlıklı olarak ithal teknoloji giderini etkiler."
+            ),
+            "fields": [
+                {"name": "inflation_percent", "label": "Enflasyon",
+                 "unit": "%", "default": 30, "min": -100, "max": 1000, "step": 1},
+                {"name": "exchange_rate_change_percent", "label": "Kur değişimi",
+                 "unit": "%", "default": 20, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+        {
+            "key": "research-strategy",
+            "label": "Araştırma fonu değişikliği",
+            "question": "Araştırma fonları %25 artarsa Ar-Ge gideri ne olur?",
+            "description": "Araştırma geliri ve buna bağlı Ar-Ge gideri birlikte değişir.",
+            "fields": [
+                {"name": "research_funding_change_percent", "label": "Araştırma fonu değişimi",
+                 "unit": "%", "default": 25, "min": -100, "max": 1000, "step": 1},
+            ],
+        },
+    ]
+
+
+@router.get(
+    "/financial-periods",
+    summary="Senaryo tabanı olarak seçilebilecek mali dönemler",
+)
+def get_scenario_financial_periods(db: Session = Depends(get_db)) -> dict:
+    """Gerçekleşen verisi olan mali dönemleri listeler.
+
+    Kalemi olmayan veya öğrenci sayısı sıfır olan planlama yılları listelenmez;
+    seçilseler sıfır tabanlı anlamsız bir senaryo üretirlerdi.
+    """
+    periods = available_periods(db)
+    return {
+        "periods": periods,
+        "default": periods[-1] if periods else None,
+        "note": (
+            "Bir dönem seçildiğinde senaryo tabanı o dönemin gerçekleşen gelir/gider "
+            "verisinden üretilir; böylece senaryo sonuçları mali analiz ekranıyla birebir uyumludur."
+        ),
+    }
+
+
+@router.get(
+    "/financial-categories",
+    summary="Senaryoda hedeflenebilecek gelir ve gider kalemleri",
+)
+def get_scenario_financial_categories(
+    academic_year: Optional[str] = Query(default=None, examples=["2025-2026"]),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Kalem bazlı senaryolarda seçilebilecek kalem adlarını döndürür."""
+    from app.models import FinancialEntry, FinancialPeriod
+
+    query = select(FinancialEntry.kind, FinancialEntry.category).distinct()
+    if academic_year:
+        query = query.join(
+            FinancialPeriod, FinancialPeriod.id == FinancialEntry.financial_period_id
+        ).where(FinancialPeriod.academic_year == academic_year)
+
+    revenue, expenditure = [], []
+    for kind, category in db.execute(query):
+        (revenue if kind == "revenue" else expenditure).append(category)
+    return {
+        "revenue_categories": sorted(set(revenue)),
+        "expenditure_categories": sorted(set(expenditure)),
+    }
 
 
 # ===========================================================================
@@ -531,6 +792,7 @@ def simulate_scenario(
         inputs=payload,
         result=_build_metrics(computation),
         breakdown=_build_breakdown(computation),
+        comparison=_build_comparison_report(computation),
         risks=risks,
         risk_level=risk_level,
         recommendation=recommendation,

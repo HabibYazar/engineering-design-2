@@ -1,121 +1,309 @@
 {
   "_aciklama": "Modül 8 — İzlenen stratejik performans göstergeleri. Kaynak: Halil'in halilhan/kpi/backend/seed_kpis.json dosyası; 10 stratejik boyut ve 14 KPI korundu, adlar Türkçeleştirildi ve fakülte kırılımı kurumsal fakülte kodlarına bağlandı.",
   "_esik_notu": "on_track_threshold ve at_risk_threshold KPI başına tanımlıdır. Bazı KPI'larda varsayılandan farklı eşik kullanıldı; proje tanımı eşiklerin yönetim tarafından yapılandırılabilir olmasını istiyor ve bunun demoda görünmesi gerekiyor.",
-  "_faculty_order": ["FEA", "FEAS", "FAS", "FHS"],
-
+  "_faculty_order": [
+    "FEA",
+    "FEAS",
+    "FAS",
+    "FHS"
+  ],
   "academic_year": "2025-2026",
-
   "kpis": [
     {
       "name": "Ders değerlendirme anketi puanı (/5)",
       "dimension": "Eğitim ve Öğretim Kalitesi",
       "unit": "puan",
-      "current_value": 4.10, "target_value": 4.30, "previous_value": 4.00, "university_average": 3.90,
-      "faculty_values": { "FEA": 4.20, "FEAS": 4.00, "FAS": 3.80, "FHS": 4.10 },
-      "corrective_action": "Mevcut öğretim destek programları sürdürülecek; puanı 4.00 altındaki bölümlerde ders tasarımı atölyesi açılacak."
+      "current_value": 4.1,
+      "target_value": 4.3,
+      "previous_value": 4.0,
+      "university_average": 3.9,
+      "faculty_values": {
+        "FEA": 4.2,
+        "FEAS": 4.0,
+        "FAS": 3.8,
+        "FHS": 4.1
+      },
+      "corrective_action": "Mevcut öğretim destek programları sürdürülecek; puanı 4.00 altındaki bölümlerde ders tasarımı atölyesi açılacak.",
+      "description": "Öğrencilerin dönem sonunda dersleri ve öğretim üyelerini değerlendirdiği anket ortalaması.",
+      "formula": "Tüm derslerin anket puanlarının ders bazında ortalaması (5 üzerinden)",
+      "data_source": "Öğrenci Bilgi Sistemi — dönem sonu anketleri",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Akredite program oranı",
       "dimension": "Kalite Güvencesi ve Akreditasyon",
       "unit": "%",
-      "current_value": 57.0, "target_value": 80.0, "previous_value": 50.0, "university_average": 57.0,
-      "faculty_values": { "FEA": 71.0, "FEAS": 50.0, "FAS": 33.0, "FHS": 50.0 },
-      "corrective_action": "2026 başvuru takvimi için Fen-Edebiyat ve Sağlık Bilimleri programlarında özdeğerlendirme raporu hazırlanacak."
+      "current_value": 57.0,
+      "target_value": 80.0,
+      "previous_value": 50.0,
+      "university_average": 57.0,
+      "faculty_values": {
+        "FEA": 71.0,
+        "FEAS": 50.0,
+        "FAS": 33.0,
+        "FHS": 50.0
+      },
+      "corrective_action": "2026 başvuru takvimi için Fen-Edebiyat ve Sağlık Bilimleri programlarında özdeğerlendirme raporu hazırlanacak.",
+      "description": "Ulusal veya uluslararası akreditasyona sahip programların toplam programa oranı.",
+      "formula": "Akredite program sayısı / toplam program sayısı × 100",
+      "data_source": "Kalite Güvence Ofisi akreditasyon kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Öğretim üyesi başına yayın sayısı",
       "dimension": "Araştırma ve Geliştirme",
       "unit": "adet",
-      "current_value": 1.42, "target_value": 2.00, "previous_value": 1.28, "university_average": 1.42,
-      "faculty_values": { "FEA": 1.74, "FEAS": 1.18, "FAS": 1.36, "FHS": 0.94 },
+      "current_value": 1.42,
+      "target_value": 2.0,
+      "previous_value": 1.28,
+      "university_average": 1.42,
+      "faculty_values": {
+        "FEA": 1.74,
+        "FEAS": 1.18,
+        "FAS": 1.36,
+        "FHS": 0.94
+      },
       "at_risk_threshold": 65,
-      "corrective_action": "Yayın teşvik bütçesi artırılacak; düşük performanslı bölümlerde ortak proje eşleştirmesi yapılacak."
+      "corrective_action": "Yayın teşvik bütçesi artırılacak; düşük performanslı bölümlerde ortak proje eşleştirmesi yapılacak.",
+      "description": "Akademik personelin yıllık ortalama hakemli yayın üretimi.",
+      "formula": "Toplam yayın sayısı / aktif akademik personel sayısı",
+      "data_source": "Akademik Personel modülü — yayın kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
-      "name": "Dış kaynaklı araştırma geliri (milyon TL)",
+      "name": "Dış kaynaklı araştırma geliri (milyon USD)",
       "dimension": "Araştırma ve Geliştirme",
-      "unit": "milyon TL",
-      "current_value": 86.0, "target_value": 110.0, "previous_value": 71.0, "university_average": 86.0,
-      "faculty_values": { "FEA": 54.0, "FEAS": 14.0, "FAS": 11.0, "FHS": 7.0 },
-      "corrective_action": "TÜBİTAK ve AB çağrılarına başvuru hedefi bölüm bazında tanımlanacak."
+      "unit": "milyon USD",
+      "current_value": 5.6,
+      "target_value": 7.5,
+      "previous_value": 5.21,
+      "university_average": 5.6,
+      "faculty_values": {
+        "FEA": 3.42,
+        "FEAS": 1.12,
+        "FAS": 0.68,
+        "FHS": 0.38
+      },
+      "corrective_action": "TÜBİTAK ve AB çağrılarına başvuru hedefi bölüm bazında tanımlanacak.",
+      "higher_is_better": true,
+      "value_source": "manual",
+      "description": "TÜBİTAK, AB ve sanayi kaynaklı proje gelirlerinin yıllık toplamı.",
+      "formula": "Araştırma proje gelirleri kaleminin dönem toplamı",
+      "data_source": "Finansal Analiz modülü — gelir kalemleri"
     },
     {
       "name": "Mezun istihdam oranı",
       "dimension": "Öğrenci ve Mezun Başarısı",
       "unit": "%",
-      "current_value": 74.0, "target_value": 85.0, "previous_value": 71.0, "university_average": 74.0,
-      "faculty_values": { "FEA": 82.0, "FEAS": 70.0, "FAS": 61.0, "FHS": 88.0 },
-      "corrective_action": "Kariyer Merkezi ile sektör buluşmaları artırılacak; staj zorunluluğu olmayan programlar gözden geçirilecek."
+      "current_value": 74.0,
+      "target_value": 85.0,
+      "previous_value": 71.0,
+      "university_average": 74.0,
+      "faculty_values": {
+        "FEA": 82.0,
+        "FEAS": 70.0,
+        "FAS": 61.0,
+        "FHS": 88.0
+      },
+      "corrective_action": "Kariyer Merkezi ile sektör buluşmaları artırılacak; staj zorunluluğu olmayan programlar gözden geçirilecek.",
+      "description": "Mezuniyetinden sonraki 12 ay içinde istihdam edilen mezunların oranı.",
+      "formula": "İstihdam edilen mezun sayısı / istihdam bilgisi bilinen mezun sayısı × 100. Bilgisi olmayan mezunlar paydaya dahil edilmez.",
+      "data_source": "Kariyer Merkezi mezun takip anketleri",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Normal sürede mezuniyet oranı",
       "dimension": "Öğrenci ve Mezun Başarısı",
       "unit": "%",
-      "current_value": 63.0, "target_value": 78.0, "previous_value": 65.0, "university_average": 63.0,
-      "faculty_values": { "FEA": 58.0, "FEAS": 68.0, "FAS": 66.0, "FHS": 71.0 },
-      "corrective_action": "Başarısızlık oranı yüksek zorunlu derslerde ek destek dersi açılacak."
+      "current_value": 63.0,
+      "target_value": 78.0,
+      "previous_value": 65.0,
+      "university_average": 63.0,
+      "faculty_values": {
+        "FEA": 58.0,
+        "FEAS": 68.0,
+        "FAS": 66.0,
+        "FHS": 71.0
+      },
+      "corrective_action": "Başarısızlık oranı yüksek zorunlu derslerde ek destek dersi açılacak.",
+      "description": "Program süresi içinde mezun olan öğrencilerin oranı.",
+      "formula": "Normal sürede mezun olan / toplam mezun × 100",
+      "data_source": "Öğrenci Analitiği modülü — mezuniyet kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
-      "name": "Öğrenci başına eğitim gideri (bin TL)",
+      "name": "Öğrenci başına eğitim gideri (bin USD)",
       "dimension": "Finansal Sürdürülebilirlik",
-      "unit": "bin TL",
-      "current_value": 233.0, "target_value": 220.0, "previous_value": 212.0, "university_average": 233.0,
+      "unit": "bin USD",
+      "current_value": 11.88,
+      "target_value": 11.0,
+      "previous_value": 11.41,
+      "university_average": 11.88,
       "on_track_threshold": 95,
-      "corrective_action": "Enerji ve bakım giderlerinde tasarruf planı uygulanacak."
+      "corrective_action": "Enerji ve bakım giderlerinde tasarruf planı uygulanacak.",
+      "higher_is_better": false,
+      "value_source": "manual",
+      "description": "Bir öğrenci için yapılan yıllık toplam harcama. Düşmesi verimlilik açısından olumludur.",
+      "formula": "Toplam gider / toplam öğrenci sayısı",
+      "data_source": "Finansal Analiz modülü — dönem giderleri"
     },
     {
-      "name": "Gelir-gider dengesi (milyon TL)",
+      "name": "Gelir-gider dengesi (milyon USD)",
       "dimension": "Finansal Sürdürülebilirlik",
-      "unit": "milyon TL",
-      "current_value": 2.0, "target_value": 40.0, "previous_value": 22.0, "university_average": 2.0,
-      "corrective_action": "Burs yükü ve yatırım harcamalarının bütçe içindeki payı yeniden değerlendirilecek."
+      "unit": "milyon USD",
+      "current_value": 2.9,
+      "target_value": 4.0,
+      "previous_value": 1.91,
+      "university_average": 2.9,
+      "corrective_action": "Burs yükü ve yatırım harcamalarının bütçe içindeki payı yeniden değerlendirilecek.",
+      "higher_is_better": true,
+      "value_source": "manual",
+      "description": "Yıllık toplam gelir ile toplam gider arasındaki fark. Negatif değer bütçe açığıdır.",
+      "formula": "Toplam gelir − toplam gider",
+      "data_source": "Finansal Analiz modülü — dönem özeti"
     },
     {
       "name": "Doktora derecesine sahip öğretim elemanı oranı",
       "dimension": "İnsan Kaynakları",
       "unit": "%",
-      "current_value": 68.0, "target_value": 75.0, "previous_value": 64.0, "university_average": 68.0,
-      "faculty_values": { "FEA": 72.0, "FEAS": 66.0, "FAS": 70.0, "FHS": 58.0 },
-      "corrective_action": "Doktorasını tamamlayan öğretim görevlileri için kadro planlaması yapılacak."
+      "current_value": 68.0,
+      "target_value": 75.0,
+      "previous_value": 64.0,
+      "university_average": 68.0,
+      "faculty_values": {
+        "FEA": 72.0,
+        "FEAS": 66.0,
+        "FAS": 70.0,
+        "FHS": 58.0
+      },
+      "corrective_action": "Doktorasını tamamlayan öğretim görevlileri için kadro planlaması yapılacak.",
+      "description": "Akademik kadronun doktoralı olan bölümü.",
+      "formula": "Doktoralı personel sayısı / toplam akademik personel × 100",
+      "data_source": "İnsan Kaynakları — personel künye kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Öğrenci / öğretim üyesi oranı",
       "dimension": "İnsan Kaynakları",
       "unit": "oran",
-      "current_value": 22.2, "target_value": 18.0, "previous_value": 23.4, "university_average": 22.2,
+      "current_value": 22.2,
+      "target_value": 18.0,
+      "previous_value": 23.4,
+      "university_average": 22.2,
       "on_track_threshold": 95,
-      "corrective_action": "Öğrenci sayısı en hızlı artan bölümlerde öncelikli kadro tahsisi yapılacak."
+      "corrective_action": "Öğrenci sayısı en hızlı artan bölümlerde öncelikli kadro tahsisi yapılacak.",
+      "description": "Bir öğretim üyesine düşen öğrenci sayısı. Düşük olması eğitim kalitesi açısından olumludur.",
+      "formula": "Toplam öğrenci sayısı / aktif akademik personel sayısı",
+      "data_source": "Öğrenci Analitiği ve Akademik Personel modülleri",
+      "higher_is_better": false,
+      "value_source": "manual"
     },
     {
       "name": "Uluslararası öğrenci oranı",
       "dimension": "Uluslararasılaşma",
       "unit": "%",
-      "current_value": 11.0, "target_value": 18.0, "previous_value": 9.0, "university_average": 11.0,
-      "faculty_values": { "FEA": 14.0, "FEAS": 10.0, "FAS": 7.0, "FHS": 6.0 },
-      "corrective_action": "Hedef ülkelerde tanıtım faaliyeti ve İngilizce program sayısı artırılacak."
+      "current_value": 11.0,
+      "target_value": 18.0,
+      "previous_value": 9.0,
+      "university_average": 11.0,
+      "faculty_values": {
+        "FEA": 14.0,
+        "FEAS": 10.0,
+        "FAS": 7.0,
+        "FHS": 6.0
+      },
+      "corrective_action": "Hedef ülkelerde tanıtım faaliyeti ve İngilizce program sayısı artırılacak.",
+      "description": "Yabancı uyruklu öğrencilerin toplam öğrenciye oranı.",
+      "formula": "Uluslararası öğrenci sayısı / toplam öğrenci × 100",
+      "data_source": "Öğrenci Analitiği modülü",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Aktif Erasmus anlaşması sayısı",
       "dimension": "Uluslararasılaşma",
       "unit": "adet",
-      "current_value": 46.0, "target_value": 60.0, "previous_value": 41.0, "university_average": 46.0,
-      "corrective_action": "Anlaşması olmayan bölümler için hedef kurum listesi çıkarılacak."
+      "current_value": 46.0,
+      "target_value": 60.0,
+      "previous_value": 41.0,
+      "university_average": 46.0,
+      "corrective_action": "Anlaşması olmayan bölümler için hedef kurum listesi çıkarılacak.",
+      "description": "Yürürlükteki ikili değişim anlaşmalarının sayısı.",
+      "formula": "Geçerlilik tarihi dolmamış anlaşmaların sayımı",
+      "data_source": "Uluslararası İlişkiler Ofisi anlaşma kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Sanayi iş birliği projesi sayısı",
       "dimension": "Üniversite-Sanayi İş Birliği",
       "unit": "adet",
-      "current_value": 28.0, "target_value": 45.0, "previous_value": 24.0, "university_average": 28.0,
-      "faculty_values": { "FEA": 19.0, "FEAS": 6.0, "FAS": 2.0, "FHS": 1.0 },
+      "current_value": 28.0,
+      "target_value": 45.0,
+      "previous_value": 24.0,
+      "university_average": 28.0,
+      "faculty_values": {
+        "FEA": 19.0,
+        "FEAS": 6.0,
+        "FAS": 2.0,
+        "FHS": 1.0
+      },
       "at_risk_threshold": 65,
-      "corrective_action": "Teknokent iş birliği protokolü genişletilecek; öğretim üyesi başına proje hedefi tanımlanacak."
+      "corrective_action": "Teknokent iş birliği protokolü genişletilecek; öğretim üyesi başına proje hedefi tanımlanacak.",
+      "description": "Sanayi ortaklı yürütülen aktif proje sayısı.",
+      "formula": "Fakültelerin ortak proje sayılarının toplamı",
+      "data_source": "Sanayi İş Birliği modülü — fakülte kayıtları",
+      "higher_is_better": true,
+      "value_source": "manual"
     },
     {
       "name": "Derslik ve laboratuvar doluluk oranı",
       "dimension": "Fiziksel ve Teknolojik Altyapı",
       "unit": "%",
-      "current_value": 78.0, "target_value": 85.0, "previous_value": 74.0, "university_average": 78.0,
-      "corrective_action": "Atıl kapasiteli mekânlar için ders programı optimizasyonu yapılacak."
+      "current_value": 78.0,
+      "target_value": 85.0,
+      "previous_value": 74.0,
+      "university_average": 78.0,
+      "corrective_action": "Atıl kapasiteli mekânlar için ders programı optimizasyonu yapılacak.",
+      "description": "Fiziksel mekânların ortalama kullanım oranı.",
+      "formula": "Toplam dolu kapasite / toplam kapasite × 100",
+      "data_source": "Fiziksel Kaynaklar modülü — mekân envanteri",
+      "higher_is_better": true,
+      "value_source": "manual"
+    },
+    {
+      "name": "Üniversite-sanayi iş birliği endeksi",
+      "dimension": "Üniversite-Sanayi İş Birliği",
+      "unit": "endeks",
+      "current_value": 0,
+      "target_value": 75.0,
+      "previous_value": 0,
+      "description": "Sanayi iş birliğinin beş ölçülebilir bileşeninden üretilen ağırlıklı endeks. Tek bir soyut puan değil; her bileşenin katkısı ayrı görülebilir.",
+      "formula": "Σ (bileşen / stratejik hedef × 100 × ağırlık). Bileşenler: aktif iş birliği (0,20), ortak proje (0,25), sanayi destekli araştırma bütçesi (0,30), staj yapan öğrenci (0,15), imzalanan protokol (0,10).",
+      "data_source": "Sanayi İş Birliği modülü — fakülte bazlı yıllık kayıtlar",
+      "higher_is_better": true,
+      "value_source": "derived",
+      "corrective_action": "Ortak proje sayısı ve sanayi destekli araştırma bütçesi hedefin en gerisinde; Teknokent protokolleri genişletilecek."
+    },
+    {
+      "name": "Bölgesel katkı endeksi",
+      "dimension": "Bölgesel Katkı",
+      "unit": "endeks",
+      "current_value": 0,
+      "target_value": 70.0,
+      "previous_value": 0,
+      "description": "Üniversitenin İç Anadolu bölgesine katkısını ölçen altı bileşenli ağırlıklı endeks. Önceden ne ölçtüğü belirsiz tek bir sayıydı.",
+      "formula": "Σ (bileşen / stratejik hedef × 100 × ağırlık). Bileşenler: bölgede istihdam edilen mezun (0,35), yerel kamu projesi (0,20), toplum hizmeti saati (0,15), bölgesel KOBİ iş birliği (0,15), belediye iş birliği (0,10), halka açık etkinlik (0,05).",
+      "data_source": "Bölgesel Katkı modülü — yıllık kurum kayıtları",
+      "higher_is_better": true,
+      "value_source": "derived",
+      "corrective_action": "Bölgede istihdam edilen mezun sayısı hedefin altında; Kariyer Merkezi bölgesel işveren ağını genişletecek."
     }
   ]
 }

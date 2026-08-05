@@ -8,7 +8,7 @@
 
 VIEWS["students"] = {
   title: "Öğrenci Analitiği",
-  subtitle: "Kayıt, doluluk, mezuniyet ve talep göstergeleri · Modül 2 ve Modül 3",
+  subtitle: "Kayıt, doluluk, mezuniyet ve talep göstergeleri",
   html: () => `
     <div class="card">
       <div class="filters">
@@ -23,12 +23,12 @@ VIEWS["students"] = {
     <div class="grid cols-2">
       <div class="card">
         <h3>Program bazlı doluluk oranı</h3>
-        <div class="note">Kontenjanın ne kadarının dolduğu (Modül 2).</div>
+        <div class="note">Kontenjanın yüzde kaçının dolduğu.</div>
         <div id="stOccupancy"></div>
       </div>
       <div class="card">
-        <h3>Burs ve uluslararasılaşma <span class="tag">Modül 3</span></h3>
-        <div class="note">Begüm'ün analitik servisinden gelen oranlar.</div>
+        <h3>Burs ve uluslararasılaşma</h3>
+        <div class="note">Burs, uluslararası öğrenci ve mezuniyet oranları.</div>
         <div id="stM3"></div>
       </div>
     </div>
@@ -40,7 +40,7 @@ VIEWS["students"] = {
     </div>
 
     <div class="card">
-      <h3>Erken uyarı sinyalleri <span class="tag">Modül 2</span></h3>
+      <h3>Erken uyarı sinyalleri</h3>
       <div class="note">Öğrenci verisinden türeyen otomatik uyarılar.</div>
       <div id="stAlerts"></div>
     </div>`,
@@ -189,7 +189,7 @@ function refreshStudents() {
 
 VIEWS["staff"] = {
   title: "Akademik Personel",
-  subtitle: "Yayın, atıf, ders yükü ve ağırlıklı performans puanı · Modül 4",
+  subtitle: "Yayın, atıf, ders yükü ve ağırlıklı performans puanı",
   html: () => `
     <div class="card">
       <div class="filters">
@@ -345,7 +345,7 @@ function refreshStaff() {
 
 VIEWS["physical"] = {
   title: "Fiziksel Kaynaklar",
-  subtitle: "Derslik, laboratuvar ve ofis kapasitesi · Modül 5",
+  subtitle: "Derslik, laboratuvar ve ofis kapasitesi",
   html: () => `
     <div id="phTiles"></div>
 
@@ -539,7 +539,7 @@ const TYPE_LABELS = {
 
 VIEWS["finance"] = {
   title: "Finansal Analiz",
-  subtitle: "Gelir, gider, bütçe gerçekleşmesi ve oran göstergeleri · Modül 6",
+  subtitle: "Gelir, gider, bütçe gerçekleşmesi ve oran göstergeleri · tüm tutarlar USD",
   html: () => `
     <div class="card">
       <div class="filters">
@@ -553,12 +553,12 @@ VIEWS["finance"] = {
     <div class="grid cols-2">
       <div class="card">
         <h3>Gelir kalemleri</h3>
-        <div class="note">Milyon TL · toplam içindeki payıyla birlikte.</div>
+        <div class="note">Milyon USD · toplam içindeki payıyla birlikte.</div>
         <div id="finRevenue"></div>
       </div>
       <div class="card">
         <h3>Gider kalemleri</h3>
-        <div class="note">Milyon TL · toplam içindeki payıyla birlikte.</div>
+        <div class="note">Milyon USD · toplam içindeki payıyla birlikte.</div>
         <div id="finExpense"></div>
       </div>
     </div>
@@ -573,8 +573,12 @@ VIEWS["finance"] = {
     </div>
 
     <div class="card">
-      <h3>Yıllar arası karşılaştırma</h3>
-      <div class="note">İlk yıl için değişim oranı hesaplanmaz (karşılaştırma tabanı yok).</div>
+      <h3>Son 5 yılda gelirlerimiz ve giderlerimiz ne kadar değişti?</h3>
+      <div class="note">
+        Tüm tutarlar <b>milyon USD</b>. İlk yıl için değişim oranı hesaplanmaz
+        (karşılaştırma tabanı yoktur).
+      </div>
+      <div id="finFiveYear"></div>
       <div id="finTrend"></div>
     </div>`,
 
@@ -602,13 +606,13 @@ function refreshFinance() {
     (s, el) => {
       el.className = "tiles";
       el.innerHTML = tileHtml([
-        ["Toplam gelir", fmt.moneyM(s.total_revenue)],
-        ["Toplam gider", fmt.moneyM(s.total_expenditure)],
-        ["Denge", fmt.moneyM(s.balance), s.balance_status === "fazla" ? "▲ fazla" : "▼ açık",
+        ["Toplam gelir", fmt.usdMillion(s.total_revenue)],
+        ["Toplam gider", fmt.usdMillion(s.total_expenditure)],
+        ["Denge", fmt.usdMillion(s.balance), s.balance_status === "fazla" ? "▲ fazla" : "▼ açık",
           s.balance_status === "fazla" ? "up" : "down"],
-        ["Öğrenci başına gelir", fmt.moneyK(s.revenue_per_student_thousand_try)],
-        ["Öğrenci başına maliyet", fmt.moneyK(s.cost_per_student_thousand_try)],
-        ["Mezun başına maliyet", fmt.moneyM(s.cost_per_graduate_million_try, 2)],
+        ["Öğrenci başına gelir", fmt.usdPerPerson(s.revenue_per_student_thousand_usd)],
+        ["Öğrenci başına maliyet", fmt.usdPerPerson(s.cost_per_student_thousand_usd)],
+        ["Mezun başına maliyet", fmt.usdMillion(s.cost_per_graduate_million_usd, 2)],
         ["Personel gideri payı", fmt.pct(s.personnel_expense_share_percent)],
         ["Burs yükü / gelir", fmt.pct(s.scholarship_impact_percent)],
       ]);
@@ -625,13 +629,18 @@ function refreshFinance() {
         el.innerHTML = `<div id="${containerId}Bars"></div>` +
           table(
             ["Kalem", "Tutar", "Pay"],
-            rows.map((r) => [fmt.esc(r.category), fmt.moneyM(r.amount), fmt.pct(r.share_percent)])
+            rows.map((r) => [fmt.esc(r.category), fmt.usdMillion(r.amount), fmt.pct(r.share_percent)])
           );
         hbars(
           containerId + "Bars",
           rows.map((r) => [r.category, Number(r.amount) || 0,
             key === "revenue_breakdown" ? "var(--primary)" : "var(--accent)"]),
-          { fmt: (v) => fmt.moneyM(v) }
+          {
+            fmt: (v) => fmt.usdMillion(v),
+            valueLabel: "Milyon USD",
+            legend: [[key === "revenue_breakdown" ? "Gelir kalemi" : "Gider kalemi",
+                      key === "revenue_breakdown" ? "var(--primary)" : "var(--accent)"]],
+          }
         );
       }
     );
@@ -658,10 +667,10 @@ function refreshFinance() {
             fmt.esc(r.department_name),
             fmt.esc(r.faculty_name),
             fmt.int(r.student_count),
-            fmt.moneyM(r.revenue),
-            fmt.moneyM(r.expenditure),
-            fmt.moneyM(r.allocated_budget),
-            fmt.moneyM(r.balance),
+            fmt.usdMillion(r.revenue),
+            fmt.usdMillion(r.expenditure),
+            fmt.usdMillion(r.allocated_budget),
+            fmt.usdMillion(r.balance),
             // Bütçe tanımsızsa oran gösterilmez.
             r.budget_realization_percent === null
               ? fmt.empty
@@ -682,9 +691,9 @@ function refreshFinance() {
           ["Dönem", "Gelir", "Gider", "Denge", "Gelir değişimi", "Gider değişimi"],
           rows.map((r) => [
             fmt.esc(r.academic_year),
-            fmt.moneyM(r.total_revenue),
-            fmt.moneyM(r.total_expenditure),
-            fmt.moneyM(r.balance),
+            fmt.usdMillion(r.total_revenue),
+            fmt.usdMillion(r.total_expenditure),
+            fmt.usdMillion(r.balance),
             r.revenue_change_percent === null ? fmt.empty : fmt.pct(r.revenue_change_percent),
             r.expenditure_change_percent === null ? fmt.empty : fmt.pct(r.expenditure_change_percent),
           ])
@@ -696,11 +705,59 @@ function refreshFinance() {
           "finTrendChart",
           withData.map((r) => r.academic_year),
           [
-            { label: "Gelir", color: "var(--primary)", values: withData.map((r) => Number(r.total_revenue)) },
-            { label: "Gider", color: "var(--accent)", values: withData.map((r) => Number(r.total_expenditure)) },
+            { label: "Toplam gelir", color: "var(--primary)",
+              values: withData.map((r) => Number(r.total_revenue)) },
+            { label: "Toplam gider", color: "var(--accent)",
+              values: withData.map((r) => Number(r.total_expenditure)) },
+            { label: "Gelir–gider dengesi", color: "#0ca30c",
+              values: withData.map((r) => Number(r.balance)) },
           ],
-          { yfmt: (v) => "₺" + Math.round(v) + "M" }
+          {
+            min: 0,
+            yfmt: (v) => "$" + fmt.dec(v, 0) + "M",
+            unitSuffix: " milyon USD",
+            yAxisLabel: "Tutar (milyon USD)",
+            xAxisLabel: "Mali dönem",
+            periodNote: `${withData[0].academic_year} – ${withData[withData.length - 1].academic_year}`,
+          }
         );
+      }
+
+      // 5 yıllık toplam değişim özeti: "gelirimiz ne kadar arttı" sorusunun
+      // doğrudan cevabı. Hesap sunucudan gelen ilk ve son yıl toplamlarından
+      // yapılır; ara yılların yüzdeleri çarpılmaz (bileşik hata olurdu).
+      const box = document.getElementById("finFiveYear");
+      if (box && withData.length > 1) {
+        const first = withData[0], last = withData[withData.length - 1];
+        const growth = (a, b) => ((Number(b) - Number(a)) / Number(a)) * 100;
+        const revG = growth(first.total_revenue, last.total_revenue);
+        const expG = growth(first.total_expenditure, last.total_expenditure);
+        const card = (label, v1, v2, g, goodWhenUp) => `
+          <div class="tile">
+            <div class="label">${fmt.esc(label)}</div>
+            <div class="value">${fmt.pct(g)}</div>
+            <div class="delta ${(g >= 0) === goodWhenUp ? "up" : "down"}">
+              ${fmt.usdMillion(v1)} → ${fmt.usdMillion(v2)}
+            </div>
+          </div>`;
+        box.className = "tiles";
+        box.innerHTML =
+          card(`Gelir değişimi (${withData.length} dönem)`, first.total_revenue, last.total_revenue, revG, true) +
+          card(`Gider değişimi (${withData.length} dönem)`, first.total_expenditure, last.total_expenditure, expG, false) +
+          `<div class="tile">
+             <div class="label">Denge değişimi</div>
+             <div class="value">${fmt.usdMillion(Number(last.balance) - Number(first.balance))}</div>
+             <div class="delta ${Number(last.balance) >= Number(first.balance) ? "up" : "down"}">
+               ${fmt.usdMillion(first.balance)} → ${fmt.usdMillion(last.balance)}
+             </div>
+           </div>
+           <div class="tile">
+             <div class="label">Gelir mi gider mi daha hızlı arttı?</div>
+             <div class="value">${revG > expG ? "Gelir" : "Gider"}</div>
+             <div class="delta ${revG > expG ? "up" : "down"}">
+               fark ${fmt.dec(Math.abs(revG - expG), 1)} puan
+             </div>
+           </div>`;
       }
     }
   );
@@ -712,7 +769,7 @@ function refreshFinance() {
 
 VIEWS["sustainability"] = {
   title: "Program Sürdürülebilirliği",
-  subtitle: "Çok kriterli program değerlendirmesi · Modül 7",
+  subtitle: "Çok kriterli program değerlendirmesi",
   html: () => `
     <div class="card">
       <div class="filters">
@@ -819,7 +876,7 @@ function refreshSustainability() {
 
 VIEWS["kpi"] = {
   title: "Performans ve KPI",
-  subtitle: "Stratejik gösterge izleme ve müdahale listesi · Modül 8",
+  subtitle: "Stratejik gösterge izleme · her göstergenin formülü ve kaynağı belirtilir",
   html: () => `
     <div id="kpiTiles"></div>
 
@@ -896,7 +953,14 @@ VIEWS["kpi"] = {
             const v = Number(d.average_achievement_percent);
             return [d.dimension, v, v < 70 ? "var(--critical, #c0392b)" : v < 90 ? "var(--accent)" : "var(--primary)"];
           }),
-          { max: 120, fmt: (v) => fmt.pct(v) }
+          {
+            max: 120,
+            fmt: (v) => fmt.pct(v),
+            valueLabel: "Hedefe ulaşma oranı (%)",
+            legend: [["Riskli (%70 altı)", "var(--critical, #c0392b)"],
+                     ["Gecikmeli (%70–90)", "var(--accent)"],
+                     ["Hedefte (%90 üstü)", "var(--primary)"]],
+          }
         );
       }
     );
@@ -937,11 +1001,12 @@ VIEWS["kpi"] = {
                 ${chip(r.status === "riskli" ? "critical" : "warning", fmt.pct(r.achievement_percent))}
                 <b>${fmt.esc(r.name)}</b>
                 <span class="push" style="font-size:.72rem">${fmt.esc(r.dimension)}</span>
-                <div class="note">Mevcut ${fmt.dec(r.current_value, 2)} ${fmt.esc(r.unit || "")} ·
-                  hedef ${fmt.dec(r.target_value, 2)}
-                  ${r.change_vs_previous_percent !== null
-                    ? ` · geçen yıla göre ${fmt.pct(r.change_vs_previous_percent)}`
-                    : " · geçen yıl verisi yok"}</div>
+                <div class="note">${fmt.esc(r.description || "")}</div>
+                <div class="note">Mevcut <b>${fmt.dec(r.current_value, 2)} ${fmt.esc(r.unit || "")}</b> ·
+                  hedef ${fmt.dec(r.target_value, 2)} ·
+                  ${fmt.esc(r.direction_label || "")}</div>
+                <div class="note muted"><b>Formül:</b> ${fmt.esc(r.formula || "—")} ·
+                  <b>Kaynak:</b> ${fmt.esc(r.data_source || "—")}</div>
                 ${r.corrective_action ? `<div class="note action">▸ ${fmt.esc(r.corrective_action)}</div>` : ""}
               </li>`
             )
@@ -960,21 +1025,33 @@ VIEWS["kpi"] = {
           }),
         (rows, el) => {
           if (!rows.length) return void (el.innerHTML = ui.empty("Bu filtrede gösterge yok."));
+          // Her göstergenin künyesi birlikte gösterilir: ne ölçtüğü, nasıl
+          // hesaplandığı, nereden geldiği ve yükselmesinin iyi mi kötü mü
+          // olduğu. Bunlar olmadan "52.2" gibi çıplak bir sayı kalıyordu.
           el.innerHTML = table(
-            ["Gösterge", "Boyut", "Mevcut", "Hedef", "Başarı", "Eşikler", "Durum"],
-            rows.map((r) => [
-              fmt.esc(r.name),
-              fmt.esc(r.dimension),
-              fmt.dec(r.current_value, 2) + " " + fmt.esc(r.unit || ""),
-              fmt.dec(r.target_value, 2),
-              fmt.pct(r.achievement_percent),
-              // Eşiklerin gösterilmesi, "neden bu durumda" sorusunu cevaplar.
-              `<span class="muted">${fmt.dec(r.at_risk_threshold, 0)} / ${fmt.dec(r.on_track_threshold, 0)}</span>`,
-              chip(
-                r.status === "hedefte" ? "good" : r.status === "gecikmeli" ? "warning" : "critical",
-                r.status
-              ),
-            ])
+            ["Gösterge", "Boyut", "Mevcut", "Hedef", "Geçen dönem", "Başarı", "Yön", "Durum"],
+            rows.map((r) => {
+              const unit = r.unit ? ` <span class="muted">${fmt.esc(r.unit)}</span>` : "";
+              const better = r.higher_is_better ? "▲ yükselmesi iyi" : "▼ düşmesi iyi";
+              const sourceTag = r.value_source === "derived"
+                ? chip("info", "sistemden hesaplanıyor") : "";
+              return [
+                `<b>${fmt.esc(r.name)}</b> ${sourceTag}
+                 <br><span class="muted">${fmt.esc(r.description || "")}</span>
+                 <br><span class="muted"><b>Formül:</b> ${fmt.esc(r.formula || "—")}</span>
+                 <br><span class="muted"><b>Kaynak:</b> ${fmt.esc(r.data_source || "—")}</span>`,
+                fmt.esc(r.dimension),
+                `<b>${fmt.dec(r.current_value, 2)}</b>${unit}`,
+                fmt.dec(r.target_value, 2),
+                r.previous_value === null ? fmt.empty : fmt.dec(r.previous_value, 2),
+                fmt.pct(r.achievement_percent),
+                `<span class="muted">${better}</span><br>${fmt.esc(r.direction_label || "")}`,
+                chip(
+                  r.status === "hedefte" ? "good" : r.status === "gecikmeli" ? "warning" : "critical",
+                  r.status
+                ),
+              ];
+            })
           );
         }
       );
@@ -989,7 +1066,7 @@ VIEWS["kpi"] = {
 
 VIEWS["rankings"] = {
   title: "THE · QS · YÖK Değerlendirme",
-  subtitle: "İç performans izleme ve veri hazırlık göstergeleri · Modül 10",
+  subtitle: "İç performans izleme ve veri hazırlık göstergeleri",
   html: () => `
     <div class="state warn">
       <b>Önemli:</b> Bu modül gerçek THE, QS veya YÖK sıralaması ÜRETMEZ.

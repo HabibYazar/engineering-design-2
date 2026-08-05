@@ -21,19 +21,24 @@ from app.models import Scenario, ScenarioBaseline
 BASELINE_NAME: str = "2026 University Baseline"
 
 BASELINE_VALUES: dict = {
-    "student_count": 5000,
-    "annual_tuition_per_student": Decimal("180000"),
-    "scholarship_rate_percent": Decimal("35"),
-    "annual_research_revenue": Decimal("50000000"),
-    "annual_other_revenue": Decimal("25000000"),
-    "annual_personnel_expense": Decimal("320000000"),
-    "annual_education_expense": Decimal("70000000"),
-    "annual_rd_expense": Decimal("45000000"),
-    "annual_building_energy_expense": Decimal("30000000"),
-    "annual_technology_expense": Decimal("25000000"),
-    "academic_staff_count": 220,
-    "classroom_capacity": 5500,
-    "laboratory_capacity": 5200,
+    # TÜM TUTARLAR USD. Değerler shared_demo_data/05_finance.json içindeki
+    # 2025-2026 mali dönemiyle tutarlıdır; seed_all_demo_data.py çalıştığında
+    # bu taban zaten o dönemin gerçek verisiyle güncellenir. Buradaki değerler
+    # yalnızca birim testlerinin kullandığı hafif veri kümesi içindir ve aynı
+    # büyüklük mertebesinde tutulmuştur ki iki ortam birbirinden kopmasın.
+    "student_count": 4000,
+    "annual_tuition_per_student": Decimal("9500"),
+    "scholarship_rate_percent": Decimal("38"),
+    "annual_research_revenue": Decimal("5600000"),
+    "annual_other_revenue": Decimal("6800000"),
+    "annual_personnel_expense": Decimal("8210000"),
+    "annual_education_expense": Decimal("5200000"),
+    "annual_rd_expense": Decimal("4100000"),
+    "annual_building_energy_expense": Decimal("10250000"),
+    "annual_technology_expense": Decimal("2750000"),
+    "academic_staff_count": 180,
+    "classroom_capacity": 1020,
+    "laboratory_capacity": 328,
     "is_active": True,
 }
 

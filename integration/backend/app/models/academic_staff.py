@@ -8,11 +8,13 @@ bölüm bir foreign key'e bağlandı; fakülte bilgisi bölüm üzerinden türet
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.decimal_types import MoneyType
 from app.database import Base
 
 if TYPE_CHECKING:
@@ -57,6 +59,14 @@ class AcademicStaff(Base):
     # 0-10 arası topluma katkı puanı; ölçek dışı değerler servis katmanında reddedilir.
     community_engagement_score: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False
+    )
+
+    # Yıllık brüt maaş (USD). Senaryo motoru "maaşlara %2 zam" sorusunu
+    # ancak kişi bazında maaş bilinirse cevaplayabilir. Ayrıca "personel gideri
+    # = personel sayısı × ortalama maaş" eşitliği bu alan sayesinde
+    # doğrulanabilir hale geliyor.
+    annual_salary_usd: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
     )
 
     has_administrative_duty: Mapped[bool] = mapped_column(

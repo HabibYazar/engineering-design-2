@@ -125,7 +125,7 @@ const api = {
 /* ==================== biçimlendirme ==================== */
 // Backend Decimal değerleri metin olarak döndürür ("486.00"). Bunları
 // doğrudan ekrana basmak yerine burada sayıya çevirip biçimlendiriyoruz;
-// böylece "486.00" yerine "₺486,0 M" görünüyor.
+// böylece "47500000" yerine "$47,5M" görünüyor.
 
 const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
 
@@ -147,14 +147,28 @@ const fmt = {
     const n = num(v);
     return n === null || Number.isNaN(n) ? fmt.empty : fmt.dec(n, digits) + "%";
   },
-  // Mali tutarlar milyon TL cinsinden saklanır.
-  moneyM(v, digits = 1) {
+  // SİSTEMDEKİ TEK PARA BİRİMİ USD'DİR.
+  // Büyüklüğe göre otomatik ölçekler: milyonun üstü "$12,3M", binin üstü
+  // "$45,2K", altı "$860". Her durumda $ işareti ve birim görünür; çıplak
+  // sayı bırakılmaz.
+  usd(v, digits = 1) {
     const n = num(v);
-    return n === null || Number.isNaN(n) ? fmt.empty : "₺" + fmt.dec(n, digits) + "M";
+    if (n === null || Number.isNaN(n)) return fmt.empty;
+    const sign = n < 0 ? "−" : "";
+    const a = Math.abs(n);
+    if (a >= 1_000_000) return sign + "$" + fmt.dec(a / 1_000_000, digits) + "M";
+    if (a >= 1_000) return sign + "$" + fmt.dec(a / 1_000, digits) + "K";
+    return sign + "$" + fmt.dec(a, 0);
   },
-  moneyK(v, digits = 1) {
+  // Mali tablolarda saklanan değer MİLYON USD'dir; olduğu gibi gösterilir.
+  usdMillion(v, digits = 2) {
     const n = num(v);
-    return n === null || Number.isNaN(n) ? fmt.empty : "₺" + fmt.dec(n, digits) + "B";
+    return n === null || Number.isNaN(n) ? fmt.empty : "$" + fmt.dec(n, digits) + "M";
+  },
+  // Kişi başına oranlar tam USD cinsindendir.
+  usdPerPerson(v) {
+    const n = num(v);
+    return n === null || Number.isNaN(n) ? fmt.empty : "$" + fmt.dec(n, 0);
   },
   // Değişim oranı: işaret ve yön oku ile.
   delta(v, { goodWhenUp = true, suffix = "%" } = {}) {

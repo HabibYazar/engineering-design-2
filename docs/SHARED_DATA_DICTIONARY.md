@@ -33,7 +33,7 @@ demoda tek tek gösterildiği için açıkça listelenmiştir.
 
 | Alan | Değer | Kaynak |
 |---|---|---|
-| Kurum | Ankara Teknoloji Üniversitesi (kurgusal vakıf üniversitesi) | `00_assumptions.json` |
+| Kurum | Ankara Bilim Üniversitesi (kurgusal vakıf üniversitesi) | `00_assumptions.json` |
 | Fakülte / Bölüm / Program | 4 / 12 / 14 | `01_university_structure.json` |
 | Öğrenci | 4.000 | `02_students.json` |
 | Akademik personel | 180 | `03_academic_staff.json` |

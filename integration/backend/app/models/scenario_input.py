@@ -2,9 +2,9 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, func
+from sqlalchemy import String, DateTime, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.decimal_types import MoneyType
@@ -40,7 +40,39 @@ class ScenarioInput(Base):
 
     # --- Mutlak (adet bazlı) değişimler ---
     # Bunlar yüzde değil, doğrudan sayı olarak girilir ve negatif olabilir.
+    # Akademik personel maaşlarındaki yüzdesel değişim.
+    # Personel SAYISI değişiminden ayrıdır: "%2 zam" personel sayısını
+    # değiştirmez ama toplam personel giderini artırır. Bu ayrım olmadan
+    # "maaşlara zam yapılırsa ne olur" sorusu cevaplanamıyordu.
+    academic_salary_change_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    administrative_salary_change_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    # Kontenjan değişimi: öğrenci sayısını doğrudan değil, gelecek yılın
+    # yerleşen sayısı üzerinden etkiler.
+    quota_change_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    # Seçilen gelir/gider kaleminde yüzdesel değişim.
+    revenue_item_change_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    expense_item_change_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    target_revenue_category: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True
+    )
+    target_expense_category: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True
+    )
+
     academic_staff_change: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    administrative_staff_change: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
     classroom_capacity_change: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     laboratory_capacity_change: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 

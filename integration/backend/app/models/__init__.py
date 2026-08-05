@@ -5,11 +5,16 @@
 # 2) Diğer dosyalarda "from app.models import Faculty" şeklinde kısa kullanım sağlansın.
 from app.models.academic_program import AcademicProgram
 from app.models.academic_staff import AcademicStaff
+from app.models.academic_success import AcademicSuccessRecord
 from app.models.administrative_unit import AdministrativeUnit
 from app.models.benchmark_institution import BenchmarkInstitution
 from app.models.benchmark_metric_value import BenchmarkMetricValue
 from app.models.comparable_university_program import ComparableUniversityProgram
 from app.models.department import Department
+from app.models.engagement import (
+    IndustryCollaborationRecord,
+    RegionalContributionRecord,
+)
 from app.models.dimension_assessment import DimensionAssessment
 from app.models.evaluation_dimension import EvaluationDimension
 from app.models.evaluation_framework import EvaluationFramework
@@ -74,4 +79,9 @@ __all__ = [
     # Modül 8 - Performans yönetimi (Halil)
     "StrategicKpi",
     "KpiFacultyValue",
+    # Akademik başarı analizi
+    "AcademicSuccessRecord",
+    # Sanayi iş birliği ve bölgesel katkı
+    "IndustryCollaborationRecord",
+    "RegionalContributionRecord",
 ]

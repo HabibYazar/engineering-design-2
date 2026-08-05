@@ -24,31 +24,36 @@ function toggleTheme() {
 }
 
 /* ==================== navigation model ==================== */
-// Menu yapisi. Parantez icindeki numaralar proje tanimindaki modul
-// numaralaridir; sunumda hangi ekranin hangi moduldan geldigi gorulsun diye
-// bilincli olarak gosteriliyor.
+// Menü yapısı. Kullanıcıya iç geliştirme ifadeleri (modül numaraları, tablo
+// veya endpoint adları) GÖSTERİLMEZ; yalnızca işi anlatan başlıklar kullanılır.
 const NAV = [
   { group: "Genel Bakış", items: [
     ["dashboard", "Yönetim Panosu", "📊"],
     ["assistant", "Akıllı Asistan", "✨"],
   ]},
-  { group: "Analiz", items: [
-    ["students", "Öğrenci Analitiği (M2·M3)", "🎓"],
-    ["staff", "Akademik Personel (M4)", "🧑‍🏫"],
-    ["physical", "Fiziksel Kaynaklar (M5)", "🏛️"],
-    ["finance", "Finansal Analiz (M6)", "💰"],
-    ["sustainability", "Program Sürdürülebilirliği (M7)", "🌱"],
-    ["kpi", "Performans ve KPI (M8)", "🎯"],
-    ["rankings", "THE · QS · YÖK (M10)", "🏆"],
+  { group: "Eğitim ve Öğrenci", items: [
+    ["students", "Öğrenci Analitiği", "🎓"],
+    ["success", "Akademik Başarı", "🏅"],
+    ["sustainability", "Program Sürdürülebilirliği", "🌱"],
+  ]},
+  { group: "Kaynaklar", items: [
+    ["staff", "Akademik Personel", "🧑‍🏫"],
+    ["physical", "Fiziksel Kaynaklar", "🏛️"],
+    ["finance", "Finansal Analiz", "💰"],
+  ]},
+  { group: "Performans", items: [
+    ["kpi", "Performans Göstergeleri", "🎯"],
+    ["engagement", "Sanayi ve Bölgesel Katkı", "🤝"],
+    ["rankings", "Değerlendirme ve Kıyaslama", "🏆"],
   ]},
   { group: "Planlama", items: [
-    ["scenarios", "Senaryo Analizi (M9)", "🧪"],
-    ["alerts", "Erken Uyarı (M11)", "⚠️"],
+    ["scenarios", "Senaryo Analizi", "🧪"],
+    ["alerts", "Erken Uyarı", "⚠️"],
   ]},
   { group: "Sistem", items: [
-    ["structure", "Üniversite Yapısı (M1)", "🏫"],
-    ["data-import", "Veri Aktarımı (M13)", "📥"],
-    ["users", "Kullanıcı ve Yetki (M14)", "👥"],
+    ["structure", "Üniversite Yapısı", "🏫"],
+    ["data-import", "Veri Aktarımı", "📥"],
+    ["users", "Kullanıcı ve Yetki", "👥"],
   ]},
 ];
 
@@ -81,7 +86,7 @@ function route() {
   if (name !== "login" && !session.user) { location.hash = "#/login"; return; }
   if (name === "login" && session.user) { location.hash = "#/dashboard"; return; }
   const view = VIEWS[name];
-  document.title = view.title + " — ATÜ Karar Destek Sistemi";
+  document.title = view.title + " — ABÜN Karar Destek Sistemi";
   name === "login" ? renderLogin() : renderApp(name, view);
 }
 
@@ -92,10 +97,10 @@ function renderLogin() {
   document.body.className = "login";
   document.body.innerHTML = `
     <form class="login-card" id="loginForm">
-      <div class="logo">ATÜ</div>
+      <div class="logo">ABÜN</div>
       <div>
         <h1>Stratejik Üniversite Yönetimi<br>ve Karar Destek Sistemi</h1>
-        <div class="sub">Ankara Teknoloji Üniversitesi · üst yönetim portalı</div>
+        <div class="sub">Ankara Bilim Üniversitesi · üst yönetim portalı</div>
       </div>
       <label class="f">Kullanıcı adı <input id="loginUser" value="admin" autocomplete="username"></label>
       <label class="f">Parola <input id="loginPass" type="password" value="demo1234" autocomplete="current-password"></label>
@@ -143,8 +148,8 @@ function ensureShell() {
   document.body.innerHTML = `
     <aside id="sidebar">
       <div class="brand">
-        <div class="logo">ATÜ</div>
-        <div><b>Ankara Teknoloji Üniversitesi</b><span>Stratejik Yönetim ve Karar Destek</span></div>
+        <div class="logo">ABÜN</div>
+        <div><b>Ankara Bilim Üniversitesi</b><span>Stratejik Yönetim ve Karar Destek</span></div>
         <button id="themeToggle" class="theme-btn" title="Gece modu">${isDark() ? "☀️" : "🌙"}</button>
       </div>
       ${NAV.map(g => `<div class="group">${g.group}</div>` +
@@ -246,18 +251,27 @@ function donuts(id, rows, opts = {}) {
           transform="rotate(-90 42 42)"/>
         <text x="42" y="47" text-anchor="middle" class="donut-val">${pct}%</text>
       </svg>
-      <div class="donut-label">${label}</div>
+      <div class="donut-label">${label}</div>${opts.unit ? `<div class="donut-unit">${opts.unit}</div>` : ""}
     </div>`).join("") + `</div>`;
 }
 
 function hbars(id, rows, opts = {}) {
-  const max = opts.max || Math.max(...rows.map(r => r[1]), 1);
-  $(id).innerHTML = rows.map(([name, value, color]) => `
-    <div class="hbar" title="${name}: ${opts.fmt ? opts.fmt(value) : value}">
-      <span class="name">${name}</span>
-      <div class="track"><div class="fill" style="width:${(value / max * 100).toFixed(1)}%${color ? `;background:${color}` : ""}"></div></div>
-      <span class="val">${opts.fmt ? opts.fmt(value) : value}</span>
-    </div>`).join("");
+  // opts.valueLabel: çubukların neyi gösterdiği (ör. "Milyon USD").
+  // Bu etiket olmadan kullanıcı çubuk uzunluğunun neyi ölçtüğünü bilemiyordu.
+  const max = opts.max || Math.max(...rows.map(r => Number(r[1]) || 0), 1);
+  const format = opts.fmt || (v => v);
+  const header = opts.valueLabel
+    ? `<div class="chart-caption">${fmt.esc(opts.valueLabel)}</div>` : "";
+  const legend = opts.legend
+    ? `<div class="legend">` + opts.legend.map(([label, color]) =>
+        `<span><span class="swatch" style="background:${color}"></span>${fmt.esc(label)}</span>`
+      ).join("") + `</div>` : "";
+  $(id).innerHTML = header + rows.map(([name, value, color]) => `
+    <div class="hbar" title="${fmt.esc(name)}: ${format(value)}${opts.valueLabel ? " (" + fmt.esc(opts.valueLabel) + ")" : ""}">
+      <span class="name">${fmt.esc(name)}</span>
+      <div class="track"><div class="fill" style="width:${((Number(value) || 0) / max * 100).toFixed(1)}%${color ? `;background:${color}` : ""}"></div></div>
+      <span class="val">${format(value)}</span>
+    </div>`).join("") + legend;
 }
 
 function meters(id, rows) {
@@ -269,26 +283,62 @@ function meters(id, rows) {
 }
 
 function lineChart(id, labels, series, opts = {}) {
-  const W = 560, H = opts.height || 200, L = 42, R = 14, T = 14, B = 26;
-  const all = series.flatMap(s => s.values);
+  // Eksen adları, birim ve legend zorunlu hale getirildi: eksende ne olduğu
+  // yazmayan bir grafik "52.2" gibi anlamsız sayılar gösteriyordu.
+  const W = 620, H = opts.height || 230;
+  const L = opts.yAxisLabel ? 62 : 48;   // sol boşluk: y ekseni adı için yer
+  const R = 16, T = 16, B = opts.xAxisLabel ? 48 : 32;
+
+  const all = series.flatMap(s => s.values).filter(v => Number.isFinite(v));
+  if (!all.length) {
+    document.getElementById(id).innerHTML = ui.empty("Grafik için veri yok.");
+    return;
+  }
   const lo = opts.min ?? Math.min(...all) * 0.9;
   const hi = opts.max ?? Math.max(...all) * 1.05;
-  const x = i => L + i * (W - L - R) / (labels.length - 1);
-  const y = v => T + (hi - v) / (hi - lo) * (H - T - B);
-  let s = "";
+  const x = i => L + i * (W - L - R) / Math.max(1, labels.length - 1);
+  const y = v => T + (hi - v) / (hi - lo || 1) * (H - T - B);
+  const fmtY = opts.yfmt || (v => Math.round(v));
+
+  let svg = "";
+  // Yatay ızgara + y ekseni değerleri
   for (let g = 0; g <= 4; g++) {
     const v = lo + (hi - lo) * g / 4;
-    s += `<line class="grid" x1="${L}" y1="${y(v)}" x2="${W - R}" y2="${y(v)}"/>` +
-         `<text x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${opts.yfmt ? opts.yfmt(v) : Math.round(v)}</text>`;
+    svg += `<line class="grid" x1="${L}" y1="${y(v)}" x2="${W - R}" y2="${y(v)}"/>` +
+           `<text x="${L - 8}" y="${y(v) + 3}" text-anchor="end">${fmtY(v)}</text>`;
   }
-  labels.forEach((lab, i) => { s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${lab}</text>`; });
+  // X ekseni etiketleri
+  labels.forEach((lab, i) => {
+    svg += `<text x="${x(i)}" y="${H - (opts.xAxisLabel ? 26 : 10)}" text-anchor="middle">${fmt.esc(lab)}</text>`;
+  });
+  // Eksen adları
+  if (opts.yAxisLabel) {
+    svg += `<text class="axis-title" transform="rotate(-90 14 ${H / 2})" x="14" y="${H / 2}" ` +
+           `text-anchor="middle">${fmt.esc(opts.yAxisLabel)}</text>`;
+  }
+  if (opts.xAxisLabel) {
+    svg += `<text class="axis-title" x="${(L + W - R) / 2}" y="${H - 6}" ` +
+           `text-anchor="middle">${fmt.esc(opts.xAxisLabel)}</text>`;
+  }
+  // Seriler
   series.forEach(sr => {
-    s += `<polyline fill="none" stroke="${sr.color}" stroke-width="2" points="${sr.values.map((v, i) => x(i) + "," + y(v)).join(" ")}"/>`;
+    const pts = sr.values.map((v, i) => Number.isFinite(v) ? `${x(i)},${y(v)}` : null).filter(Boolean);
+    svg += `<polyline fill="none" stroke="${sr.color}" stroke-width="2.2" points="${pts.join(" ")}"/>`;
     sr.values.forEach((v, i) => {
-      s += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${sr.color}" stroke="var(--surface)" stroke-width="1.5"><title>${sr.label} · ${labels[i]}: ${opts.yfmt ? opts.yfmt(v) : v}</title></circle>`;
+      if (!Number.isFinite(v)) return;
+      // Tooltip: seri adı + dönem + değer + birim. Çıplak sayı bırakılmıyor.
+      const tip = `${sr.label} · ${labels[i]}: ${fmtY(v)}${opts.unitSuffix || ""}`;
+      svg += `<circle cx="${x(i)}" cy="${y(v)}" r="3.8" fill="${sr.color}" ` +
+             `stroke="var(--surface)" stroke-width="1.5"><title>${fmt.esc(tip)}</title></circle>`;
     });
   });
-  $(id).innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}">${s}</svg>`;
+
+  const legend = `<div class="legend">` + series.map(sr =>
+    `<span><span class="swatch" style="background:${sr.color}"></span>${fmt.esc(sr.label)}</span>`
+  ).join("") + (opts.periodNote ? `<span class="period-note">${fmt.esc(opts.periodNote)}</span>` : "") + `</div>`;
+
+  document.getElementById(id).innerHTML =
+    `<svg class="chart" viewBox="0 0 ${W} ${H}">${svg}</svg>` + legend;
 }
 
 function chip(status, text) {

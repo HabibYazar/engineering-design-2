@@ -25,7 +25,7 @@ altında korunmaktadır.
 | Konu | Durum |
 |---|---|
 | Veri kaynağı | **Kurgusal.** `integration/shared_demo_data/` altındaki varsayımlardan üretilir. Gerçek bir kurumun verisi değildir. |
-| Kurum adı | "Ankara Teknoloji Üniversitesi" — kurgusaldır |
+| Kurum adı | "Ankara Bilim Üniversitesi" — kurgusaldır |
 | Öğrenci/personel kayıtları | İsimler rastgele havuzdan üretilir; gerçek kişi değildir |
 | Mali rakamlar | Yapısı gerçekçi, değerleri kurgusaldır |
 | Taban puanlar | ÖSYM ölçeğinde (0-500) ama gerçek ÖSYM verisi değildir |

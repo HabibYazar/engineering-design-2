@@ -41,13 +41,15 @@ const VIEWS = [
   ["dashboard", /Toplam öğrenci/],
   ["assistant", /dil modeli/i],
   ["students", /Doluluk|doluluk/],
+  ["success", /geçme oranı/i],
   ["staff", /Ağırlıklı puan|performans/i],
   ["physical", /Derslik|Laboratuvar/],
-  ["finance", /₺/],
+  ["finance", /\$/],
   ["sustainability", /sürdürülebilirlik|Skor/i],
   ["kpi", /gösterge/i],
+  ["engagement", /endeks/i],
   ["rankings", /ÜRETMEZ/],
-  ["scenarios", /baseline|Senaryo/i],
+  ["scenarios", /taban|Senaryo/i],
   ["alerts", /uyarı/i],
   ["structure", /Fakülte|fakülte/],
   ["data-import", /Önizleme|önizle/i],
@@ -127,8 +129,8 @@ function check(label, condition, detail = "") {
   check("gercek API ile giris basarili", !!w.sessionStorage.getItem("atu-token"));
   check("uygulama kabugu cizildi", !!$("#sidebar"));
   check(
-    "14 menu ogesi var",
-    w.document.querySelectorAll("#sidebar a[data-route]").length === 14,
+    "16 menu ogesi var",
+    w.document.querySelectorAll("#sidebar a[data-route]").length === 16,
     "bulunan: " + w.document.querySelectorAll("#sidebar a[data-route]").length
   );
   await sleep(500);
@@ -155,7 +157,7 @@ function check(label, condition, detail = "") {
   }
 
   // ---------------- ekranlar ----------------
-  console.log("\n--- 14 ekran ---");
+  console.log("\n--- 16 ekran ---");
   for (const [name, expected] of VIEWS) {
     const elapsed = await openView(name);
 
@@ -197,17 +199,45 @@ function check(label, condition, detail = "") {
   t = await go("rankings");
   check("Modul 10: gercek siralama uretmedigi uyarisi var", /ÜRETMEZ/.test(t));
 
+  t = await go("finance");
+  check("mali ekranda USD gosteriliyor", /\$/.test(t) && !/₺|TL\b/.test(t), t.slice(0, 120));
+  check("5 yillik degisim ozeti var", /Gelir değişimi/.test(t));
+
+  t = await go("success");
+  check("basari ekrani ders gecme oranini gosteriyor", /geçme oranı/i.test(t));
+  check("basari ekraninda kirilim var", /Fakülte|fakülte/.test(t));
+
+  t = await go("kpi");
+  check("KPI kunyesi gosteriliyor (formul + kaynak)", /Formül:/.test(t) && /Kaynak:/.test(t));
+
+  t = await go("engagement");
+  check("endeks bilesenleri gosteriliyor", /Endekse katkı|katkı/i.test(t));
+
+  // Menude ic gelistirme ifadesi kalmamali
+  const menuText = w.document.querySelector("#sidebar").textContent;
+  check("menude modul numarasi yok", !/\bM\d|Modül \d/.test(menuText), menuText.slice(0, 100));
+
   // Senaryo simulasyonu
   await openView("scenarios");
+  // Maas zammi senaryosunu sec ve hesapla
+  const typeSel = $("#scType");
+  typeSel.value = "academic-staffing";
+  typeSel.dispatchEvent(new w.Event("change"));
+  await sleep(300);
   $("#scPreview").click();
-  await sleep(2000);
+  await sleep(2500);
   const result = $("#scResult").textContent;
   check(
-    "senaryo simulasyonu gercek sonuc uretti",
-    /risk/.test(result) && /\d/.test(result) && !/Henüz/.test(result),
-    result.slice(0, 120)
+    "maas senaryosu gercek sonuc uretti",
+    /risk seviyesi/.test(result) && /\d/.test(result) && !/Hesapla düğmesine/.test(result),
+    result.slice(0, 150)
   );
+  check("onceki/yeni deger karsilastirmasi var",
+    /Önceki değer/.test(result) && /Yeni değer/.test(result));
+  check("mali + akademik + kapasite etkileri gosteriliyor",
+    /Mali etki/.test(result) && /Akademik etki/.test(result) && /Kapasite etkisi/.test(result));
   check("simulasyonun onizleme oldugu belirtiliyor", /önizleme/.test(result));
+  check("USD gosteriliyor", /\$/.test(result));
 
   console.log("\n--- JavaScript hatalari ---");
   check("konsolda JS hatasi yok", jsErrors.length === 0, jsErrors.slice(0, 3).join(" | "));

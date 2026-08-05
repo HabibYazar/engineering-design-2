@@ -6,9 +6,10 @@ metindi ve Modül 1'deki bölüm kayıtlarıyla eşleşmiyordu; aynı bölümün
 verisi ile öğrenci verisi birbirine bağlanamıyordu. Kanonik modelde bölüm bir
 foreign key ile bağlandı.
 
-Para birimi: tüm tutarlar milyon TL cinsinden ve Decimal olarak saklanır.
-Float kullanılsaydı toplama sırasında kuruş kayması oluşurdu; bu yüzden projenin
-diğer modüllerinde de kullanılan MoneyType tercih edildi.
+Para birimi: SİSTEMDEKİ TÜM TUTARLAR USD CİNSİNDENDİR. Mali kalemler milyon
+USD olarak saklanır. Float kullanılsaydı toplama sırasında sent kayması
+oluşurdu; bu yüzden projenin diğer modüllerinde de kullanılan MoneyType
+tercih edildi.
 """
 
 from datetime import datetime
@@ -54,6 +55,37 @@ class FinancialPeriod(Base):
     total_students: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_graduates: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # ------------------------------------------------------------------
+    # Sürücü (driver) değerler
+    # ------------------------------------------------------------------
+    # Personel gideri ve burs gideri kalemleri bu değerlerden TÜRETİLİR:
+    #   akademik personel gideri = akademik personel sayısı × ortalama maaş
+    #   burs gideri              = brüt öğrenim ücreti geliri × burs oranı
+    #
+    # Neden ayrıca saklanıyor: senaryo motoru "maaşlara %2 zam yapılırsa" gibi
+    # bir soruyu ancak personel sayısını ve ortalama maaşı ayrı ayrı bilirse
+    # cevaplayabilir. Yalnızca toplam gider saklansaydı, zammın etkisi
+    # hesaplanamaz, tahmin edilirdi.
+    #
+    # Ayrıca bu alanlar sayesinde senaryo baseline'ı mali dönemden türetilebiliyor
+    # ve "aynı kurumun geliri iki modülde farklı" sorunu ortadan kalkıyor.
+    academic_staff_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    average_academic_salary_usd: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    administrative_staff_count: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    average_administrative_salary_usd: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    list_tuition_per_student_usd: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+    average_scholarship_rate_percent: Mapped[Decimal] = mapped_column(
+        MoneyType, default=Decimal("0"), nullable=False
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
@@ -86,7 +118,7 @@ class FinancialEntry(Base):
     kind: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(120), nullable=False)
 
-    # Milyon TL. Negatif tutar kabul edilmez; düzeltme işlemi servis katmanında
+    # Milyon USD. Negatif tutar kabul edilmez; düzeltme işlemi servis katmanında
     # mevcut tutarın üzerine eklenerek yapılır ve sonuç sıfırın altına inemez.
     amount: Mapped[Decimal] = mapped_column(MoneyType, nullable=False)
 

@@ -33,15 +33,18 @@ from app.database import SessionLocal, init_db
 from app.models import (
     AcademicProgram,
     AcademicStaff,
+    AcademicSuccessRecord,
     AdministrativeUnit,
     Department,
     DepartmentBudget,
     Faculty,
     FinancialEntry,
     FinancialPeriod,
+    IndustryCollaborationRecord,
     KpiFacultyValue,
     PhysicalFacility,
     ProgramEnrollmentSnapshot,
+    RegionalContributionRecord,
     StrategicKpi,
     Student,
     SystemUser,
@@ -382,6 +385,25 @@ def seed_enrollment_snapshots(db: Session, counter: Counter) -> None:
 # ----------------------------------------------------------------------------
 
 
+# Unvan bazlı maaş bandı (yıllık brüt USD).
+# Bantların ağırlıklı ortalaması 05_finance.json içindeki güncel yıl ortalama
+# akademik maaşına (34.000 USD) yakın çıkacak şekilde seçildi; böylece
+# "personel gideri = sayı × ortalama maaş" eşitliği bozulmuyor.
+SALARY_BANDS = {
+    "Prof. Dr.":      (52000, 64000),
+    "Doç. Dr.":       (41000, 50000),
+    "Dr. Öğr. Üyesi": (31000, 39000),
+    "Öğr. Gör.":      (23000, 29000),
+    "Araş. Gör.":     (16000, 21000),
+}
+
+
+def _salary_for_title(title: str, rng: random.Random) -> Decimal:
+    """Unvana göre yıllık brüt maaş üretir."""
+    low, high = SALARY_BANDS.get(title, (25000, 32000))
+    return quantize_money(Decimal(rng.randint(low, high)))
+
+
 def seed_academic_staff(db: Session, counter: Counter) -> None:
     """Akademik personel kayıtlarını deterministik olarak üretir."""
     spec = load("03_academic_staff.json")
@@ -433,6 +455,7 @@ def seed_academic_staff(db: Session, counter: Counter) -> None:
                 project_count=rng.randint(prj_lo, prj_hi),
                 patent_count=rng.randint(pat_lo, pat_hi),
                 community_engagement_score=rng.randint(com_lo, com_hi),
+                annual_salary_usd=_salary_for_title(title_spec["title"], rng),
                 has_administrative_duty=(
                     rng.randint(1, 100) <= spec["administrative_duty_percent"]
                 ),
@@ -490,6 +513,15 @@ def seed_facilities(db: Session, counter: Counter) -> None:
 # ----------------------------------------------------------------------------
 
 
+def _graduates_for_year(academic_year: str) -> int:
+    """Üniversite geneli mezun sayısını başarı veri dosyasından okur.
+
+    Tek kaynak kuralı: bu sayı yalnızca 08_academic_success.json içinde durur.
+    """
+    spec = load("08_academic_success.json")
+    return int(spec["university_graduates_per_year"].get(academic_year, 0))
+
+
 def seed_finance(db: Session, counter: Counter) -> None:
     """Mali dönemleri, gelir/gider kalemlerini ve bölüm bütçelerini ekler."""
     data = load("05_finance.json")
@@ -504,10 +536,33 @@ def seed_finance(db: Session, counter: Counter) -> None:
             select(FinancialPeriod).where(FinancialPeriod.academic_year == year)
         ).scalars().first()
         if period is None:
+            drivers = row.get("drivers", {})
+            # Mezun sayısı mali dosyada tekrar yazılmaz; başarı dosyasından
+            # okunur. Aynı sayının iki dosyada durması, birini güncelleyip
+            # diğerini unutmaya davetiye çıkarırdı.
+            graduates = _graduates_for_year(year)
             period = FinancialPeriod(
                 academic_year=year,
                 total_students=row.get("total_students", 0),
-                total_graduates=row.get("total_graduates", 0),
+                total_graduates=(
+                    row["total_graduates"]
+                    if row.get("total_graduates") is not None
+                    else graduates
+                ),
+                academic_staff_count=drivers.get("academic_staff_count", 0),
+                average_academic_salary_usd=quantize_money(
+                    Decimal(str(drivers.get("average_academic_salary_usd", 0)))
+                ),
+                administrative_staff_count=drivers.get("administrative_staff_count", 0),
+                average_administrative_salary_usd=quantize_money(
+                    Decimal(str(drivers.get("average_administrative_salary_usd", 0)))
+                ),
+                list_tuition_per_student_usd=quantize_money(
+                    Decimal(str(drivers.get("list_tuition_per_student_usd", 0)))
+                ),
+                average_scholarship_rate_percent=quantize_money(
+                    Decimal(str(drivers.get("average_scholarship_rate_percent", 0)))
+                ),
             )
             db.add(period)
             db.flush()
@@ -650,6 +705,11 @@ def seed_kpis(db: Session, counter: Counter) -> None:
                 Decimal(str(row.get("at_risk_threshold", 70)))
             ),
             corrective_action=row.get("corrective_action"),
+            description=row.get("description"),
+            formula=row.get("formula"),
+            data_source=row.get("data_source"),
+            higher_is_better=row.get("higher_is_better", True),
+            value_source=row.get("value_source", "manual"),
         )
         db.add(kpi)
         db.flush()
@@ -715,6 +775,215 @@ def seed_users(db: Session, counter: Counter) -> None:
 
 
 # ----------------------------------------------------------------------------
+# 8) Akademik başarı (program × yıl)
+# ----------------------------------------------------------------------------
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    """Değeri sınırlar içinde tutar."""
+    return max(low, min(high, value))
+
+
+def seed_academic_success(db: Session, counter: Counter) -> None:
+    """Program bazlı başarı, geçme, bırakma ve mezuniyet oranlarını üretir."""
+    spec = load("08_academic_success.json")
+    rng = random.Random(spec["random_seed"])
+    bounds = spec["bounds"]
+    noise = spec["yearly_noise_range"]
+
+    programs = {p.code: p for p in db.execute(select(AcademicProgram)).scalars()}
+    years = spec["academic_years"]
+
+    # Her programın ölçüm yaptığı öğrenci sayısı, o programa KAYITLI TOPLAM
+    # öğrenci sayısıdır. Kayıt görüntüsündeki "yerleşen" sayısı yalnızca o yıl
+    # yeni gelenleri kapsar; onu ağırlık olarak kullanmak üniversite toplamını
+    # 4000 yerine ~900 gösterirdi ve ekranlar arasında tutarsızlık yaratırdı.
+    from sqlalchemy import func as _func
+
+    program_totals = {
+        program_id: count
+        for program_id, count in db.execute(
+            select(Student.academic_program_id, _func.count(Student.id))
+            .where(Student.is_active.is_(True))
+            .group_by(Student.academic_program_id)
+        )
+    }
+
+    created = existing = 0
+    for year_index, academic_year in enumerate(years):
+        for code, params in spec["programs"].items():
+            program = programs.get(code)
+            if program is None:
+                continue
+
+            found = db.execute(
+                select(AcademicSuccessRecord).where(
+                    AcademicSuccessRecord.academic_program_id == program.id,
+                    AcademicSuccessRecord.academic_year == academic_year,
+                )
+            ).scalars().first()
+            if found is not None:
+                existing += 1
+                continue
+
+            drift = params["yearly_trend"] * year_index
+            jitter = rng.uniform(noise["min"], noise["max"])
+
+            pass_rate = _clamp(
+                params["base_pass_rate"] + drift + jitter,
+                bounds["pass_rate"]["min"], bounds["pass_rate"]["max"],
+            )
+            # Ortalama başarı puanı geçme oranıyla aynı yönde hareket eder;
+            # ters yönde hareket etmesi veri hatası sayılırdı.
+            score = _clamp(
+                params["base_score"] + drift * 0.8 + jitter * 0.7,
+                bounds["average_score"]["min"], bounds["average_score"]["max"],
+            )
+            # Bırakma oranı geçme oranıyla TERS yönde hareket eder.
+            dropout = _clamp(
+                params["dropout_base"] - drift * 0.5 + jitter * 0.4,
+                bounds["dropout_rate"]["min"], bounds["dropout_rate"]["max"],
+            )
+            graduation = _clamp(
+                params["graduation_base"] + drift * 0.7 + jitter * 0.5,
+                bounds["graduation_rate"]["min"], bounds["graduation_rate"]["max"],
+            )
+
+            measured = program_totals.get(program.id)
+            if not measured:
+                # Öğrencisi olmayan program için kontenjan üzerinden makul bir sayı.
+                measured = max(1, int(program.quota * 0.85))
+
+            db.add(
+                AcademicSuccessRecord(
+                    academic_program_id=program.id,
+                    academic_year=academic_year,
+                    measured_student_count=measured,
+                    course_pass_rate=quantize_money(Decimal(str(round(pass_rate, 2)))),
+                    average_success_score=quantize_money(Decimal(str(round(score, 2)))),
+                    dropout_rate=quantize_money(Decimal(str(round(dropout, 2)))),
+                    graduation_rate=quantize_money(Decimal(str(round(graduation, 2)))),
+                    # Mezun sayısı: programın öğrenci sayısı × mezuniyet oranı,
+                    # 4 yıllık öğrenim süresine bölünerek yıllık mezun elde edilir.
+                    graduate_count=int(measured * graduation / 100 / 4),
+                )
+            )
+            created += 1
+
+    db.commit()
+    counter.add("Akademik başarı kayıtları", created, existing)
+
+
+# ----------------------------------------------------------------------------
+# 9) Sanayi iş birliği ve bölgesel katkı
+# ----------------------------------------------------------------------------
+
+
+def seed_engagement(db: Session, counter: Counter) -> None:
+    """Sanayi iş birliği ve bölgesel katkı kayıtlarını ekler."""
+    data = load("09_engagement.json")
+    faculties = {f.code: f for f in db.execute(select(Faculty)).scalars()}
+
+    created_ic = existing_ic = 0
+    for academic_year, rows in data["industry_collaboration"].items():
+        for faculty_code, values in rows.items():
+            faculty = faculties.get(faculty_code)
+            if faculty is None:
+                continue
+            found = db.execute(
+                select(IndustryCollaborationRecord).where(
+                    IndustryCollaborationRecord.faculty_id == faculty.id,
+                    IndustryCollaborationRecord.academic_year == academic_year,
+                )
+            ).scalars().first()
+            if found is not None:
+                existing_ic += 1
+                continue
+            db.add(
+                IndustryCollaborationRecord(
+                    faculty_id=faculty.id,
+                    academic_year=academic_year,
+                    active_partnerships=values["active_partnerships"],
+                    joint_projects=values["joint_projects"],
+                    funded_research_musd=quantize_money(
+                        Decimal(str(values["funded_research_musd"]))
+                    ),
+                    intern_students=values["intern_students"],
+                    signed_protocols=values["signed_protocols"],
+                )
+            )
+            created_ic += 1
+    db.commit()
+    counter.add("Sanayi iş birliği kayıtları", created_ic, existing_ic)
+
+    created_rc = existing_rc = 0
+    for academic_year, values in data["regional_contribution"].items():
+        found = db.execute(
+            select(RegionalContributionRecord).where(
+                RegionalContributionRecord.academic_year == academic_year
+            )
+        ).scalars().first()
+        if found is not None:
+            existing_rc += 1
+            continue
+        db.add(RegionalContributionRecord(academic_year=academic_year, **values))
+        created_rc += 1
+    db.commit()
+    counter.add("Bölgesel katkı kayıtları", created_rc, existing_rc)
+
+
+def sync_scenario_baseline(db: Session, counter: Counter) -> None:
+    """Aktif senaryo tabanını güncel mali dönemle eşitler.
+
+    Neden gerekli: senaryo tabanı ile mali analiz modülü birbirinden bağımsız
+    kurulmuştu ve aynı kurumun yıllık gelirini farklı söylüyorlardı. Bir karar
+    destek sisteminde bu, verilen kararı doğrudan yanlış yapan bir tutarsızlıktır.
+    Artık taban, güncel mali dönemin gerçek verisinden üretilip kaydediliyor.
+    """
+    from app.models import ScenarioBaseline
+    from app.services.scenario_baseline_builder import build_from_financial_period
+
+    assumptions = load("00_assumptions.json")
+    current_year = assumptions["akademik_yillar"]["guncel"]
+
+    try:
+        derived = build_from_financial_period(db, current_year)
+    except Exception as error:
+        print(f"  UYARI: senaryo tabani mali donemden uretilemedi: {error}")
+        counter.add("Senaryo tabanı (mali dönemle eşitlendi)", 0, 0)
+        return
+
+    active = db.execute(
+        select(ScenarioBaseline).where(ScenarioBaseline.is_active.is_(True))
+    ).scalars().first()
+
+    fields = (
+        "student_count", "annual_tuition_per_student", "scholarship_rate_percent",
+        "annual_research_revenue", "annual_other_revenue", "annual_personnel_expense",
+        "annual_education_expense", "annual_rd_expense",
+        "annual_building_energy_expense", "annual_technology_expense",
+        "academic_staff_count", "classroom_capacity", "laboratory_capacity",
+    )
+
+    if active is None:
+        active = ScenarioBaseline(
+            name=f"{current_year} kurumsal taban", is_active=True
+        )
+        for field in fields:
+            setattr(active, field, getattr(derived, field))
+        db.add(active)
+        created, existing = 1, 0
+    else:
+        for field in fields:
+            setattr(active, field, getattr(derived, field))
+        active.name = f"{current_year} kurumsal taban"
+        created, existing = 0, 1
+
+    db.commit()
+    counter.add("Senaryo tabanı (mali dönemle eşitlendi)", created, existing)
+
+
+# ----------------------------------------------------------------------------
 # Ana akış
 # ----------------------------------------------------------------------------
 
@@ -738,6 +1007,8 @@ def main() -> None:
         seed_academic_staff(db, counter)
         seed_facilities(db, counter)
         seed_finance(db, counter)
+        seed_academic_success(db, counter)
+        seed_engagement(db, counter)
         seed_kpis(db, counter)
         seed_users(db, counter)
     except Exception as error:
@@ -756,7 +1027,16 @@ def main() -> None:
     seed_scenario_data.seed()
     seed_ranking_data.seed()
 
-    print("\n[3/3] Ozet:")
+    # Senaryo tabanini mali donemle esitle: iki modul ayni kurumun gelirini
+    # farkli soylememelidir.
+    print("\n[3/3] Senaryo tabani mali donemle esitleniyor...")
+    db2: Session = SessionLocal()
+    try:
+        sync_scenario_baseline(db2, counter)
+    finally:
+        db2.close()
+
+    print("\nOzet:")
     counter.report()
     print(
         "\nTamamlandi. Script tekrar calistirilirsa yeni kayit eklenmez;\n"

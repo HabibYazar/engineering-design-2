@@ -269,7 +269,7 @@ def budget_to_dict(budget: DepartmentBudget) -> dict:
         "expenditure": budget.expenditure,
         "allocated_budget": budget.allocated_budget,
         "balance": quantize_money(budget.revenue - budget.expenditure),
-        "cost_per_student_thousand_try": cost_per_student,
+        "cost_per_student_thousand_usd": cost_per_student,
         "budget_realization_percent": realization,
         "budget_status": _budget_status(realization),
     }
@@ -377,18 +377,29 @@ def financial_summary(db: Session, academic_year: str) -> dict:
         "balance_status": "fazla" if balance >= 0 else "açık",
         "total_students": period.total_students,
         "total_graduates": period.total_graduates,
-        # Tutarlar milyon TL; bin TL'ye çevirmek için 1000 ile çarpılıyor.
-        "revenue_per_student_thousand_try": (
+        # Tam USD: milyon USD × 1.000.000 / öğrenci sayısı.
+        "revenue_per_student_usd": (
+            quantize_money(total_revenue * Decimal("1000000") / period.total_students)
+            if period.total_students
+            else None
+        ),
+        "cost_per_student_usd": (
+            quantize_money(total_expenditure * Decimal("1000000") / period.total_students)
+            if period.total_students
+            else None
+        ),
+        # Tutarlar milyon USD; bin USD'ye çevirmek için 1000 ile çarpılıyor.
+        "revenue_per_student_thousand_usd": (
             quantize_money(total_revenue * Decimal("1000") / period.total_students)
             if period.total_students
             else None
         ),
-        "cost_per_student_thousand_try": (
+        "cost_per_student_thousand_usd": (
             quantize_money(total_expenditure * Decimal("1000") / period.total_students)
             if period.total_students
             else None
         ),
-        "cost_per_graduate_million_try": (
+        "cost_per_graduate_million_usd": (
             quantize_money(total_expenditure / period.total_graduates)
             if period.total_graduates
             else None

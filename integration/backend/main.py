@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.database import init_db
 from app.routers import (
     academic_staff,
+    academic_success,
     assistant,
     administrative_units,
     auth,
@@ -18,6 +19,7 @@ from app.routers import (
     departments,
     early_warning,
     education_analytics,
+    engagement,
     faculties,
     finance,
     health,
@@ -103,6 +105,16 @@ app.include_router(finance.router)
 
 # Modül 8 - Kurumsal Performans Yönetimi ve İzleme (Halil)
 app.include_router(kpi.router)
+
+# Akademik Başarı Analizi
+# Üniversite -> fakülte -> bölüm -> program kırılımında ders geçme,
+# başarısızlık, bırakma ve mezuniyet oranları.
+app.include_router(academic_success.router)
+
+# Üniversite-Sanayi İş Birliği ve Bölgesel Katkı
+# Bu iki gösterge önceden elle girilen tek bir puandı; artık ölçülebilir
+# alt bileşenlerden formülle hesaplanıyor.
+app.include_router(engagement.router)
 
 # Akıllı Asistan altyapısı.
 # NOT: Bu router hiçbir dil modeline bağlı DEĞİLDİR ve cevap üretmez.

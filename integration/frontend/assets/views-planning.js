@@ -1,250 +1,309 @@
-// Planlama ekranları: Senaryo Analizi (Modül 9) ve Erken Uyarı (Modül 11).
+// Planlama ekranları: Senaryo Analizi ve Erken Uyarı.
+//
+// ÖNEMLİ: Bu ekranda hiçbir hesap yapılmaz. Senaryo türleri, girdi alanları,
+// sınırlar ve karşılaştırma tablosunun tamamı sunucudan gelir.
+//
+// Neden: önceki sürümde senaryo türleri ve alan adları burada elle yazılıydı
+// ve backend şemasıyla uyuşmuyordu ("staff_count_change" gönderiliyordu ama
+// backend "academic_staff_change" bekliyordu). Sonuçta hiçbir parametre
+// uygulanmıyor, her senaryo aynı sonucu döndürüyordu — kullanıcı değeri
+// değiştirdiğini sanıp aynı tabloyu görüyordu. Katalog sunucudan geldiği için
+// bu uyumsuzluk artık mümkün değil.
 
 /* ==================================================================
-   Senaryo Analizi — Modül 9 (Habib)
+   Senaryo Analizi
    ================================================================== */
 
 VIEWS["scenarios"] = {
   title: "Senaryo Analizi",
-  subtitle: "What-if simülasyonu, risk değerlendirmesi ve öneriler · Modül 9",
+  subtitle: "What-if simülasyonu · değişikliğin mali, akademik ve kapasite etkileri",
   html: () => `
+    <div class="card">
+      <h3>1. Karşılaştırma tabanını seçin</h3>
+      <div class="note">
+        Senaryo, seçtiğiniz mali dönemin <b>gerçekleşen</b> gelir ve gider
+        verisi üzerinden hesaplanır. Böylece senaryo sonuçları Finansal Analiz
+        ekranındaki rakamlarla birebir aynı olur.
+      </div>
+      <div class="filters">
+        <label class="f">Mali dönem <select id="scPeriod"></select></label>
+        <span class="muted" id="scPeriodNote"></span>
+      </div>
+    </div>
+
     <div class="grid cols-3-2">
       <div class="card">
-        <h3>Yeni simülasyon</h3>
-        <div class="note">
-          Hesaplama sunucuda Decimal ile yapılır; sonuçlar veritabanına
-          yazılmadan önizlenir.
-        </div>
-
+        <h3>2. Senaryoyu tanımlayın</h3>
         <label class="f">Senaryo türü <select id="scType"></select></label>
+        <div class="note" id="scQuestion"></div>
         <div id="scInputs"></div>
         <div class="form-actions">
-          <button class="primary" id="scPreview">Önizle</button>
-          <button class="ghost" id="scReset">Temizle</button>
+          <button class="primary" id="scPreview">Hesapla</button>
+          <button class="ghost" id="scReset">Sıfırla</button>
         </div>
+        <div class="note" id="scExplain"></div>
       </div>
 
       <div class="card">
-        <h3>Aktif temel senaryo (baseline)</h3>
-        <div class="note">Simülasyonun karşılaştırma tabanı.</div>
+        <h3>Mevcut durum (taban)</h3>
+        <div class="note">Değişiklik uygulanmadan önceki değerler.</div>
         <div id="scBaseline"></div>
       </div>
     </div>
 
-    <div class="card">
-      <h3>Simülasyon sonucu</h3>
-      <div id="scResult">${ui.empty("Henüz simülasyon çalıştırılmadı.")}</div>
-    </div>
-
-    <div class="card">
-      <h3>Kayıtlı senaryolar</h3>
-      <div id="scList"></div>
-    </div>`,
+    <div id="scResult">${ui.empty("Bir senaryo seçip Hesapla düğmesine basın.")}</div>`,
 
   async init() {
-    // Senaryo türleri ve girdi alanları OpenAPI şemasından değil, sunucunun
-    // döndürdüğü senaryo listesinden türetiliyor.
-    const sel = document.getElementById("scType");
-    sel.innerHTML = SCENARIO_TYPES.map(
-      (t) => `<option value="${t.value}">${fmt.esc(t.label)}</option>`
-    ).join("");
-    sel.addEventListener("change", renderScenarioInputs);
+    // Mali dönemler ve senaryo kataloğu sunucudan alınır.
+    const [periodInfo, catalog] = await Promise.all([
+      api.get("/api/scenarios/financial-periods"),
+      api.get("/api/scenarios/catalog"),
+    ]);
+    SCENARIO_CATALOG = catalog;
+
+    const periodSelect = document.getElementById("scPeriod");
+    periodSelect.innerHTML = periodInfo.periods
+      .map((p) => `<option value="${fmt.esc(p)}">${fmt.esc(p)}</option>`)
+      .join("");
+    if (periodInfo.default) periodSelect.value = periodInfo.default;
+    document.getElementById("scPeriodNote").textContent = periodInfo.note;
+    periodSelect.addEventListener("change", loadScenarioBaseline);
+
+    const typeSelect = document.getElementById("scType");
+    typeSelect.innerHTML = catalog
+      .map((t) => `<option value="${fmt.esc(t.key)}">${fmt.esc(t.label)}</option>`)
+      .join("");
+    typeSelect.addEventListener("change", renderScenarioInputs);
+
+    // Kalem bazlı senaryolar için gelir/gider kalem listesi.
+    SCENARIO_CATEGORIES = await api
+      .get("/api/scenarios/financial-categories")
+      .catch(() => ({ revenue_categories: [], expenditure_categories: [] }));
+
     renderScenarioInputs();
+    loadScenarioBaseline();
 
     document.getElementById("scPreview").addEventListener("click", runScenarioPreview);
     document.getElementById("scReset").addEventListener("click", () => {
       renderScenarioInputs();
       document.getElementById("scResult").innerHTML = ui.empty(
-        "Henüz simülasyon çalıştırılmadı."
+        "Bir senaryo seçip Hesapla düğmesine basın."
       );
     });
-
-    load(
-      "scBaseline",
-      () => api.get("/api/scenarios/baselines/active"),
-      (b, el) => {
-        el.innerHTML = `
-          <div class="kv">
-            ${kv("Ad", fmt.esc(b.name))}
-            ${kv("Akademik yıl", fmt.esc(b.academic_year))}
-            ${kv("Öğrenci sayısı", fmt.int(b.student_count))}
-            ${kv("Yıllık ücret", fmt.moneyM(b.annual_tuition_fee, 2))}
-            ${kv("Burs oranı", fmt.pct(b.scholarship_rate_percent))}
-            ${kv("Öğretim üyesi", fmt.int(b.academic_staff_count))}
-            ${kv("Derslik kapasitesi", fmt.int(b.classroom_capacity))}
-            ${kv("Laboratuvar kapasitesi", fmt.int(b.laboratory_capacity))}
-          </div>
-          <div class="note">${fmt.esc(b.description || "")}</div>`;
-      }
-    );
-
-    load(
-      "scList",
-      () => api.get("/api/scenarios"),
-      (rows, el) => {
-        if (!rows.length) return void (el.innerHTML = ui.empty("Kayıtlı senaryo yok."));
-        el.innerHTML = table(
-          ["Senaryo", "Tür", "Durum", "Oluşturulma"],
-          rows.map((r) => [
-            `<b>${fmt.esc(r.name)}</b><br><span class="muted">${fmt.esc(r.description || "")}</span>`,
-            fmt.esc(SCENARIO_LABEL[r.scenario_type] || r.scenario_type),
-            chip(r.status === "completed" ? "good" : "info", r.status),
-            fmt.esc((r.created_at || "").slice(0, 10)),
-          ])
-        );
-      }
-    );
   },
 };
 
-// Senaryo türleri ve her türün gerektirdiği girdiler.
-// Backend'in kabul ettiği alan adları birebir kullanılıyor.
-const SCENARIO_TYPES = [
-  {
-    value: "tuition-change",
-    label: "Öğrenim ücreti değişikliği",
-    fields: [["tuition_change_percent", "Ücret değişimi (%)", 10, -50, 100]],
-  },
-  {
-    value: "scholarship-change",
-    label: "Burs politikası değişikliği",
-    fields: [["scholarship_change_percent", "Burs oranı değişimi (puan)", 5, -50, 50]],
-  },
-  {
-    value: "student-count-change",
-    label: "Öğrenci sayısı değişikliği",
-    fields: [["student_count_change_percent", "Öğrenci sayısı değişimi (%)", 10, -50, 100]],
-  },
-  {
-    value: "new-program",
-    label: "Yeni program açma",
-    fields: [
-      ["new_program_student_count", "Yeni program öğrenci sayısı", 80, 1, 2000],
-      ["new_program_staff_count", "Gerekli öğretim üyesi", 6, 0, 200],
-    ],
-  },
-  {
-    value: "program-closure",
-    label: "Program kapatma",
-    fields: [["closing_program_student_count", "Kapatılan programın öğrenci sayısı", 60, 1, 2000]],
-  },
-  {
-    value: "staff-change",
-    label: "Öğretim üyesi sayısı değişikliği",
-    fields: [["staff_count_change", "Öğretim üyesi değişimi (kişi)", 10, -200, 200]],
-  },
-  {
-    value: "capacity-change",
-    label: "Fiziksel kapasite değişikliği",
-    fields: [
-      ["classroom_capacity_change", "Derslik kapasitesi değişimi", 200, -5000, 5000],
-      ["laboratory_capacity_change", "Laboratuvar kapasitesi değişimi", 50, -5000, 5000],
-    ],
-  },
-];
+let SCENARIO_CATALOG = [];
+let SCENARIO_CATEGORIES = { revenue_categories: [], expenditure_categories: [] };
 
-const SCENARIO_LABEL = Object.fromEntries(SCENARIO_TYPES.map((t) => [t.value, t.label]));
+function selectedScenario() {
+  const key = document.getElementById("scType").value;
+  return SCENARIO_CATALOG.find((t) => t.key === key) || SCENARIO_CATALOG[0];
+}
 
 function renderScenarioInputs() {
-  const type = document.getElementById("scType").value;
-  const spec = SCENARIO_TYPES.find((t) => t.value === type);
+  const spec = selectedScenario();
+  if (!spec) return;
+
+  document.getElementById("scQuestion").innerHTML =
+    `<b>Örnek soru:</b> ${fmt.esc(spec.question)}`;
+  document.getElementById("scExplain").textContent = spec.description;
+
   document.getElementById("scInputs").innerHTML = spec.fields
-    .map(
-      ([key, label, def, min, max]) =>
-        `<label class="f">${fmt.esc(label)}
-           <input type="number" data-key="${key}" value="${def}" min="${min}" max="${max}" step="1">
-         </label>`
-    )
+    .map((f) => {
+      // Kalem seçimi gereken alanlar açılır liste olarak çizilir; kullanıcı
+      // kalem adını elle yazmak zorunda kalmaz.
+      if (f.type === "revenue_category" || f.type === "expense_category") {
+        const options =
+          f.type === "revenue_category"
+            ? SCENARIO_CATEGORIES.revenue_categories
+            : SCENARIO_CATEGORIES.expenditure_categories;
+        return `<label class="f">${fmt.esc(f.label)}
+          <select data-key="${f.name}" data-kind="text">
+            ${options.map((o) => `<option value="${fmt.esc(o)}">${fmt.esc(o)}</option>`).join("")}
+          </select></label>`;
+      }
+      const unit = f.unit ? ` (${fmt.esc(f.unit)})` : "";
+      return `<label class="f">${fmt.esc(f.label)}${unit}
+        <input type="number" data-key="${f.name}" data-kind="number"
+               value="${f.default}" min="${f.min}" max="${f.max}" step="${f.step}">
+      </label>`;
+    })
     .join("");
 }
 
-async function runScenarioPreview() {
-  const type = document.getElementById("scType").value;
-  const inputs = {};
-  document.querySelectorAll("#scInputs input").forEach((i) => {
-    inputs[i.dataset.key] = Number(i.value);
-  });
-
+async function loadScenarioBaseline() {
+  const period = document.getElementById("scPeriod").value;
+  // Taban değerleri, hiçbir değişiklik uygulanmamış bir önizlemeden okunur.
+  // Böylece ekranda gösterilen taban ile hesapta kullanılan taban aynı olur.
   await load(
-    "scResult",
-    () => api.post("/api/scenarios/preview", { scenario_type: type, inputs }),
+    "scBaseline",
+    () => api.post(`/api/scenarios/preview?financial_period=${encodeURIComponent(period)}`, {}),
     (r, el) => {
-      const c = r.computation || r;
-      const risks = r.risks || [];
-      const level = r.risk_level || c.risk_level;
-      const levelClass =
-        level === "critical" ? "critical" : level === "high" ? "warning" : level === "medium" ? "info" : "good";
-
+      const m = r.result;
       el.innerHTML = `
-        <div class="state ${level === "low" ? "empty" : "warn"}">
-          ${chip(levelClass, "risk: " + level)} ${fmt.esc(r.recommendation || "")}
-        </div>
-
-        <h4>Hesaplanan etkiler</h4>
         <div class="kv">
-          ${Object.entries(c)
-            .filter(([k, v]) => typeof v !== "object" && v !== null && k !== "risk_level")
-            .map(([k, v]) => kv(SCENARIO_FIELD_LABELS[k] || k, formatScenarioValue(k, v)))
-            .join("")}
+          ${kv("Mali dönem", fmt.esc(period))}
+          ${kv("Öğrenci sayısı", fmt.int(m.baseline_student_count))}
+          ${kv("Akademik personel", fmt.int(m.baseline_staff_count))}
+          ${kv("Toplam gelir", fmt.usd(m.baseline_revenue))}
+          ${kv("Toplam gider", fmt.usd(m.baseline_expenditure))}
+          ${kv("Gelir–gider dengesi", fmt.usd(m.baseline_balance ?? (Number(m.baseline_revenue) - Number(m.baseline_expenditure)))) }
+          ${kv("Öğrenci başına maliyet", fmt.usd(m.baseline_cost_per_student))}
+          ${kv("Öğrenci / öğretim üyesi", fmt.dec(m.baseline_student_staff_ratio, 2))}
+          ${kv("Derslik kapasitesi", fmt.int(m.baseline_classroom_capacity))}
+          ${kv("Laboratuvar kapasitesi", fmt.int(m.baseline_laboratory_capacity))}
         </div>
-
-        <h4>Tespit edilen riskler (${risks.length})</h4>
-        ${
-          risks.length
-            ? `<ul class="plain">${risks
-                .map(
-                  (x) =>
-                    `<li>${chip(
-                      x.level === "critical" ? "critical" : x.level === "high" ? "warning" : "info",
-                      x.level
-                    )}${fmt.esc(x.message || x.description)}</li>`
-                )
-                .join("")}</ul>`
-            : ui.empty("Bu senaryoda risk kuralı tetiklenmedi.")
-        }
-
-        <div class="note">
-          Bu bir önizlemedir; veritabanına kayıt yazılmamıştır.
-          Hesaplamalar Decimal ile yapılır, float yuvarlaması yoktur.
-        </div>`;
+        <div class="note">Tüm parasal değerler ${r.comparison.currency} cinsindendir.</div>`;
     }
   );
 }
 
-const SCENARIO_FIELD_LABELS = {
-  baseline_revenue: "Mevcut gelir",
-  projected_revenue: "Projeksiyon gelir",
-  revenue_change: "Gelir değişimi",
-  revenue_change_percent: "Gelir değişimi (%)",
-  baseline_cost: "Mevcut maliyet",
-  projected_cost: "Projeksiyon maliyet",
-  cost_change: "Maliyet değişimi",
-  baseline_student_count: "Mevcut öğrenci sayısı",
-  projected_student_count: "Projeksiyon öğrenci sayısı",
-  baseline_staff_count: "Mevcut öğretim üyesi",
-  projected_staff_count: "Projeksiyon öğretim üyesi",
-  student_staff_ratio: "Öğrenci / öğretim üyesi oranı",
-  classroom_utilization_percent: "Derslik kullanım oranı",
-  laboratory_utilization_percent: "Laboratuvar kullanım oranı",
-  net_balance: "Net denge",
-};
+async function runScenarioPreview() {
+  const spec = selectedScenario();
+  const period = document.getElementById("scPeriod").value;
 
-function formatScenarioValue(key, value) {
-  if (key.includes("percent") || key.includes("utilization")) return fmt.pct(value);
-  if (key.includes("count")) return fmt.int(value);
-  if (key.includes("ratio")) return fmt.dec(value, 2);
-  if (key.includes("revenue") || key.includes("cost") || key.includes("balance"))
-    return fmt.moneyM(value, 2);
-  return fmt.dec(value, 2);
+  // Girdiler katalogdaki alan adlarıyla toplanır; arayüzde ad uydurulmaz.
+  const inputs = {};
+  document.querySelectorAll("#scInputs [data-key]").forEach((el) => {
+    inputs[el.dataset.key] =
+      el.dataset.kind === "number" ? Number(el.value) : el.value;
+  });
+
+  await load(
+    "scResult",
+    () =>
+      api.post(
+        `/api/scenarios/preview?financial_period=${encodeURIComponent(period)}`,
+        inputs
+      ),
+    (r, el) => {
+      const cmp = r.comparison;
+      const cur = cmp.currency;
+      const level = r.risk_level;
+      const levelClass =
+        level === "critical" ? "critical"
+        : level === "high" ? "warning"
+        : level === "medium" ? "info"
+        : "good";
+
+      // Değer biçimlendirmesi birime göre yapılır; çıplak sayı bırakılmaz.
+      const showValue = (m, key) => {
+        const v = m[key];
+        if (m.unit === "usd") return fmt.usd(v);
+        if (m.unit === "percent") return fmt.pct(v);
+        if (m.unit === "count") return fmt.int(v);
+        return fmt.dec(v, 2);
+      };
+      const showDelta = (m) => {
+        const sign = Number(m.absolute_change) > 0 ? "+" : "";
+        const abs =
+          m.unit === "usd" ? fmt.usd(m.absolute_change)
+          : m.unit === "percent" ? fmt.dec(m.absolute_change, 2) + " puan"
+          : m.unit === "count" ? fmt.int(m.absolute_change)
+          : fmt.dec(m.absolute_change, 2);
+        return sign + abs;
+      };
+
+      const groupTable = (rows, title, note) => {
+        if (!rows.length) return "";
+        return `<div class="card">
+          <h3>${fmt.esc(title)}</h3>
+          <div class="note">${fmt.esc(note)}</div>
+          ${table(
+            ["Gösterge", "Önceki değer", "Yeni değer", "Değişim", "Yüzde", "Yorum"],
+            rows.map((m) => {
+              const cls =
+                m.is_favorable === true ? "good"
+                : m.is_favorable === false ? "critical"
+                : "info";
+              const arrow = m.direction === "up" ? "▲" : m.direction === "down" ? "▼" : "—";
+              const verdict =
+                m.is_favorable === true ? "olumlu"
+                : m.is_favorable === false ? "olumsuz"
+                : "nötr";
+              return [
+                `<b>${fmt.esc(m.label)}</b><br><span class="muted">${fmt.esc(m.description)}</span>`,
+                showValue(m, "baseline_value"),
+                `<b>${showValue(m, "projected_value")}</b>`,
+                `${arrow} ${showDelta(m)}`,
+                m.percent_change === null ? fmt.empty : fmt.pct(m.percent_change, 2),
+                m.direction === "flat" ? chip("neutral", "değişmedi") : chip(cls, verdict),
+              ];
+            })
+          )}
+        </div>`;
+      };
+
+      const highlights = cmp.most_significant
+        .map((m) => {
+          const cls =
+            m.is_favorable === true ? "good"
+            : m.is_favorable === false ? "critical"
+            : "info";
+          return `<div class="tile">
+            <div class="label">${fmt.esc(m.label)}</div>
+            <div class="value">${showValue(m, "projected_value")}</div>
+            <div class="delta ${m.is_favorable === false ? "down" : "up"}">
+              ${m.percent_change === null ? fmt.empty : fmt.pct(m.percent_change, 2)}
+              · önceki ${showValue(m, "baseline_value")}
+            </div>
+          </div>`;
+        })
+        .join("");
+
+      el.innerHTML = `
+        <div class="card">
+          <h3>Senaryo sonucu — ${fmt.esc(spec.label)}</h3>
+          <div class="state ${level === "low" ? "empty" : "warn"}">
+            ${chip(levelClass, "risk seviyesi: " + level)}
+            ${fmt.esc(r.recommendation || "")}
+          </div>
+          <h4>En çok değişen göstergeler</h4>
+          <div class="tiles">${highlights}</div>
+          <div class="note">
+            Taban: <b>${fmt.esc(period)}</b> mali dönemi ·
+            Para birimi: <b>${fmt.esc(cur)}</b> ·
+            Bu bir <b>önizlemedir</b>, veritabanına kayıt yazılmamıştır.
+          </div>
+        </div>
+
+        ${groupTable(cmp.financial, "Mali etki",
+          "Gelir, gider, denge ve öğrenci başına maliyet üzerindeki etki. Tüm tutarlar " + cur + ".")}
+        ${groupTable(cmp.academic, "Akademik etki",
+          "Öğrenci ve personel sayıları ile öğretim üyesi başına düşen öğrenci.")}
+        ${groupTable(cmp.capacity, "Kapasite etkisi",
+          "Eş zamanlı talep, tüm öğrencilerin aynı anda derslikte olmadığı varsayımıyla hesaplanır.")}
+
+        ${
+          r.risks.length
+            ? `<div class="card"><h3>Tespit edilen riskler (${r.risks.length})</h3>
+                <ul class="plain">${r.risks
+                  .map(
+                    (x) =>
+                      `<li>${chip(
+                        x.level === "critical" ? "critical"
+                        : x.level === "high" ? "warning" : "info",
+                        x.level
+                      )}${fmt.esc(x.message || x.description || "")}</li>`
+                  )
+                  .join("")}</ul></div>`
+            : `<div class="card"><h3>Riskler</h3>${ui.empty(
+                "Bu senaryoda hiçbir risk kuralı tetiklenmedi."
+              )}</div>`
+        }`;
+    }
+  );
 }
 
+
 /* ==================================================================
-   Erken Uyarı — Modül 11 (Begüm)
+   Erken Uyarı Sistemi
    ================================================================== */
 
 VIEWS["alerts"] = {
   title: "Erken Uyarı Sistemi",
-  subtitle: "Kural motoru tabanlı otomatik risk tespiti · Modül 11",
+  subtitle: "Kural motoru tabanlı otomatik risk tespiti",
   html: () => `
     <div class="card">
       <div class="filters">

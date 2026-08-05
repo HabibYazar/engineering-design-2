@@ -57,16 +57,23 @@ def detect_risks(computation: ScenarioComputation) -> List[RiskItem]:
         )
 
     # --- 3) Derslik kapasitesi ---
-    if computation.projected_student_count > computation.projected_classroom_capacity:
+    # Karşılaştırma EŞ ZAMANLI talep üzerinden yapılır. Toplam öğrenci sayısını
+    # kapasiteyle karşılaştırmak, tüm öğrencilerin aynı anda derslikte olduğunu
+    # varsaymak demektir; bu varsayımla her kurum "kapasitesi yetersiz" çıkar ve
+    # uyarı anlamını yitirir. Aynı düzeltme scenario_engine._capacity_status
+    # içinde de yapıldı; iki yerde farklı ölçüt kullanmamak için burada da
+    # motorun hesapladığı eş zamanlı talep kullanılıyor.
+    if computation.simultaneous_classroom_demand > computation.projected_classroom_capacity:
         shortage: int = (
-            computation.projected_student_count - computation.projected_classroom_capacity
+            computation.simultaneous_classroom_demand - computation.projected_classroom_capacity
         )
         risks.append(
             RiskItem(
                 code="classroom_capacity_exceeded",
                 message=(
-                    f"Derslik kapasitesi yetersiz: {computation.projected_student_count} öğrenciye "
-                    f"karşılık {computation.projected_classroom_capacity} kapasite var. "
+                    f"Derslik kapasitesi yetersiz: aynı anda derslikte olması beklenen "
+                    f"{computation.simultaneous_classroom_demand} öğrenciye karşılık "
+                    f"{computation.projected_classroom_capacity} kapasite var. "
                     f"{shortage} kişilik açık oluşuyor."
                 ),
                 severity="warning",
@@ -74,16 +81,17 @@ def detect_risks(computation: ScenarioComputation) -> List[RiskItem]:
         )
 
     # --- 4) Laboratuvar kapasitesi ---
-    if computation.projected_student_count > computation.projected_laboratory_capacity:
+    if computation.simultaneous_laboratory_demand > computation.projected_laboratory_capacity:
         shortage = (
-            computation.projected_student_count - computation.projected_laboratory_capacity
+            computation.simultaneous_laboratory_demand - computation.projected_laboratory_capacity
         )
         risks.append(
             RiskItem(
                 code="laboratory_capacity_exceeded",
                 message=(
-                    f"Laboratuvar kapasitesi yetersiz: {computation.projected_student_count} "
-                    f"öğrenciye karşılık {computation.projected_laboratory_capacity} kapasite var. "
+                    f"Laboratuvar kapasitesi yetersiz: aynı anda laboratuvarda olması beklenen "
+                    f"{computation.simultaneous_laboratory_demand} öğrenciye karşılık "
+                    f"{computation.projected_laboratory_capacity} kapasite var. "
                     f"{shortage} kişilik açık oluşuyor."
                 ),
                 severity="warning",

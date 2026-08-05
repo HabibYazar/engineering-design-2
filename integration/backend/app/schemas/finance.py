@@ -1,6 +1,6 @@
 """Modül 6 — Stratejik finansal analiz şemaları.
 
-Tüm tutarlar milyon TL cinsindendir ve Decimal olarak taşınır.
+Tüm tutarlar milyon USD cinsindendir ve Decimal olarak taşınır.
 """
 
 from decimal import Decimal
@@ -49,7 +49,7 @@ class FinancialEntryCreate(BaseModel):
     kind: str = Field(description="revenue veya expenditure", examples=["revenue"])
     category: str = Field(min_length=2, max_length=120, examples=["Öğrenim ücretleri"])
     amount: Decimal = Field(
-        description="Milyon TL. Negatif değer düzeltme olarak mevcut tutardan düşer.",
+        description="Milyon USD. Negatif değer düzeltme olarak mevcut tutardan düşer.",
         examples=[Decimal("486.00")],
     )
 
@@ -96,7 +96,7 @@ class DepartmentBudgetResponse(BaseModel):
     balance: Decimal = Field(
         description="Gelir eksi gider.", examples=[Decimal("24.00")]
     )
-    cost_per_student_thousand_try: Optional[Decimal] = Field(
+    cost_per_student_thousand_usd: Optional[Decimal] = Field(
         default=None,
         description="Öğrenci sayısı sıfırsa hesaplanmaz.",
         examples=[Decimal("206.45")],
@@ -122,13 +122,22 @@ class FinancialSummary(BaseModel):
     balance_status: str = Field(examples=["fazla"])
     total_students: int = Field(examples=[2700])
     total_graduates: int = Field(examples=[540])
-    revenue_per_student_thousand_try: Optional[Decimal] = Field(
+    # Bin USD cinsinden gösterim özet kartlar için pratiktir ancak iki ondalıkla
+    # yuvarlandığı için 10 USD çözünürlük kaybı olur. Hassas karşılaştırma ve
+    # test gereken yerlerde tam USD alanları kullanılır.
+    revenue_per_student_usd: Optional[Decimal] = Field(
+        default=None, description="Öğrenci başına gelir (tam USD)", examples=[Decimal("12600.00")]
+    )
+    cost_per_student_usd: Optional[Decimal] = Field(
+        default=None, description="Öğrenci başına maliyet (tam USD)", examples=[Decimal("11875.00")]
+    )
+    revenue_per_student_thousand_usd: Optional[Decimal] = Field(
         default=None, examples=[Decimal("230.37")]
     )
-    cost_per_student_thousand_try: Optional[Decimal] = Field(
+    cost_per_student_thousand_usd: Optional[Decimal] = Field(
         default=None, examples=[Decimal("222.59")]
     )
-    cost_per_graduate_million_try: Optional[Decimal] = Field(
+    cost_per_graduate_million_usd: Optional[Decimal] = Field(
         default=None, examples=[Decimal("1.11")]
     )
     personnel_expense_share_percent: Optional[Decimal] = Field(

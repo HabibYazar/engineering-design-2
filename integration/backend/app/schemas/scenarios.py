@@ -193,6 +193,13 @@ class ScenarioInputCreate(BaseModel):
     parametreyi göndererek "diğer her şey sabitken ne olur" sorusunu sorabilir.
     """
 
+    # extra="forbid" KRİTİK: bu ayar olmadan yanlış yazılmış bir alan adı
+    # (örneğin "staff_count_change" yerine "academic_staff_change") sessizce
+    # yok sayılıyor ve simülasyon hiçbir değişiklik uygulanmamış gibi
+    # baseline sonucunu döndürüyordu. Kullanıcı parametreyi değiştirdiğini
+    # sanıp aynı sonucu görüyordu. Artık böyle bir istek 422 ile reddediliyor.
+    model_config = ConfigDict(extra="forbid")
+
     # Yüzdesel değişimler
     # Her alana kendi anlamına uygun gerçekçi bir örnek verildi; böylece Swagger'daki
     # "Try it out" gövdesi doğrudan denenebilir bir senaryo üretiyor.
@@ -227,15 +234,72 @@ class ScenarioInputCreate(BaseModel):
         examples=[10.00],
     )
 
+    # --- Maaş senaryoları ---
+    # Personel SAYISI değişiminden ayrıdır. "%2 zam" personel sayısını
+    # değiştirmez ama toplam personel giderini ve öğrenci başına maliyeti
+    # değiştirir. Bu alan olmadan "maaşlara zam yapılırsa ne olur" sorusu
+    # sistemde hiç cevaplanamıyordu.
+    academic_salary_change_percent: Decimal = Field(
+        default=Decimal("0"), ge=PERCENT_MIN, le=PERCENT_MAX,
+        description="Akademik personel maaşlarındaki yüzdesel değişim",
+        examples=[2.00],
+    )
+    administrative_salary_change_percent: Decimal = Field(
+        default=Decimal("0"), ge=PERCENT_MIN, le=PERCENT_MAX,
+        description="İdari personel maaşlarındaki yüzdesel değişim",
+        examples=[2.00],
+    )
+
+    # --- Kontenjan ---
+    quota_change_percent: Decimal = Field(
+        default=Decimal("0"), ge=PERCENT_MIN, le=PERCENT_MAX,
+        description=(
+            "Program kontenjanlarındaki yüzdesel değişim. Kontenjan artışı "
+            "öğrenci sayısını doluluk oranı kadar artırır; boş kontenjan gelir üretmez."
+        ),
+        examples=[15.00],
+    )
+
+    # --- Tek bir gelir/gider kalemi üzerinde değişiklik ---
+    # Yönetici "yalnızca enerji giderini %20 düşürsem ne olur" diye sorabilsin
+    # diye kalem adı ve oranı birlikte gönderilir.
+    target_revenue_category: Optional[str] = Field(
+        default=None, max_length=120,
+        description="Değişiklik uygulanacak gelir kalemi adı (boşsa kalem bazlı değişiklik yok)",
+        examples=["Sanayi iş birliği gelirleri"],
+    )
+    revenue_item_change_percent: Decimal = Field(
+        default=Decimal("0"), ge=PERCENT_MIN, le=PERCENT_MAX,
+        description="Seçilen gelir kalemindeki yüzdesel değişim",
+        examples=[20.00],
+    )
+    target_expense_category: Optional[str] = Field(
+        default=None, max_length=120,
+        description="Değişiklik uygulanacak gider kalemi adı",
+        examples=["Enerji ve işletme giderleri"],
+    )
+    expense_item_change_percent: Decimal = Field(
+        default=Decimal("0"), ge=PERCENT_MIN, le=PERCENT_MAX,
+        description="Seçilen gider kalemindeki yüzdesel değişim",
+        examples=[-15.00],
+    )
+
     # Mutlak değişimler (negatif olabilir)
     academic_staff_change: int = Field(
-        default=0, description="Akademik personel sayısındaki artış/azalış (adet)"
+        default=0, ge=-5000, le=5000,
+        description="Akademik personel sayısındaki artış/azalış (adet)",
+    )
+    administrative_staff_change: int = Field(
+        default=0, ge=-5000, le=5000,
+        description="İdari personel sayısındaki artış/azalış (adet)",
     )
     classroom_capacity_change: int = Field(
-        default=0, description="Derslik kapasitesindeki artış/azalış (kişi)"
+        default=0, ge=-100000, le=100000,
+        description="Derslik kapasitesindeki artış/azalış (kişi)",
     )
     laboratory_capacity_change: int = Field(
-        default=0, description="Laboratuvar kapasitesindeki artış/azalış (kişi)"
+        default=0, ge=-100000, le=100000,
+        description="Laboratuvar kapasitesindeki artış/azalış (kişi)",
     )
 
 
@@ -329,6 +393,72 @@ class FinancialBreakdown(BaseModel):
     projected_balance: Decimal = Field(..., examples=[221500000.00])
 
 
+class MetricComparisonResponse(BaseModel):
+    """Tek bir göstergenin baseline ↔ senaryo karşılaştırması.
+
+    Arayüz bu yapıyı doğrudan tabloya çizer; fark ve yüzde hesabını kendisi
+    yapmaz. Aynı hesabın iki yerde yapılması iki farklı yuvarlama üretirdi.
+    """
+
+    key: str = Field(examples=["total_expenditure"])
+    label: str = Field(examples=["Toplam gider"])
+    unit: str = Field(
+        description="usd | percent | count | ratio", examples=["usd"]
+    )
+    baseline_value: Decimal = Field(
+        description="Değişiklik öncesi değer", examples=[Decimal("47500000.00")]
+    )
+    projected_value: Decimal = Field(
+        description="Değişiklik sonrası değer", examples=[Decimal("47622400.00")]
+    )
+    absolute_change: Decimal = Field(
+        description="Yeni değer eksi önceki değer", examples=[Decimal("122400.00")]
+    )
+    percent_change: Optional[Decimal] = Field(
+        default=None,
+        description="Yüzdesel değişim. Önceki değer sıfırsa tanımsızdır ve null döner.",
+        examples=[Decimal("0.26")],
+    )
+    direction: str = Field(description="up | down | flat", examples=["up"])
+    is_favorable: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Değişimin kurum açısından olumlu olup olmadığı. Nötr göstergelerde "
+            "(öğrenci sayısı gibi) null döner."
+        ),
+        examples=[False],
+    )
+    group: str = Field(examples=["Mali etki"])
+    description: str = Field(
+        default="",
+        description="Göstergenin ne anlama geldiği ve nasıl hesaplandığı.",
+        examples=["Toplam gider / öğrenci sayısı."],
+    )
+
+
+class ScenarioComparisonReport(BaseModel):
+    """Senaryonun mali, akademik ve kapasite etkilerini gruplanmış olarak taşır."""
+
+    currency: str = Field(
+        default="USD",
+        description="Parasal alanların para birimi. Sistemde tek para birimi kullanılır.",
+        examples=["USD"],
+    )
+    financial: List[MetricComparisonResponse] = Field(
+        default_factory=list, description="Mali etkiler"
+    )
+    academic: List[MetricComparisonResponse] = Field(
+        default_factory=list, description="Akademik etkiler"
+    )
+    capacity: List[MetricComparisonResponse] = Field(
+        default_factory=list, description="Kapasite etkileri"
+    )
+    most_significant: List[MetricComparisonResponse] = Field(
+        default_factory=list,
+        description="Yüzdesel olarak en çok değişen göstergeler (en fazla 5 adet).",
+    )
+
+
 class SimulationResponse(BaseModel):
     """Simülasyon veya ön izleme sonucunda dönen tam rapor."""
 
@@ -347,6 +477,10 @@ class SimulationResponse(BaseModel):
     # Ana sonuç tablosu (preview modunda id ve tarih alanları doldurulmaz).
     result: "SimulationMetrics"
     breakdown: FinancialBreakdown
+
+    # Baseline ↔ senaryo karşılaştırması. Önceki değer, yeni değer, mutlak
+    # değişim ve yüzde değişim burada gelir; arayüz fark hesabı yapmaz.
+    comparison: ScenarioComparisonReport
 
     risks: List[RiskItem] = Field(default_factory=list)
     risk_level: RiskLevel

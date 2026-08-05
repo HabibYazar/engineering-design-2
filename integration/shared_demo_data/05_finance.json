@@ -1,109 +1,315 @@
 {
-  "_aciklama": "Modül 6 — Mali dönemler, gelir/gider kalemleri ve bölüm bütçeleri. Tüm tutarlar MİLYON TL cinsindendir.",
-  "_kaynak": "Rakamların yapısı Halil'in halilhan/finance/backend/seed_data.json dosyasından alındı, 12 bölümlü yeni kurum yapısına ölçeklendi ve kalem adları Türkçeleştirildi.",
-  "_tutarlilik": "Öğrenci sayıları (total_students) Modül 2'deki 4000 öğrenci hedefiyle uyumludur; mali oranlar bu paydayı kullanır.",
-
+  "_aciklama": "Mali dönemler, gelir/gider kalemleri ve bölüm bütçeleri. TÜM TUTARLAR MİLYON USD CİNSİNDENDİR.",
+  "_para_birimi": "USD (milyon). Sistemde başka para birimi kullanılmaz.",
+  "_turetme_kurali": "Akademik personel gideri = akademik personel sayısı × ortalama akademik maaş. İdari personel gideri = idari personel sayısı × ortalama idari maaş. Burs gideri = brüt öğrenim ücreti geliri × ortalama burs oranı. Bu üç kalem 'drivers' bloğundan hesaplanır ve testle doğrulanır.",
+  "_kategori_yapisi": {
+    "gelir": [
+      "Öğrenim ücretleri (brüt)",
+      "Araştırma proje gelirleri",
+      "Sanayi iş birliği gelirleri",
+      "Sürekli eğitim ve sertifika programları",
+      "Bağış ve sponsorluklar",
+      "Diğer faaliyet gelirleri"
+    ],
+    "gider": [
+      "Akademik personel giderleri",
+      "İdari personel giderleri",
+      "Burs giderleri",
+      "Altyapı ve bakım giderleri",
+      "Eğitim ve laboratuvar giderleri",
+      "Enerji ve işletme giderleri",
+      "Araştırma ve geliştirme giderleri",
+      "Bilgi teknolojileri giderleri",
+      "Diğer giderler"
+    ]
+  },
   "periods": [
+    {
+      "academic_year": "2021-2022",
+      "total_students": 3200,
+      "total_graduates": null,
+      "drivers": {
+        "_aciklama": "Turetilebilir kalemler bu surucu degerlerden hesaplanir. Boylece 'personel gideri = personel sayisi x ortalama maas' esitligi testle dogrulanabilir.",
+        "academic_staff_count": 148,
+        "average_academic_salary_usd": 28000,
+        "administrative_staff_count": 78,
+        "average_administrative_salary_usd": 18000,
+        "list_tuition_per_student_usd": 7600,
+        "average_scholarship_rate_percent": 41.0
+      },
+      "revenue": {
+        "Öğrenim ücretleri (brüt)": 24.32,
+        "Araştırma proje gelirleri": 4.03,
+        "Sanayi iş birliği gelirleri": 1.84,
+        "Sürekli eğitim ve sertifika programları": 1.26,
+        "Bağış ve sponsorluklar": 0.86,
+        "Diğer faaliyet gelirleri": 0.94
+      },
+      "expenditure": {
+        "Akademik personel giderleri": 4.14,
+        "İdari personel giderleri": 1.4,
+        "Burs giderleri": 9.97,
+        "Altyapı ve bakım giderleri": 4.25,
+        "Eğitim ve laboratuvar giderleri": 3.74,
+        "Enerji ve işletme giderleri": 3.13,
+        "Araştırma ve geliştirme giderleri": 2.95,
+        "Bilgi teknolojileri giderleri": 1.98,
+        "Diğer giderler": 1.84
+      },
+      "_kontrol": {
+        "toplam_gelir_milyon_usd": 33.25,
+        "toplam_gider_milyon_usd": 33.4,
+        "denge_milyon_usd": -0.15
+      }
+    },
+    {
+      "academic_year": "2022-2023",
+      "total_students": 3450,
+      "total_graduates": null,
+      "drivers": {
+        "_aciklama": "Turetilebilir kalemler bu surucu degerlerden hesaplanir. Boylece 'personel gideri = personel sayisi x ortalama maas' esitligi testle dogrulanabilir.",
+        "academic_staff_count": 158,
+        "average_academic_salary_usd": 29500,
+        "administrative_staff_count": 83,
+        "average_administrative_salary_usd": 19000,
+        "list_tuition_per_student_usd": 8000,
+        "average_scholarship_rate_percent": 40.0
+      },
+      "revenue": {
+        "Öğrenim ücretleri (brüt)": 27.6,
+        "Araştırma proje gelirleri": 4.42,
+        "Sanayi iş birliği gelirleri": 2.01,
+        "Sürekli eğitim ve sertifika programları": 1.38,
+        "Bağış ve sponsorluklar": 0.95,
+        "Diğer faaliyet gelirleri": 1.03
+      },
+      "expenditure": {
+        "Akademik personel giderleri": 4.66,
+        "İdari personel giderleri": 1.58,
+        "Burs giderleri": 11.04,
+        "Altyapı ve bakım giderleri": 4.66,
+        "Eğitim ve laboratuvar giderleri": 4.11,
+        "Enerji ve işletme giderleri": 3.44,
+        "Araştırma ve geliştirme giderleri": 3.24,
+        "Bilgi teknolojileri giderleri": 2.17,
+        "Diğer giderler": 2.01
+      },
+      "_kontrol": {
+        "toplam_gelir_milyon_usd": 37.39,
+        "toplam_gider_milyon_usd": 36.91,
+        "denge_milyon_usd": 0.48
+      }
+    },
     {
       "academic_year": "2023-2024",
       "total_students": 3620,
-      "total_graduates": 648,
+      "total_graduates": null,
+      "drivers": {
+        "_aciklama": "Turetilebilir kalemler bu surucu degerlerden hesaplanir. Boylece 'personel gideri = personel sayisi x ortalama maas' esitligi testle dogrulanabilir.",
+        "academic_staff_count": 165,
+        "average_academic_salary_usd": 31000,
+        "administrative_staff_count": 87,
+        "average_administrative_salary_usd": 20000,
+        "list_tuition_per_student_usd": 8400,
+        "average_scholarship_rate_percent": 39.5
+      },
       "revenue": {
-        "Öğrenim ücretleri": 604,
-        "Araştırma proje gelirleri": 58,
-        "Sürekli eğitim programları": 19,
-        "Sanayi iş birliği gelirleri": 24,
-        "Bağışlar": 6,
-        "Sponsorluklar": 8,
-        "Diğer faaliyet gelirleri": 15
+        "Öğrenim ücretleri (brüt)": 30.41,
+        "Araştırma proje gelirleri": 4.82,
+        "Sanayi iş birliği gelirleri": 2.19,
+        "Sürekli eğitim ve sertifika programları": 1.5,
+        "Bağış ve sponsorluklar": 1.03,
+        "Diğer faaliyet gelirleri": 1.12
       },
       "expenditure": {
-        "Akademik personel maaşları": 268,
-        "İdari personel maaşları": 84,
-        "Eğitim giderleri": 62,
-        "Ar-Ge giderleri": 46,
-        "Burs giderleri": 108,
-        "Bakım ve enerji giderleri": 58,
-        "Teknoloji ve laboratuvar giderleri": 41,
-        "Merkezi idari giderler": 37,
-        "Yatırım harcamaları": 32
+        "Akademik personel giderleri": 5.12,
+        "İdari personel giderleri": 1.74,
+        "Burs giderleri": 12.01,
+        "Altyapı ve bakım giderleri": 5.07,
+        "Eğitim ve laboratuvar giderleri": 4.47,
+        "Enerji ve işletme giderleri": 3.74,
+        "Araştırma ve geliştirme giderleri": 3.53,
+        "Bilgi teknolojileri giderleri": 2.36,
+        "Diğer giderler": 2.19
+      },
+      "_kontrol": {
+        "toplam_gelir_milyon_usd": 41.07,
+        "toplam_gider_milyon_usd": 40.23,
+        "denge_milyon_usd": 0.84
       }
     },
     {
       "academic_year": "2024-2025",
       "total_students": 3840,
-      "total_graduates": 702,
+      "total_graduates": null,
+      "drivers": {
+        "_aciklama": "Turetilebilir kalemler bu surucu degerlerden hesaplanir. Boylece 'personel gideri = personel sayisi x ortalama maas' esitligi testle dogrulanabilir.",
+        "academic_staff_count": 173,
+        "average_academic_salary_usd": 32500,
+        "administrative_staff_count": 91,
+        "average_administrative_salary_usd": 21000,
+        "list_tuition_per_student_usd": 8900,
+        "average_scholarship_rate_percent": 38.5
+      },
       "revenue": {
-        "Öğrenim ücretleri": 671,
-        "Araştırma proje gelirleri": 71,
-        "Sürekli eğitim programları": 23,
-        "Sanayi iş birliği gelirleri": 31,
-        "Bağışlar": 7,
-        "Sponsorluklar": 10,
-        "Diğer faaliyet gelirleri": 17
+        "Öğrenim ücretleri (brüt)": 34.18,
+        "Araştırma proje gelirleri": 5.21,
+        "Sanayi iş birliği gelirleri": 2.37,
+        "Sürekli eğitim ve sertifika programları": 1.63,
+        "Bağış ve sponsorluklar": 1.12,
+        "Diğer faaliyet gelirleri": 1.21
       },
       "expenditure": {
-        "Akademik personel maaşları": 298,
-        "İdari personel maaşları": 92,
-        "Eğitim giderleri": 69,
-        "Ar-Ge giderleri": 53,
-        "Burs giderleri": 124,
-        "Bakım ve enerji giderleri": 64,
-        "Teknoloji ve laboratuvar giderleri": 47,
-        "Merkezi idari giderler": 41,
-        "Yatırım harcamaları": 28
+        "Akademik personel giderleri": 5.62,
+        "İdari personel giderleri": 1.91,
+        "Burs giderleri": 13.16,
+        "Altyapı ve bakım giderleri": 5.49,
+        "Eğitim ve laboratuvar giderleri": 4.84,
+        "Enerji ve işletme giderleri": 4.05,
+        "Araştırma ve geliştirme giderleri": 3.81,
+        "Bilgi teknolojileri giderleri": 2.56,
+        "Diğer giderler": 2.37
+      },
+      "_kontrol": {
+        "toplam_gelir_milyon_usd": 45.72,
+        "toplam_gider_milyon_usd": 43.81,
+        "denge_milyon_usd": 1.91
       }
     },
     {
       "academic_year": "2025-2026",
       "total_students": 4000,
-      "total_graduates": 748,
+      "total_graduates": null,
+      "drivers": {
+        "_aciklama": "Turetilebilir kalemler bu surucu degerlerden hesaplanir. Boylece 'personel gideri = personel sayisi x ortalama maas' esitligi testle dogrulanabilir.",
+        "academic_staff_count": 180,
+        "average_academic_salary_usd": 34000,
+        "administrative_staff_count": 95,
+        "average_administrative_salary_usd": 22000,
+        "list_tuition_per_student_usd": 9500,
+        "average_scholarship_rate_percent": 38.0
+      },
       "revenue": {
-        "Öğrenim ücretleri": 742,
-        "Araştırma proje gelirleri": 86,
-        "Sürekli eğitim programları": 27,
-        "Sanayi iş birliği gelirleri": 39,
-        "Bağışlar": 9,
-        "Sponsorluklar": 12,
-        "Diğer faaliyet gelirleri": 20
+        "Öğrenim ücretleri (brüt)": 38.0,
+        "Araştırma proje gelirleri": 5.6,
+        "Sanayi iş birliği gelirleri": 2.55,
+        "Sürekli eğitim ve sertifika programları": 1.75,
+        "Bağış ve sponsorluklar": 1.2,
+        "Diğer faaliyet gelirleri": 1.3
       },
       "expenditure": {
-        "Akademik personel maaşları": 334,
-        "İdari personel maaşları": 101,
-        "Eğitim giderleri": 78,
-        "Ar-Ge giderleri": 61,
-        "Burs giderleri": 142,
-        "Bakım ve enerji giderleri": 73,
-        "Teknoloji ve laboratuvar giderleri": 54,
-        "Merkezi idari giderler": 46,
-        "Yatırım harcamaları": 44
+        "Akademik personel giderleri": 6.12,
+        "İdari personel giderleri": 2.09,
+        "Burs giderleri": 14.44,
+        "Altyapı ve bakım giderleri": 5.9,
+        "Eğitim ve laboratuvar giderleri": 5.2,
+        "Enerji ve işletme giderleri": 4.35,
+        "Araştırma ve geliştirme giderleri": 4.1,
+        "Bilgi teknolojileri giderleri": 2.75,
+        "Diğer giderler": 2.55
+      },
+      "_kontrol": {
+        "toplam_gelir_milyon_usd": 50.4,
+        "toplam_gider_milyon_usd": 47.5,
+        "denge_milyon_usd": 2.9
       }
     },
     {
-      "_not": "2026-2027 planlama yılıdır. Kalem yapısı açıktır ancak tutarlar sıfırdır; henüz gerçekleşme yoktur. Sıfır tutar burada 'veri yok' değil, gerçekten 'henüz harcama yapılmadı' anlamına gelir.",
+      "_not": "2026-2027 planlama yilidir. Kalem yapisi acilir ancak tutarlar sifirdir; henuz gerceklesme yoktur. Buradaki sifir 'veri yok' degil, gercekten 'harcama yapilmadi' demektir.",
       "academic_year": "2026-2027",
       "total_students": 0,
       "total_graduates": 0,
       "copy_categories_from": "2025-2026"
     }
   ],
-
-  "_bolum_butceleri_notu": "Yalnızca güncel yıl (2025-2026) için bölüm kırılımı tanımlıdır. Bazı bölümlerin gerçekleşmesi bütçesini aşacak şekilde seçildi ki bütçe aşımı uyarısı demoda görünsün.",
   "department_budgets": {
+    "_aciklama": "Yalnızca güncel yıl için bölüm kırılımı. Toplamları dönem toplamıyla uyumludur; bazı bölümler bilinçli olarak bütçesini aşar ki uyarı demoda görünsün.",
     "academic_year": "2025-2026",
     "rows": [
-      { "department_code": "CENG", "student_count": 520, "revenue": 152, "expenditure": 128, "allocated_budget": 125 },
-      { "department_code": "SWE",  "student_count": 416, "revenue": 124, "expenditure": 106, "allocated_budget": 108 },
-      { "department_code": "EEE",  "student_count": 468, "revenue": 118, "expenditure": 121, "allocated_budget": 112 },
-      { "department_code": "ME",   "student_count": 416, "revenue": 96,  "expenditure": 104, "allocated_budget": 99 },
-      { "department_code": "CE",   "student_count": 364, "revenue": 78,  "expenditure": 92,  "allocated_budget": 84 },
-      { "department_code": "IE",   "student_count": 390, "revenue": 88,  "expenditure": 84,  "allocated_budget": 86 },
-      { "department_code": "ARCH", "student_count": 416, "revenue": 94,  "expenditure": 97,  "allocated_budget": 93 },
-      { "department_code": "BA",   "student_count": 624, "revenue": 168, "expenditure": 139, "allocated_budget": 144 },
-      { "department_code": "ECON", "student_count": 364, "revenue": 82,  "expenditure": 76,  "allocated_budget": 80 },
-      { "department_code": "IR",   "student_count": 312, "revenue": 64,  "expenditure": 71,  "allocated_budget": 66 },
-      { "department_code": "PSY",  "student_count": 468, "revenue": 106, "expenditure": 98,  "allocated_budget": 102 },
-      { "department_code": "NUR",  "student_count": 442, "revenue": 98,  "expenditure": 91,  "allocated_budget": 94 }
+      {
+        "department_code": "CENG",
+        "student_count": 400,
+        "revenue": 5.75,
+        "expenditure": 4.75,
+        "allocated_budget": 4.89
+      },
+      {
+        "department_code": "SWE",
+        "student_count": 320,
+        "revenue": 4.52,
+        "expenditure": 3.8,
+        "allocated_budget": 3.88
+      },
+      {
+        "department_code": "EEE",
+        "student_count": 360,
+        "revenue": 4.49,
+        "expenditure": 4.27,
+        "allocated_budget": 4.01
+      },
+      {
+        "department_code": "ME",
+        "student_count": 320,
+        "revenue": 3.83,
+        "expenditure": 3.8,
+        "allocated_budget": 3.65
+      },
+      {
+        "department_code": "CE",
+        "student_count": 280,
+        "revenue": 3.1,
+        "expenditure": 3.32,
+        "allocated_budget": 2.99
+      },
+      {
+        "department_code": "IE",
+        "student_count": 300,
+        "revenue": 3.89,
+        "expenditure": 3.56,
+        "allocated_budget": 3.63
+      },
+      {
+        "department_code": "ARCH",
+        "student_count": 320,
+        "revenue": 3.95,
+        "expenditure": 3.8,
+        "allocated_budget": 3.69
+      },
+      {
+        "department_code": "BA",
+        "student_count": 480,
+        "revenue": 7.02,
+        "expenditure": 5.7,
+        "allocated_budget": 5.99
+      },
+      {
+        "department_code": "ECON",
+        "student_count": 280,
+        "revenue": 3.7,
+        "expenditure": 3.32,
+        "allocated_budget": 3.45
+      },
+      {
+        "department_code": "IR",
+        "student_count": 240,
+        "revenue": 2.78,
+        "expenditure": 2.85,
+        "allocated_budget": 2.65
+      },
+      {
+        "department_code": "PSY",
+        "student_count": 360,
+        "revenue": 4.81,
+        "expenditure": 4.27,
+        "allocated_budget": 4.4
+      },
+      {
+        "department_code": "NUR",
+        "student_count": 340,
+        "revenue": 4.46,
+        "expenditure": 4.04,
+        "allocated_budget": 4.12
+      }
     ]
   }
 }

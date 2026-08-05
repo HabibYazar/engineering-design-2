@@ -16,12 +16,12 @@ VIEWS["dashboard"] = {
     <div class="grid cols-3-2">
       <div class="card">
         <h3>Öğrenci sayısı — program doluluk eğilimi</h3>
-        <div class="note">Yıllara göre toplam kontenjan ve yerleşen öğrenci (Modül 2).</div>
+        <div class="note">Yıllara göre doluluk ve mezuniyet oranı.</div>
         <div id="trend"></div>
       </div>
       <div class="card">
         <h3>KPI karnesi</h3>
-        <div class="note">Stratejik göstergelerin hedefe ulaşma oranı (Modül 8).</div>
+        <div class="note">Stratejik göstergelerin hedefe ulaşma oranı.</div>
         <div id="kpiRings"></div>
         <h4>En zayıf stratejik boyutlar</h4>
         <ul class="plain" id="weakDims"></ul>
@@ -31,7 +31,7 @@ VIEWS["dashboard"] = {
     <div class="grid cols-2">
       <div class="card">
         <h3>Bölüm bazlı gelir ve gider</h3>
-        <div class="note">Milyon TL · ${CURRENT_YEAR} (Modül 6).</div>
+        <div class="note">Milyon USD · ${CURRENT_YEAR}</div>
         <div class="legend">
           <span><span class="swatch" style="background:var(--primary)"></span>Gelir</span>
           <span><span class="swatch" style="background:var(--accent)"></span>Gider</span>
@@ -40,7 +40,7 @@ VIEWS["dashboard"] = {
       </div>
       <div class="card">
         <h3>Kritik riskler ve erken uyarılar</h3>
-        <div class="note">Kural motorundan gelen aktif uyarılar (Modül 11).</div>
+        <div class="note">Kural motorundan gelen aktif uyarılar.</div>
         <div id="risks"></div>
       </div>
     </div>
@@ -99,11 +99,11 @@ async function loadHeadline() {
         ["Aktif öğrenci oranı", fmt.pct(activeShare), students ? `${fmt.int(students.dropped_out_students)} ayrılan` : "", ""],
         ["Akademik personel", staff ? fmt.int(staff.total_staff) : fmt.empty,
           staff ? `${fmt.int(staff.total_publication)} yayın` : "", ""],
-        ["Toplam gelir", finance ? fmt.moneyM(finance.total_revenue) : fmt.empty,
-          finance ? `öğrenci başına ${fmt.moneyK(finance.revenue_per_student_thousand_try)}` : "", ""],
-        ["Toplam gider", finance ? fmt.moneyM(finance.total_expenditure) : fmt.empty,
+        ["Toplam gelir", finance ? fmt.usdMillion(finance.total_revenue) : fmt.empty,
+          finance ? `öğrenci başına ${fmt.usdPerPerson(finance.revenue_per_student_thousand_usd)}` : "", ""],
+        ["Toplam gider", finance ? fmt.usdMillion(finance.total_expenditure) : fmt.empty,
           finance ? `personel payı ${fmt.pct(finance.personnel_expense_share_percent)}` : "", ""],
-        ["Gelir–gider dengesi", finance ? fmt.moneyM(finance.balance) : fmt.empty,
+        ["Gelir–gider dengesi", finance ? fmt.usdMillion(finance.balance) : fmt.empty,
           finance ? (finance.balance_status === "fazla" ? "▲ fazla" : "▼ açık") : "",
           finance && finance.balance_status === "fazla" ? "up" : "down"],
         ["Mekân doluluk oranı", capacity ? fmt.pct(capacity.overall_occupancy_percent) : fmt.empty,
@@ -231,7 +231,7 @@ async function loadFacultyFinance() {
         bars.push([`${r.department_name} — gider`, Number(r.expenditure), "var(--accent)"]);
       });
       el.id = "facBars";
-      hbars("facBars", bars, { fmt: (v) => fmt.moneyM(v) });
+      hbars("facBars", bars, { fmt: (v) => fmt.usdMillion(v) });
     }
   );
 }
@@ -310,7 +310,7 @@ async function loadDrilldown() {
       });
 
       const open = new Set();
-      const cell = (v) => (v ? fmt.moneyM(v) : fmt.empty);
+      const cell = (v) => (v ? fmt.usdMillion(v) : fmt.empty);
 
       const render = () => {
         el.innerHTML = `<div class="table-wrap"><table><thead><tr>
@@ -321,7 +321,7 @@ async function loadDrilldown() {
                   <td>${open.has(i) ? "▾ " : "▸ "}${fmt.esc(g.faculty.name)}</td>
                   <td>${g.students ? fmt.int(g.students) : fmt.empty}</td>
                   <td>${cell(g.revenue)}</td><td>${cell(g.expenditure)}</td>
-                  <td>${g.revenue || g.expenditure ? fmt.moneyM(g.revenue - g.expenditure) : fmt.empty}</td>
+                  <td>${g.revenue || g.expenditure ? fmt.usdMillion(g.revenue - g.expenditure) : fmt.empty}</td>
                   <td>${g.children.length} bölüm</td></tr>`;
                 if (open.has(i)) {
                   html += g.children
@@ -340,9 +340,9 @@ async function loadDrilldown() {
                       return `<tr class="sub">
                         <td>${fmt.esc(d.name)}</td>
                         <td>${s ? fmt.int(s.total_students) : fmt.empty}</td>
-                        <td>${b ? fmt.moneyM(b.revenue) : fmt.empty}</td>
-                        <td>${b ? fmt.moneyM(b.expenditure) : fmt.empty}</td>
-                        <td>${b ? fmt.moneyM(b.balance) : fmt.empty}</td>
+                        <td>${b ? fmt.usdMillion(b.revenue) : fmt.empty}</td>
+                        <td>${b ? fmt.usdMillion(b.expenditure) : fmt.empty}</td>
+                        <td>${b ? fmt.usdMillion(b.balance) : fmt.empty}</td>
                         <td>${b ? chip(level, status) : fmt.empty}</td></tr>`;
                     })
                     .join("");

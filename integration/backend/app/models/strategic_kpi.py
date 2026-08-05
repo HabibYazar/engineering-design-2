@@ -76,6 +76,30 @@ class StrategicKpi(Base):
 
     corrective_action: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # ------------------------------------------------------------------
+    # Göstergenin künyesi
+    # ------------------------------------------------------------------
+    # Bir göstergenin sayısı tek başına anlamsızdır. "52.2" değerinin neyi
+    # ölçtüğü, nasıl hesaplandığı, hangi veriden geldiği ve yükselmesinin iyi
+    # mi kötü mü olduğu bilinmeden yönetim kararı verilemez. Bu alanlar
+    # doldurulmadığı için arayüzde çıplak sayılar görünüyordu.
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    formula: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Değerin yükselmesi iyi mi? Öğrenci başına maliyet gibi göstergelerde
+    # düşmek iyidir; bu bayrak olmadan arayüz her artışı yeşil gösterirdi.
+    higher_is_better: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+
+    # Değer elle mi girildi, yoksa sistem verisinden mi hesaplandı?
+    # "derived" olan göstergeler her istekte yeniden hesaplanır ve elle
+    # değiştirilemez; böylece formülle veri arasındaki bağ kopmaz.
+    value_source: Mapped[str] = mapped_column(
+        String(20), default="manual", nullable=False
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False, index=True
     )

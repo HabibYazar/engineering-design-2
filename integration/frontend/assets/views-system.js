@@ -222,7 +222,7 @@ function refreshStructure() {
 
 VIEWS["data-import"] = {
   title: "Veri Aktarımı",
-  subtitle: "CSV / Excel / JSON toplu veri yükleme · Modül 13",
+  subtitle: "CSV / Excel / JSON toplu veri yükleme",
   html: () => `
     <div class="grid cols-3-2">
       <div class="card">
@@ -412,7 +412,7 @@ function refreshImportHistory() {
 
 VIEWS["users"] = {
   title: "Kullanıcı ve Yetki Yönetimi",
-  subtitle: "Rol tabanlı erişim denetimi · Modül 14",
+  subtitle: "Rol tabanlı erişim denetimi",
   html: () => `
     <div class="state empty">
       <b>Güvenlik notu:</b> Parolalar veritabanında düz metin olarak saklanmaz.

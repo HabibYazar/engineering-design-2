@@ -43,6 +43,24 @@ def _base_query():
     )
 
 
+def _direction_label(change_percent, higher_is_better: bool) -> str:
+    """Değişimi kurumun lehine mi aleyhine mi olduğuyla birlikte anlatır.
+
+    Sadece "+%2,5" yazmak yeterli değildir: öğrenci başına maliyetin %2,5
+    artması kötüdür, yayın sayısının %2,5 artması iyidir. Yön bilgisi
+    olmadan arayüz her artışı yeşil gösterirdi.
+    """
+    if change_percent is None:
+        return "geçen dönem verisi yok"
+    if change_percent == 0:
+        return "geçen döneme göre değişmedi"
+    increased = change_percent > 0
+    improved = increased == higher_is_better
+    movement = "arttı" if increased else "azaldı"
+    judgement = "iyileşme" if improved else "kötüleşme"
+    return f"geçen döneme göre {movement} ({judgement})"
+
+
 def evaluate(kpi: StrategicKpi) -> dict:
     """KPI'yı hesaplanmış başarı oranı ve durumuyla birlikte döndürür."""
     achievement = (
@@ -87,6 +105,16 @@ def evaluate(kpi: StrategicKpi) -> dict:
         "change_vs_previous_percent": change,
         "gap_vs_university_average": gap,
         "corrective_action": kpi.corrective_action,
+        # Göstergenin künyesi: ne ölçtüğü, nasıl hesaplandığı, nereden geldiği.
+        "description": kpi.description,
+        "formula": kpi.formula,
+        "data_source": kpi.data_source,
+        "higher_is_better": kpi.higher_is_better,
+        "value_source": kpi.value_source,
+        # Değişimin sade dille yorumu. Yalnızca artı/eksi işareti göstermek
+        # yetmiyor: öğrenci başına maliyetin artması "kötüleşti" demektir ama
+        # yayın sayısının artması "iyileşti" demektir.
+        "direction_label": _direction_label(change, kpi.higher_is_better),
         "faculty_values": [
             {
                 "faculty_id": fv.faculty_id,

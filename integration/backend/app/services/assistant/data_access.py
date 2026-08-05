@@ -126,11 +126,11 @@ def financial_summary(db: Session) -> List[ContextItem]:
         return [_item(module, "durum", "Mali özet", None)]
 
     labels = {
-        "total_revenue": "Toplam gelir (milyon TL)",
-        "total_expenditure": "Toplam gider (milyon TL)",
-        "balance": "Gelir-gider dengesi (milyon TL)",
-        "revenue_per_student_thousand_try": "Öğrenci başına gelir (bin TL)",
-        "cost_per_student_thousand_try": "Öğrenci başına maliyet (bin TL)",
+        "total_revenue": "Toplam gelir (milyon USD)",
+        "total_expenditure": "Toplam gider (milyon USD)",
+        "balance": "Gelir-gider dengesi (milyon USD)",
+        "revenue_per_student_thousand_usd": "Öğrenci başına gelir (bin USD)",
+        "cost_per_student_thousand_usd": "Öğrenci başına maliyet (bin USD)",
         "personnel_expense_share_percent": "Personel giderinin payı (%)",
         "scholarship_impact_percent": "Burs yükünün gelire oranı (%)",
     }

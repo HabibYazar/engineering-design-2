@@ -37,8 +37,8 @@ Açıldıktan sonra:
 
 | Adres | İçerik |
 |---|---|
-| <http://127.0.0.1:8000> | Web arayüzü (14 ekran) |
-| <http://127.0.0.1:8000/docs> | Swagger API dokümantasyonu (121 endpoint) |
+| <http://127.0.0.1:8000> | Web arayüzü (16 ekran) |
+| <http://127.0.0.1:8000/docs> | Swagger API dokümantasyonu (195 endpoint) |
 | <http://127.0.0.1:8000/health> | Sağlık kontrolü |
 
 ### Demo hesapları
@@ -77,7 +77,7 @@ engineering-design-2-main/
 │   │   │   ├── config/            JSON yapılandırma (ağırlıklar, kurallar)
 │   │   │   └── core/              Ayarlar, Decimal tipleri
 │   │   ├── tests/                 412 birim testi
-│   │   ├── tests_integration/     20 entegrasyon testi
+│   │   ├── tests_integration/     57 entegrasyon testi
 │   │   ├── main.py                Uygulama giriş noktası
 │   │   ├── seed_all_demo_data.py  Ortak veriyi yükleyen tek script
 │   │   └── .env.example           Ortam değişkeni şablonu
@@ -87,11 +87,11 @@ engineering-design-2-main/
 │   │   └── assets/
 │   │       ├── api.js             Backend istemcisi
 │   │       ├── app.js             Yönlendirici, oturum, kabuk
-│   │       ├── views-*.js         14 ekran
+│   │       ├── views-*.js         16 ekran
 │   │       ├── style.css          Halil'in tasarım sistemi
 │   │       └── integration.css    Entegrasyonda eklenen bileşenler
 │   │
-│   ├── shared_demo_data/          TEK DOĞRULUK KAYNAĞI (8 JSON dosyası)
+│   ├── shared_demo_data/          TEK DOĞRULUK KAYNAĞI (10 JSON dosyası)
 │   ├── tests_ui/                  Arayüz entegrasyon testi (jsdom)
 │   └── archive_before_merge/      Birleştirme öncesi orijinal dosyalar
 │
@@ -122,6 +122,8 @@ kullanılan dosyaların birleştirme öncesi hâli ayrıca
 | 10 | THE / QS / YÖK Değerlendirme | Habib | `/api/ranking-evaluations` | THE · QS · YÖK |
 | 11 | Erken Uyarı Sistemi | Begüm | `/api/early-warning` | Erken Uyarı |
 | 13 | Veri Entegrasyonu | Habib | `/api/data-integration` | Veri Aktarımı |
+| — | Akademik Başarı Analizi | Entegrasyon | `/api/academic-success` | Akademik Başarı |
+| — | Sanayi ve Bölgesel Katkı | Entegrasyon | `/api/engagement` | Sanayi ve Bölgesel Katkı |
 | 14 | Kullanıcı ve Yetkilendirme | Eda | `/api/auth` | Kullanıcı ve Yetki |
 
 Modül 12 için ekip deposunda backend kodu bulunmamaktadır; ayrıntı
@@ -135,21 +137,21 @@ Ayrıntılı dosya eşlemesi: [`docs/TEAM_MODULE_MAP.md`](docs/TEAM_MODULE_MAP.m
 
 ```bash
 cd integration/backend
-python -m pytest tests tests_integration -q     # 432 test
+python -m pytest tests tests_integration -q     # 469 test
 ```
 
 Arayüz testi (sunucu çalışırken, ayrı bir terminalde):
 
 ```bash
 npm install jsdom
-node integration/tests_ui/test_frontend.js       # 31 kontrol
+node integration/tests_ui/test_frontend.js       # 43 kontrol
 ```
 
 | Test kümesi | Adet | Kapsam |
 |---|---|---|
 | Birim testleri (`tests/`) | 412 | Modül içi iş mantığı, doğrulama, hesaplama |
-| Entegrasyon testleri (`tests_integration/`) | 20 | Router çakışması, model birleşimi, modüller arası bağ, veri dürüstlüğü |
-| Arayüz testleri (`tests_ui/`) | 31 | 14 ekranın gerçek veriyle dolması, hata gösterimi, oturum |
+| Entegrasyon testleri (`tests_integration/`) | 57 | Router çakışması, model birleşimi, hesaplama doğruluğu, 5 yıllık mali toplamlar, senaryo formülleri, oran sınırları, seed idempotanslığı |
+| Arayüz testleri (`tests_ui/`) | 43 | 16 ekranın gerçek veriyle dolması, USD gösterimi, senaryo karşılaştırması, hata gösterimi |
 
 ---
 
@@ -161,8 +163,11 @@ node integration/tests_ui/test_frontend.js       # 31 kontrol
   [`docs/ASSISTANT_ARCHITECTURE.md`](docs/ASSISTANT_ARCHITECTURE.md)
 - **Modül 10 gerçek sıralama üretmez.** THE, QS veya YÖK sıralamalarını
   hesaplamaz; kurum içi performans ve veri hazırlık göstergeleri üretir.
+- **Tek para birimi USD'dir.** Sistemde TL veya birimsiz tutar bulunmaz;
+  her parasal değer `$` işaretiyle ve birimiyle gösterilir.
 - **Veri seti kurgusaldır.** `integration/shared_demo_data/` altındaki
-  varsayımlardan üretilir ve gerçek bir kurumun verisi değildir.
+  varsayımlardan üretilir ve gerçek bir kurumun verisi değildir. 5 mali dönem,
+  5 yıllık başarı ve iş birliği verisi içerir.
 - Bilinen sınırlamaların tamamı:
   [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md)
 
@@ -178,5 +183,6 @@ node integration/tests_ui/test_frontend.js       # 31 kontrol
 | [`docs/SHARED_DATA_DICTIONARY.md`](docs/SHARED_DATA_DICTIONARY.md) | Ortak veri sözlüğü |
 | [`docs/API_OVERVIEW.md`](docs/API_OVERVIEW.md) | Endpoint listesi |
 | [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Sunum senaryosu |
+| [`docs/FIXED_CALCULATION_BUGS.md`](docs/FIXED_CALCULATION_BUGS.md) | Bulunan ve düzeltilen hesaplama hataları |
 | [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) | Bilinen sınırlamalar |
 | [`docs/ASSISTANT_ARCHITECTURE.md`](docs/ASSISTANT_ARCHITECTURE.md) | Asistan mimarisi |
