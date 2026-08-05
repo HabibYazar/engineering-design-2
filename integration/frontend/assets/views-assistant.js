@@ -1,0 +1,341 @@
+// Akıllı Asistan — yerel dil modeliyle (Ollama) gerçek sohbet.
+//
+// Bu ekranda sabit, örnek veya kural tabanlı cevap YOKTUR. Gösterilen her
+// yanıt backend üzerinden yerel modelden gelir. Model kapalıysa ekran bunu
+// açıkça söyler ve boş bir cevap balonu göstermez.
+//
+// Modelin düşünme (reasoning) metni backend'de ayıklanır; bu dosyaya hiç
+// ulaşmaz.
+
+// Kullanıcı mesajı üst sınırı — backend ile aynı değer. Sunucuya boşuna
+// istek göndermemek için burada da kontrol edilir.
+const ASSISTANT_MAX_LENGTH = 4000;
+
+// Ekranda gösterilecek durumlar. "API bağlı" gibi belirsiz metin kullanılmaz;
+// kullanıcı ne yapması gerektiğini okuyabilmeli.
+const ASSISTANT_STATES = {
+  connecting: { kind: "info", text: "Bağlantı kuruluyor…" },
+  ready: { kind: "good", text: "Yapay zekâ hazır" },
+  service_down: {
+    kind: "critical",
+    text: "Ollama servisine ulaşılamıyor",
+    hint: "Ollama'yı başlatın: ollama serve",
+  },
+  model_missing: {
+    kind: "warning",
+    text: "Model kurulu değil",
+    hint: "Modeli kurun: ollama pull",
+  },
+  disabled: {
+    kind: "warning",
+    text: "Akıllı Asistan devre dışı",
+    hint: "Yapılandırmada ASSISTANT_ENABLED=false.",
+  },
+  generating: { kind: "info", text: "Yanıt oluşturuluyor…" },
+  error: { kind: "critical", text: "Hata oluştu" },
+};
+
+let ASSISTANT_STATUS = null;
+let ASSISTANT_CONVERSATION = null;
+let ASSISTANT_BUSY = false;
+
+VIEWS["assistant"] = {
+  title: "Akıllı Asistan",
+  subtitle: "Yerel dil modeli · veriler makineden çıkmaz",
+  html: () => `
+    <div class="card assistant-card">
+      <div class="assistant-head">
+        <div id="assistantState"></div>
+        <button class="ghost" id="assistantReset" type="button">Yeni konuşma</button>
+      </div>
+
+      <div id="assistantThread" class="assistant-thread" aria-live="polite"></div>
+
+      <form id="assistantForm" class="assistant-composer" autocomplete="off">
+        <textarea id="assistantInput" rows="2"
+          maxlength="${ASSISTANT_MAX_LENGTH}"
+          placeholder="Sorunuzu yazın… (Enter ile gönder, Shift+Enter ile satır atla)"></textarea>
+        <div class="composer-side">
+          <button class="primary" id="assistantSend" type="submit">Gönder</button>
+          <span class="counter" id="assistantCounter">0 / ${ASSISTANT_MAX_LENGTH}</span>
+        </div>
+      </form>
+
+      <div class="note assistant-scope-note">
+        Model bu aşamada üniversite veritabanına <b>erişemez</b>. Kurum verisi
+        gerektiren sorularda sayı üretmez, hangi veriye ihtiyaç duyduğunu söyler.
+      </div>
+    </div>
+
+    ${ux.details(
+      "Bu asistan nasıl çalışıyor?",
+      `<div id="assistantArchitecture">${ux.skeleton(3)}</div>`,
+      { hint: "Mimari ve sonraki adımlar" }
+    )}`,
+
+  async init() {
+    ASSISTANT_CONVERSATION = null;
+    ASSISTANT_BUSY = false;
+
+    renderState("connecting");
+    renderThread([]);
+
+    await refreshAssistantStatus();
+    bindComposer();
+    loadAssistantArchitecture();
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Durum                                                               */
+/* ------------------------------------------------------------------ */
+
+function renderState(key, extra = "") {
+  const el = document.getElementById("assistantState");
+  if (!el) return;
+  const state = ASSISTANT_STATES[key] || ASSISTANT_STATES.error;
+  const hint = extra || state.hint || "";
+  el.innerHTML =
+    ux.statusBadge(state.kind, state.text) +
+    (hint ? `<div class="assistant-hint">${fmt.esc(hint)}</div>` : "");
+}
+
+/** Sunucu durumunu ekran durumuna çevirir. */
+function statusKey(status) {
+  if (!status) return "error";
+  if (!status.enabled) return "disabled";
+  if (!status.service_available) return "service_down";
+  if (!status.model_available) return "model_missing";
+  return "ready";
+}
+
+async function refreshAssistantStatus() {
+  try {
+    ASSISTANT_STATUS = await api.get("/api/assistant/status");
+  } catch (err) {
+    ASSISTANT_STATUS = null;
+    renderState("error", err.userMessage || err.message);
+    setComposerEnabled(false);
+    return;
+  }
+
+  const key = statusKey(ASSISTANT_STATUS);
+  // Hazır durumda model adı da yazılır: kullanıcı hangi modelle konuştuğunu bilsin.
+  const suffix = key === "ready" ? ` — ${ASSISTANT_STATUS.model}` : "";
+  const el = document.getElementById("assistantState");
+  if (el) {
+    const state = ASSISTANT_STATES[key];
+    const hint =
+      key === "model_missing"
+        ? `Modeli kurun: ollama pull ${ASSISTANT_STATUS.model}`
+        : state.hint || "";
+    el.innerHTML =
+      ux.statusBadge(state.kind, state.text + suffix) +
+      (hint ? `<div class="assistant-hint">${fmt.esc(hint)}</div>` : "");
+  }
+
+  setComposerEnabled(key === "ready");
+  if (key !== "ready") {
+    renderThread([
+      {
+        role: "system",
+        text: ASSISTANT_STATUS.message,
+      },
+    ]);
+  }
+}
+
+function setComposerEnabled(enabled) {
+  const input = document.getElementById("assistantInput");
+  const send = document.getElementById("assistantSend");
+  if (input) input.disabled = !enabled;
+  if (send) send.disabled = !enabled;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sohbet akışı                                                        */
+/* ------------------------------------------------------------------ */
+
+// Konuşma balonları. Model çıktısı asla ham HTML olarak basılmaz.
+const THREAD = [];
+
+function renderThread(initial) {
+  const el = document.getElementById("assistantThread");
+  if (!el) return;
+  if (initial) {
+    THREAD.length = 0;
+    THREAD.push(...initial);
+  }
+  if (!THREAD.length) {
+    el.innerHTML = `<div class="assistant-empty">
+      Yerel model hazır. Bir soru yazarak başlayın.
+    </div>`;
+    return;
+  }
+  el.innerHTML = THREAD.map(bubble).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+function bubble(item) {
+  if (item.role === "system") {
+    return `<div class="assistant-note">${fmt.esc(item.text)}</div>`;
+  }
+  const who = item.role === "user" ? "Siz" : "Asistan";
+  return `<div class="assistant-msg ${item.role}">
+    <div class="who">${who}</div>
+    <div class="body">${
+      item.pending ? `<span class="typing">Yanıt oluşturuluyor…</span>` : safeText(item.text)
+    }</div>
+  </div>`;
+}
+
+/**
+ * Model çıktısını güvenli biçimde HTML'e çevirir.
+ *
+ * Sıra önemli: ÖNCE her şey kaçırılır, SONRA sınırlı bir biçimlendirme
+ * uygulanır. Tersi yapılsaydı modelin ürettiği bir <script> etiketi sayfaya
+ * girerdi. Desteklenen tek biçimler: paragraf, satır sonu, madde listesi,
+ * **kalın** ve `kod`.
+ */
+function safeText(raw) {
+  const escaped = fmt.esc(String(raw || ""));
+
+  const inline = (line) =>
+    line
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  const blocks = escaped.split(/\n{2,}/);
+  return blocks
+    .map((block) => {
+      const lines = block.split("\n");
+      const isList = lines.every((l) => /^\s*[-*•]\s+/.test(l) || !l.trim());
+      if (isList && lines.some((l) => l.trim())) {
+        return (
+          "<ul>" +
+          lines
+            .filter((l) => l.trim())
+            .map((l) => `<li>${inline(l.replace(/^\s*[-*•]\s+/, ""))}</li>`)
+            .join("") +
+          "</ul>"
+        );
+      }
+      return `<p>${inline(lines.join("<br>"))}</p>`;
+    })
+    .join("");
+}
+
+function bindComposer() {
+  const form = document.getElementById("assistantForm");
+  const input = document.getElementById("assistantInput");
+  const counter = document.getElementById("assistantCounter");
+  const reset = document.getElementById("assistantReset");
+  if (!form || !input) return;
+
+  input.addEventListener("input", () => {
+    counter.textContent = `${input.value.length} / ${ASSISTANT_MAX_LENGTH}`;
+  });
+
+  // Enter gönderir, Shift+Enter satır atlar — sohbet arayüzlerinin beklenen davranışı.
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await sendMessage(input.value);
+  });
+
+  reset.addEventListener("click", () => {
+    ASSISTANT_CONVERSATION = null;
+    renderThread([]);
+    ui.toast("Yeni konuşma başlatıldı.", "success");
+  });
+}
+
+async function sendMessage(rawMessage) {
+  const message = (rawMessage || "").trim();
+  if (ASSISTANT_BUSY) return;
+  if (!message) {
+    ui.toast("Önce bir mesaj yazın.", "error");
+    return;
+  }
+  if (message.length > ASSISTANT_MAX_LENGTH) {
+    ui.toast(`Mesaj en fazla ${ASSISTANT_MAX_LENGTH} karakter olabilir.`, "error");
+    return;
+  }
+
+  ASSISTANT_BUSY = true;
+  setComposerEnabled(false);
+  renderState("generating");
+
+  const input = document.getElementById("assistantInput");
+  if (input) {
+    input.value = "";
+    document.getElementById("assistantCounter").textContent = `0 / ${ASSISTANT_MAX_LENGTH}`;
+  }
+
+  THREAD.push({ role: "user", text: message });
+  const pending = { role: "assistant", text: "", pending: true };
+  THREAD.push(pending);
+  renderThread();
+
+  try {
+    const result = await api.post("/api/assistant/chat", {
+      message,
+      conversation_id: ASSISTANT_CONVERSATION,
+      stream: false,
+    });
+    ASSISTANT_CONVERSATION = result.conversation_id;
+    pending.text = result.answer;
+    pending.pending = false;
+    renderThread();
+    await refreshAssistantStatus();
+  } catch (err) {
+    // Hata gizlenmez ve uydurma cevapla doldurulmaz: balon çıkarılır,
+    // sebebi ayrı bir not olarak yazılır.
+    THREAD.pop();
+    THREAD.push({ role: "system", text: err.userMessage || err.message });
+    renderThread();
+    renderState("error", err.userMessage || err.message);
+  } finally {
+    ASSISTANT_BUSY = false;
+    setComposerEnabled(statusKey(ASSISTANT_STATUS) === "ready");
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Mimari bölümü                                                       */
+/* ------------------------------------------------------------------ */
+
+async function loadAssistantArchitecture() {
+  await load(
+    "assistantArchitecture",
+    () => api.get("/api/assistant/architecture"),
+    (arch, el) => {
+      el.innerHTML = `
+        <p class="note">${fmt.esc(arch.summary)}</p>
+        <div class="table-wrap"><table><thead><tr>
+          <th>Bileşen</th><th>Sorumluluk</th><th>Durum</th></tr></thead><tbody>
+          ${arch.components
+            .map(
+              (c) =>
+                `<tr><td>${fmt.esc(c.file)}</td><td>${fmt.esc(
+                  c.responsibility
+                )}</td><td>${chip(
+                  c.status === "hazır" ? "good" : "warning",
+                  c.status
+                )}</td></tr>`
+            )
+            .join("")}
+        </tbody></table></div>
+        <h4>Sonraki adımlar</h4>
+        <ol class="plain">${arch.next_steps
+          .map((s) => `<li>${fmt.esc(s)}</li>`)
+          .join("")}</ol>`;
+    }
+  );
+}

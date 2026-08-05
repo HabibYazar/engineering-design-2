@@ -6,6 +6,9 @@ pandas
 openpyxl
 python-multipart
 
+# Yerel Ollama sunucusuyla konusmak icin (bulut API'si degil).
+httpx
+
 # Test bağımlılıkları
 pytest==9.1.1
 httpx2

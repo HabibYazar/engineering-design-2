@@ -214,34 +214,60 @@ def test_kpi_faculty_values_link_to_module1_faculty(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_assistant_has_no_llm_connected(client: TestClient) -> None:
-    """Asistan hiçbir dil modeline bağlı olmamalı ve bunu açıkça söylemeli."""
+def test_assistant_uses_a_local_model_only(client: TestClient) -> None:
+    """Asistan YEREL bir modele bağlı olmalı; bulut servisine değil."""
     status = client.get("/api/assistant/status").json()
 
-    assert status["enabled"] is False
-    assert status["provider"] in (None, "")
-    assert status["model"] in (None, "")
-    assert status["api_key_configured"] is False
-    assert "dil modeli" in status["message"].lower()
+    assert status["provider"] == "ollama"
+    assert status["model"], "Model adı boş."
+    # Ollama bu makinede kurulu olmayabilir; test 'hazır mı' değil,
+    # 'dürüstçe bildiriyor mu' sorusunu kontrol eder.
+    assert isinstance(status["service_available"], bool)
+    assert isinstance(status["ready"], bool)
+    assert status["message"], "Durum mesajı boş."
 
 
-def test_assistant_never_generates_an_answer(client: TestClient) -> None:
-    """Cevap üreten bir endpoint bulunmamalı; bağlam cevabı uyarı içermeli."""
-    paths = set(client.get("/openapi.json").json()["paths"])
-    answer_endpoints = [
-        p for p in paths if p.startswith("/api/assistant") and
-        any(word in p for word in ("ask", "answer", "chat", "complete", "generate"))
-    ]
-    assert not answer_endpoints, (
-        f"Dil modeli bağlı olmadan cevap üreten endpoint var: {answer_endpoints}"
-    )
+def test_assistant_never_returns_a_fabricated_answer(client: TestClient) -> None:
+    """Model kapalıyken cevap üretilmemeli; hata dönmeli.
 
+    Sistemin en önemli sözü bu: bağlı model yokken sahte cevap yazmamak.
+    """
+    response = client.post("/api/assistant/chat", json={"message": "Merhaba"})
+
+    if response.status_code == 200:
+        # Ollama bu makinede çalışıyor: cevap gerçek modelden gelmiş olmalı.
+        body = response.json()
+        assert body["provider"] == "ollama"
+        assert body["answer"].strip()
+        assert "<think" not in body["answer"].lower(), "Düşünme metni sızmış."
+        assert body["used_tools"] == [], "Bu aşamada araç çağrısı olmamalı."
+    else:
+        # Ollama kapalı: uydurma metin değil, açık bir hata dönmeli.
+        assert response.status_code in (502, 503, 504)
+        detail = response.json()["detail"]
+        assert detail, "Hata mesajı boş."
+        assert "Ollama" in detail or "model" in detail.lower()
+
+
+def test_assistant_status_never_crashes_the_application(client: TestClient) -> None:
+    """Asistan uç noktası, Ollama kapalıyken bile uygulamayı çökertmemeli."""
+    assert client.get("/api/assistant/status").status_code == 200
+    # Diğer modüller etkilenmemeli.
+    assert client.get("/health").status_code == 200
+    assert client.get("/api/faculties").status_code == 200
+
+
+def test_assistant_context_layer_is_not_wired_to_the_model_yet(client: TestClient) -> None:
+    """Bağlam katmanı hazır ama modele bağlı DEĞİL; bu açıkça bildirilmeli."""
     context = client.post(
         "/api/assistant/prepare-context",
         json={"question": "Hangi programların doluluk oranı düşüyor?"},
     ).json()
-    assert "DEĞİLDİR" in context["notice"], "Cevap olmadığı uyarısı kaldırılmış."
     assert context["context_items"], "Bağlam boş; veri erişimi çalışmıyor."
+
+    architecture = client.get("/api/assistant/architecture").json()
+    pending = [c for c in architecture["components"] if c["status"] != "hazır"]
+    assert pending, "Araç entegrasyonu eksik olduğu halde 'her şey hazır' deniyor."
 
 
 def test_no_api_key_in_source_code() -> None:
@@ -335,18 +361,21 @@ def test_frontend_is_served_at_root(client: TestClient) -> None:
 
 
 def test_frontend_assets_are_reachable(client: TestClient) -> None:
-    """Arayüzün ihtiyaç duyduğu dosyaların hepsi erişilebilir olmalı."""
-    for asset in (
-        "/assets/api.js",
-        "/assets/app.js",
-        "/assets/style.css",
-        "/assets/integration.css",
-        "/assets/views-overview.js",
-        "/assets/views-analytics.js",
-        "/assets/views-planning.js",
-        "/assets/views-system.js",
-    ):
-        assert client.get(asset).status_code == 200, f"{asset} servis edilmiyor."
+    """Arayüzün ihtiyaç duyduğu dosyaların hepsi erişilebilir olmalı.
+
+    Liste index.html'den okunur; elle tutulan bir kopya, dosya eklenip
+    silindiğinde sessizce eskir.
+    """
+    import re
+
+    html = client.get("/").text
+    scripts = re.findall(r'src="(assets/[^"?]+)', html)
+    styles = re.findall(r'href="(assets/[^"?]+)', html)
+    assets = scripts + styles
+
+    assert len(scripts) >= 8, f"Beklenenden az betik bulundu: {scripts}"
+    for asset in assets:
+        assert client.get("/" + asset).status_code == 200, f"{asset} servis edilmiyor."
 
 
 def test_api_and_docs_still_work_behind_frontend_mount(client: TestClient) -> None:

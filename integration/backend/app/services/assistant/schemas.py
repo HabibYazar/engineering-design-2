@@ -1,10 +1,11 @@
 """Akıllı asistan katmanının veri sözleşmeleri.
 
-ÖNEMLİ: Bu katman hiçbir dil modeline (LLM) bağlı DEĞİLDİR ve cevap üretmez.
-Yaptığı tek iş, bir soruya cevap verilebilmesi için hangi kurumsal verilerin
-gerekli olduğunu belirleyip bu veriyi veritabanından toplamaktır. Model
-bağlandığında aynı bağlam modele gönderilecek; şu anda kullanıcıya ham veri ve
-"cevap üretilmedi" bilgisi gösterilir.
+Asistan YEREL bir dil modeliyle (Ollama) çalışır. Hiçbir bulut servisine istek
+gönderilmez ve hiçbir API anahtarı kullanılmaz.
+
+Bu aşamada model kurumsal veriye ERİŞEMEZ: araç çağrısı, veritabanı sorgusu ve
+senaryo motoru bağlantısı yoktur. Bağlam hazırlama katmanı (`context_builder`)
+ayrı durur ve bir sonraki aşamada modele bağlanacaktır.
 """
 
 from typing import List, Optional
@@ -13,34 +14,81 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AssistantStatus(BaseModel):
-    """Asistanın yapılandırma durumu.
+    """Asistanın çalışma durumu.
 
-    Değerler .env dosyasından okunur. Anahtarın kendisi hiçbir zaman
-    döndürülmez; yalnızca tanımlı olup olmadığı bildirilir.
+    Değerler yapılandırmadan ve yerel Ollama servisinden okunur. Bu uç nokta
+    Ollama kapalıyken de cevap verir; hata fırlatmaz.
     """
 
+    provider: str = Field(description="Etkin sağlayıcı.", examples=["ollama"])
+    model: str = Field(description="Kullanılacak model.", examples=["qwen3.5:9b"])
     enabled: bool = Field(
-        description="ASSISTANT_ENABLED ortam değişkeni.", examples=[False]
+        description="Asistan yapılandırmada etkin mi?", examples=[True]
     )
-    provider: Optional[str] = Field(
+    service_available: bool = Field(
+        description="Yerel Ollama servisine ulaşılabiliyor mu?", examples=[True]
+    )
+    model_available: bool = Field(
+        description="İstenen model Ollama'da kurulu mu?", examples=[True]
+    )
+    ready: bool = Field(
+        description="Servis ayakta VE model kurulu mu?", examples=[True]
+    )
+    message: str = Field(examples=["Yapay zekâ hazır — qwen3.5:9b"])
+    installed_models: List[str] = Field(
+        default_factory=list,
+        description="Ollama'da kurulu model adları. Servis kapalıysa boştur.",
+        examples=[["qwen3.5:9b"]],
+    )
+
+
+class ChatRequest(BaseModel):
+    """Kullanıcının asistana gönderdiği mesaj."""
+
+    # Uzunluk sınırı hem burada hem serviste var: şema HTTP seviyesinde 422
+    # üretir, servis ise doğrudan çağrıldığında da korur.
+    message: str = Field(
+        min_length=1,
+        max_length=4000,
+        description="Kullanıcı mesajı. Boş olamaz.",
+        examples=["Merhaba"],
+    )
+    conversation_id: Optional[str] = Field(
         default=None,
-        description="LLM_PROVIDER ortam değişkeni. Boşsa sağlayıcı seçilmemiştir.",
+        description="Var olan bir konuşmayı sürdürmek için. Boşsa yeni konuşma açılır.",
         examples=[None],
     )
-    model: Optional[str] = Field(
-        default=None, description="LLM_MODEL ortam değişkeni.", examples=[None]
-    )
-    base_url: Optional[str] = Field(
-        default=None, description="LLM_BASE_URL ortam değişkeni.", examples=[None]
-    )
-    api_key_configured: bool = Field(
-        description="LLM_API_KEY tanımlı mı? Anahtarın kendisi asla döndürülmez.",
+    stream: bool = Field(
+        default=False,
+        description="Bu alan uyumluluk içindir; akış için /chat/stream kullanılır.",
         examples=[False],
     )
-    message: str = Field(
-        examples=[
-            "Asistan devre dışı. Hiçbir dil modeli bağlı değil; sistem cevap üretmez."
-        ]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChatResponse(BaseModel):
+    """Modelin ürettiği cevap.
+
+    Modelin düşünme (reasoning) metni bu cevaba KONULMAZ; sağlayıcı katmanında
+    ayıklanır ve yalnızca sunucu günlüğüne uzunluğu yazılır.
+    """
+
+    conversation_id: str = Field(examples=["7f1c2e6a-9a4b-4d1f-9c2a-1f3b5d7e9c11"])
+    answer: str = Field(examples=["Merhaba, size nasıl yardımcı olabilirim?"])
+    provider: str = Field(examples=["ollama"])
+    model: str = Field(examples=["qwen3.5:9b"])
+    used_tools: List[str] = Field(
+        default_factory=list,
+        description="Bu aşamada araç çağrısı yoktur; liste her zaman boştur.",
+        examples=[[]],
+    )
+    data_source: str = Field(
+        description=(
+            "Cevabın dayanağı. 'general_model_knowledge' modelin kendi genel "
+            "bilgisidir; kurum verisi DEĞİLDİR."
+        ),
+        examples=["general_model_knowledge"],
     )
 
 

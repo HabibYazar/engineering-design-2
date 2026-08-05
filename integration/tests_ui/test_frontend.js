@@ -39,7 +39,7 @@ try {
 // doğrulamak gerekiyor.
 const VIEWS = [
   ["dashboard", /Toplam öğrenci/],
-  ["assistant", /dil modeli/i],
+  ["assistant", /Ollama|Yapay zekâ|yerel/i],
   ["students", /Doluluk|doluluk/],
   ["success", /geçme oranı/i],
   ["staff", /Ağırlıklı puan|performans/i],
@@ -203,8 +203,9 @@ function check(label, condition, detail = "") {
   check("parola alanlari arayuze sizmiyor", !/password_hash|password_salt/i.test(t));
 
   t = await go("assistant");
-  check("asistan: dil modeli bagli olmadigini soyluyor", /dil modeli/i.test(t));
-  check("asistan: uydurma cevap uretmiyor", !/İşte cevabınız|Cevap:/i.test(t));
+  check("asistan: uydurma cevap uretmiyor", !/İşte cevabınız|Örnek cevap/i.test(t));
+  check("asistan: modelin dusunme metni gorunmuyor", !/<think|thinking/i.test(t));
+  check("asistan: belirsiz 'API bagli' metni yok", !/API bağlı/.test(t), t.slice(0, 160));
 
   t = await go("rankings");
   check("Modul 10: gercek siralama uretmedigi uyarisi var", /ÜRETMEZ/.test(t));
@@ -360,6 +361,84 @@ function check(label, condition, detail = "") {
   }
 
   // ---------------- Yonetim Panosu yeniden tasarimi ----------------
+  console.log("\n--- Akilli Asistan (yerel model) ---");
+  await openView("assistant");
+  await sleep(900);
+  view = $("#view");
+  const assistantText = view.textContent;
+
+  // Ollama bu test ortaminda kapali: ekran bunu ACIKCA soylemeli.
+  check(
+    "asistan: durum rozeti cizildi",
+    !!view.querySelector("#assistantState .status-badge, #assistantState .chip"),
+    view.querySelector("#assistantState")
+      ? view.querySelector("#assistantState").innerHTML.slice(0, 160)
+      : "durum alani yok"
+  );
+  check(
+    "asistan: Ollama kapaliyken anlasilir durum gosteriyor",
+    /Ollama servisine ulaşılamıyor|Model kurulu değil|Yapay zekâ hazır/.test(assistantText),
+    assistantText.slice(0, 200)
+  );
+  check(
+    "asistan: sohbet alani var",
+    !!view.querySelector("#assistantThread") && !!view.querySelector("#assistantInput")
+  );
+  // Ollama bu makinede acik olabilir de olmayabilir de. Test iki durumu da
+  // dogrular: hazir degilken giris kilitli, hazirken gercek cevap geliyor.
+  const assistantReady = !/Ollama servisine ulaşılamıyor|Model kurulu değil/.test(
+    assistantText
+  );
+  if (!assistantReady) {
+    check(
+      "asistan: model hazir degilken giris kilitli",
+      view.querySelector("#assistantInput").disabled === true
+    );
+  } else {
+    check("asistan: model hazirken giris acik",
+      view.querySelector("#assistantInput").disabled === false);
+
+    view.querySelector("#assistantInput").value = "Merhaba";
+    view.querySelector("#assistantForm").dispatchEvent(
+      new w.Event("submit", { cancelable: true, bubbles: true })
+    );
+    await sleep(3000);
+    const thread = $("#assistantThread").textContent;
+    check("asistan: gercek model cevabi balona yazildi",
+      /Asistan/.test(thread) && thread.length > 40 && !/Yanıt oluşturuluyor/.test(thread),
+      thread.replace(/\s+/g, " ").slice(0, 180));
+    check("asistan: cevapta dusunme metni yok",
+      !/<think|muhakeme|gizli/i.test(thread),
+      thread.replace(/\s+/g, " ").slice(0, 180));
+  }
+  check(
+    "asistan: model erisimi olmadigini soyluyor",
+    /veritabanına|erişemez/.test(assistantText),
+    assistantText.slice(0, 220)
+  );
+
+  // Durum uc noktasi Ollama kapaliyken bile 200 donmeli.
+  const assistantStatus = await (await fetch(BASE + "/api/assistant/status")).json();
+  check(
+    "asistan: durum ucu ollama kapaliyken de cevap veriyor",
+    assistantStatus.provider === "ollama" && typeof assistantStatus.ready === "boolean",
+    JSON.stringify(assistantStatus).slice(0, 200)
+  );
+  check(
+    "asistan: sahte 'hazir' bildirmiyor",
+    assistantStatus.ready === assistantStatus.service_available && assistantStatus.model,
+    JSON.stringify(assistantStatus).slice(0, 200)
+  );
+
+  // Bos mesaj sunucuya gitse bile reddedilmeli.
+  const emptyResponse = await fetch(BASE + "/api/assistant/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "   " }),
+  });
+  check("asistan: bos mesaj reddediliyor", emptyResponse.status === 422,
+    "durum: " + emptyResponse.status);
+
   console.log("\n--- Yonetim Panosu ---");
 
   const mark = requested.length;

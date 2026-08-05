@@ -77,7 +77,7 @@ Write-Host "===============================================================" -Fo
 # --------------------------------------------------------------------------
 # 0) Klasör kontrolü
 # --------------------------------------------------------------------------
-Write-Step "0/6" "Proje yapisi kontrol ediliyor"
+Write-Step "0/7" "Proje yapisi kontrol ediliyor"
 
 if (-not (Test-Path $BackendDir)) {
     Write-Err2 "Backend klasoru bulunamadi: $BackendDir"
@@ -94,7 +94,7 @@ Write-Ok "Arayuz  : $FrontendDir"
 # --------------------------------------------------------------------------
 # 1) Python
 # --------------------------------------------------------------------------
-Write-Step "1/6" "Python surumu kontrol ediliyor"
+Write-Step "1/7" "Python surumu kontrol ediliyor"
 
 try {
     $pythonVersion = & python --version 2>&1
@@ -118,7 +118,7 @@ Write-Ok "$pythonVersion"
 # --------------------------------------------------------------------------
 # 2) Sanal ortam
 # --------------------------------------------------------------------------
-Write-Step "2/6" "Sanal ortam hazirlaniyor"
+Write-Step "2/7" "Sanal ortam hazirlaniyor"
 
 if (-not (Test-Path $VenvDir)) {
     Write-Ok "Sanal ortam olusturuluyor (.venv)..."
@@ -140,7 +140,7 @@ Write-Ok "Sanal ortam hazir: $VenvDir"
 # --------------------------------------------------------------------------
 # 3) Bağımlılıklar
 # --------------------------------------------------------------------------
-Write-Step "3/6" "Bagimliliklar"
+Write-Step "3/7" "Bagimliliklar"
 
 if ($SkipInstall) {
     Write-Warn2 "-SkipInstall verildi, kurulum atlandi."
@@ -159,7 +159,7 @@ if ($SkipInstall) {
 # --------------------------------------------------------------------------
 # 4) Veritabanı ve demo verisi
 # --------------------------------------------------------------------------
-Write-Step "4/6" "Veritabani ve ortak demo verisi"
+Write-Step "4/7" "Veritabani ve ortak demo verisi"
 
 Push-Location $BackendDir
 try {
@@ -182,7 +182,7 @@ try {
     # ----------------------------------------------------------------------
     # 5) Testler
     # ----------------------------------------------------------------------
-    Write-Step "5/6" "Testler"
+    Write-Step "5/7" "Testler"
 
     if ($RunTests) {
         Write-Ok "Birim ve entegrasyon testleri calistiriliyor..."
@@ -198,9 +198,46 @@ try {
     }
 
     # ----------------------------------------------------------------------
-    # 6) Sunucu
+    # 6) Akilli Asistan - yerel dil modeli (Ollama)
     # ----------------------------------------------------------------------
-    Write-Step "6/6" "Sunucu baslatiliyor"
+    # Ollama kapaliysa proje DURDURULMAZ. Yalnizca Akilli Asistan ekrani
+    # devre disi baslar; diger 15 ekran normal calisir.
+    #
+    # Ollama'yi otomatik baslatmayi DENEMEYIZ: servis yonetici yetkisi
+    # gerektirebilir ve kullanicinin makinesinde arka plan servisi baslatmak
+    # bu betigin isi degil.
+    Write-Step "6/7" "Akilli Asistan (yerel dil modeli)"
+
+    $OllamaUrl   = "http://127.0.0.1:11434"
+    $OllamaModel = "qwen3.5:9b"
+
+    try {
+        # -NoProxy: makinede proxy tanimliysa 127.0.0.1 istegi disari yonlenir.
+        $tags = Invoke-RestMethod -Uri "$OllamaUrl/api/tags" -TimeoutSec 5 -ErrorAction Stop
+        $installed = @($tags.models | ForEach-Object { $_.name })
+
+        if ($installed -contains $OllamaModel) {
+            Write-Ok "Ollama calisiyor ve $OllamaModel kurulu. Akilli Asistan hazir."
+        } else {
+            Write-Warn2 "Uyari: $OllamaModel modeli bulunamadi."
+            Write-Warn2 "  Kurmak icin: ollama pull $OllamaModel"
+            if ($installed.Count -gt 0) {
+                Write-Warn2 "  Kurulu modeller: $($installed -join ', ')"
+            }
+            Write-Warn2 "  Proje calismaya devam edecek; yalnizca Akilli Asistan devre disi."
+        }
+    }
+    catch {
+        Write-Warn2 "Uyari: Ollama calismiyor. Akilli Asistan devre disi baslayacak."
+        Write-Warn2 "  Baslatmak icin ayri bir pencerede: ollama serve"
+        Write-Warn2 "  Adres: $OllamaUrl"
+        Write-Warn2 "  Projenin geri kalani normal calisir."
+    }
+
+    # ----------------------------------------------------------------------
+    # 7) Sunucu
+    # ----------------------------------------------------------------------
+    Write-Step "7/7" "Sunucu baslatiliyor"
 
     $url = "http://127.0.0.1:$Port"
     Write-Host ""
