@@ -216,7 +216,7 @@ function openAssistantView(index) {
   // çerçeveye bırakılıyor.
   requestAnimationFrame(() => {
     try {
-      panel.innerHTML = aiRenderView(item.uiSpec);
+      panel.innerHTML = aiRenderView(item.uiSpec, item.structured);
       const close = panel.querySelector("[data-ai-close]");
       if (close) {
         close.addEventListener("click", () => {
@@ -436,6 +436,9 @@ async function sendMessage(rawMessage) {
     // Dinamik pencere tanımı balonla birlikte saklanır; konuşma geçmişinden
     // yeniden açılabilsin diye.
     pending.uiSpec = result.ui_spec || null;
+    // Sayıların DOĞRULANABİLMESİ için ham sonuç da saklanır: renderer her
+    // grafiği bu kaynağa göre denetler.
+    pending.structured = result.structured_result || null;
     renderThread();
     await refreshAssistantStatus();
   } catch (err) {

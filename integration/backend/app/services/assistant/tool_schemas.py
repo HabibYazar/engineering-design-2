@@ -87,6 +87,17 @@ class ScopedMetric(BaseModel):
     note: Optional[str] = Field(
         default=None, description="Veri yoksa veya kapsam sınırlıysa açıklama."
     )
+    semantic_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "Metriğin ANLAM türü: count_change, monetary_change, "
+            "capacity_coverage, capacity_demand, staffing_gap, "
+            "target_comparison, historical_trend, forecast, risk_score, "
+            "distribution, utilization, ranking, status. Boş bırakılırsa "
+            "`metric_semantics.classify()` birime ve anahtara bakarak "
+            "belirler. Arayüz grafik türünü BU alana göre seçer."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

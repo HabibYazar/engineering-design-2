@@ -3,30 +3,33 @@
 BU DOSYA HESAP YAPMAZ ve METİNDEN SAYI AYIKLAMAZ.
 
 Her sayı `structured_result["metrics"]` içindeki bir kayıttan gelir ve
-üretilen bileşen `source_keys` alanında hangi metrikten geldiğini söyler.
-Testler bu bağı doğrular.
+üretilen bileşen `source_metric_ids` alanında hangi metriğin hangi
+alanından geldiğini söyler (`"<anahtar>.<baseline|scenario|change>"`).
+Renderer bu adresleri çözüp karşılaştırır.
 
-BİLGİ HİYERARŞİSİ
------------------
-Varsayılan görünüm en fazla:
-  * 5 özet kartı
-  * 3 grafik
-  * 3 kritik risk
-  * kısa yönetim yorumu
+BİLGİ HİYERARŞİSİ — ANA EKRAN
+-----------------------------
+    1. Karar özeti (tek cümle + rozetler)
+    2. En fazla 5 KPI kartı
+    3. En fazla 4 grafik            ← ui_planner, anlama göre seçer
+    4. En kritik 3 risk
+    5. En fazla 4 maddelik karar önerisi
 
-Geri kalan her şey (ayrıntılı program/üniversite metrikleri, yöntem,
-kullanılan veriler, varsayımlar, teknik çıktı) kapalı açılır bölümlerde
-durur. 40 satırlık markdown varsayılan olarak GÖSTERİLMEZ.
+Uzun her şey — yönetim değerlendirmesi, ayrıntılı metrikler, yöntem,
+varsayımlar, kaynaklar, teknik çıktı, ham cevap — en altta KAPALI
+açılır bölümlerdedir. Kullanıcı açmadıkça görünmez.
 """
 
 import hashlib
+import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from app.services.assistant import ui_planner
 from app.services.assistant.ui_spec import (
-    ChartSeries,
+    Badge,
     Component,
     Section,
     Theme,
@@ -35,20 +38,32 @@ from app.services.assistant.ui_spec import (
 
 logger = logging.getLogger(__name__)
 
-# Grafik serilerinin anlamı. Legend YALNIZCA bir kez, grafik bileşeninin
-# kendi `legend` alanında tanımlanır.
-LEGEND_BASELINE = {"role": "baseline", "label": "Mevcut durum"}
-LEGEND_SCENARIO = {"role": "scenario", "label": "Senaryo sonucu"}
-LEGEND_CAPACITY = {"role": "capacity", "label": "Kullanılabilir kapasite"}
+# Legend YALNIZCA panel düzeyinde, bir kez tanımlanır. Her grafiğin altına
+# aynı açıklamayı koymak ekranı kalabalıklaştırmaktan başka bir şey yapmaz.
+PANEL_LEGEND = [
+    {"role": "baseline", "label": "Mevcut durum"},
+    {"role": "scenario", "label": "Senaryo sonucu"},
+    {"role": "capacity", "label": "Kapasite / hedef"},
+]
 
 COST_EXCLUSION_WARNING = (
     "Finansal sonuçlar gerekli yeni personel ve kapasite yatırımlarının "
     "maliyetini içermemektedir."
 )
 
+UNCALCULATED_COSTS = [
+    "Ek personel maliyeti hesaplanmadı",
+    "Fiziksel yatırım maliyeti hesaplanmadı",
+]
+
+# Karşılama oranı eşikleri. Renk TEK BAŞINA anlam taşımaz; her seviyenin
+# metin karşılığı da vardır.
+LEVEL_LABELS = {"critical": "Kritik", "warning": "Yüksek", "info": "İzlenmeli",
+                "positive": "Uygun"}
+
 
 def _index(structured: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {m["key"]: m for m in structured.get("metrics", [])}
+    return {m["key"]: m for m in structured.get("metrics", []) if m.get("key")}
 
 
 def _num(metric: Optional[Dict[str, Any]], field: str) -> Optional[float]:
@@ -56,6 +71,19 @@ def _num(metric: Optional[Dict[str, Any]], field: str) -> Optional[float]:
         return None
     value = metric.get(field)
     return None if value is None else float(value)
+
+
+def _addr(metric: Optional[Dict[str, Any]], field: str) -> Optional[str]:
+    return None if metric is None else f"{metric['key']}.{field}"
+
+
+def _ids(*pairs: Tuple[Optional[Dict[str, Any]], str]) -> List[str]:
+    return [a for a in (_addr(m, f) for m, f in pairs) if a]
+
+
+# ---------------------------------------------------------------------------
+# Biçimlendirme
+# ---------------------------------------------------------------------------
 
 
 def _fmt_count(value: Optional[float], unit: str = "") -> str:
@@ -94,25 +122,28 @@ def _fmt_percent(value: Optional[float]) -> str:
     return f"%{text}"
 
 
+def _fmt_points(value: Optional[float]) -> str:
+    """Yüzde farkı PUAN cinsindendir; "%-5,90" yazmak yanlış olurdu."""
+    if value is None:
+        return "Veri bulunamadı"
+    text = f"{abs(Decimal(str(value))):.2f}".replace(".", ",")
+    word = "Azalış" if value < 0 else "Artış"
+    return f"{word}: {'-' if value < 0 else '+'}{text} puan"
+
+
 def _signed(value: Optional[float], formatter) -> str:
     if value is None:
         return "Veri bulunamadı"
-    prefix = "+" if value > 0 else ""
-    return f"{prefix}{formatter(value)}"
+    return f"{'+' if value > 0 else ''}{formatter(value)}"
 
 
 def _trend(value: Optional[float]) -> Optional[str]:
     if value is None:
         return None
-    if value > 0:
-        return "up"
-    if value < 0:
-        return "down"
-    return "flat"
+    return "up" if value > 0 else "down" if value < 0 else "flat"
 
 
 def _view_id(structured: Dict[str, Any], calculated_at: Optional[datetime]) -> str:
-    """Pencere kimliği. Scoped CSS ve aynı konuşmada birden çok pencere için."""
     seed = "|".join(
         [
             str(structured.get("type")),
@@ -125,29 +156,193 @@ def _view_id(structured: Dict[str, Any], calculated_at: Optional[datetime]) -> s
 
 
 # ---------------------------------------------------------------------------
-# Öğrenci senaryosu penceresi
+# 1) Karar özeti
 # ---------------------------------------------------------------------------
 
 
-def _enrollment_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
-    """En fazla 5 özet kartı. Her değer bir metrikten gelir."""
+def _decision_summary(
+    structured: Dict[str, Any], index: Dict[str, Dict[str, Any]], scope_name: str
+) -> Component:
+    """En fazla iki satırlık karar cümlesi ve rozetler.
+
+    Cümle şablondan değil, VERİDEN kurulur: hangi yönde değişim var, mali
+    etki olumlu mu, kapasite açığı büyüyor mu. Metrikleri olmayan bir
+    senaryoda ilgili cümle parçası hiç yazılmaz.
+    """
+    clauses: List[str] = []
+
+    students = index.get("program_student_count")
+    if students and _num(students, "baseline") and _num(students, "change") is not None:
+        percent = round(_num(students, "change") / _num(students, "baseline") * 100)
+        direction = "artışı" if _num(students, "change") > 0 else "azalışı"
+        clauses.append(f"%{abs(percent)} öğrenci {direction}")
+
+    net = index.get("university_net_balance")
+    revenue = index.get("program_revenue_effect") or index.get("university_total_revenue")
+    money_change = _num(net, "change")
+    if money_change is None:
+        money_change = _num(revenue, "change")
+    if money_change is not None:
+        clauses.append(
+            "ek gelir oluşturuyor" if money_change > 0 else "bütçeyi olumsuz etkiliyor"
+        )
+
+    # Kapasite yönü: karşılama oranları düşüyor mu, kadro açığı büyüyor mu?
+    worsening: List[str] = []
+    for key, name in (
+        ("program_classroom_coverage", "fiziksel"),
+        ("program_laboratory_coverage", "fiziksel"),
+    ):
+        metric = index.get(key)
+        if metric and _num(metric, "scenario") is not None and _num(metric, "baseline") is not None:
+            if _num(metric, "scenario") < _num(metric, "baseline"):
+                worsening.append(name)
+    if _num(index.get("program_marginal_fte"), "change"):
+        worsening.append("akademik")
+
+    if worsening:
+        order = [w for w in ("akademik", "fiziksel") if w in worsening]
+        clauses.append(
+            "ancak programın mevcut "
+            + " ve ".join(order)
+            + " kapasite açığını önemli ölçüde büyütüyor"
+        )
+
+    sentence = (scope_name + ": " if scope_name else "") + ", ".join(clauses[:1])
+    if len(clauses) > 1:
+        sentence = (
+            (scope_name + ": " if scope_name else "")
+            + clauses[0] + " " + " ".join(clauses[1:])
+        )
+    if not clauses:
+        sentence = f"{scope_name or 'Kurum'} için hesaplanan sonuçlar aşağıdadır."
+    if not sentence.endswith("."):
+        sentence += "."
+
+    badges = [Badge(label=b, tone=t) for b, t in _badges(structured, index, scope_name)]
+
+    return Component(
+        type="decision_summary",
+        id="decision-summary",
+        title=sentence,
+        span=12,
+        badges=badges,
+        aria_label="Karar özeti: " + sentence,
+    )
+
+
+def _risk_level(index: Dict[str, Dict[str, Any]]) -> str:
+    """Panelin genel risk seviyesi. Metriklerden türetilir, tahmin edilmez."""
+    coverages = [
+        _num(index.get(k), "scenario")
+        for k in index
+        if k.endswith("_coverage") and _num(index.get(k), "scenario") is not None
+    ]
+    if coverages and min(coverages) < 50:
+        return "critical"
+    if _num(index.get("program_marginal_fte"), "change"):
+        return "critical"
+    if coverages and min(coverages) < 80:
+        return "warning"
+    return "info"
+
+
+def _badges(
+    structured: Dict[str, Any], index: Dict[str, Dict[str, Any]], scope_name: str
+) -> List[Tuple[str, str]]:
+    kind = {
+        "enrollment_change_scenario": "Program senaryosu",
+        "staff_salary_scenario": "Personel senaryosu",
+    }.get(structured.get("type"), "Kurumsal analiz")
+
+    level = _risk_level(index)
+    level_text = {"critical": "Yüksek risk", "warning": "Orta risk",
+                  "info": "Düşük risk"}[level]
+
+    badges: List[Tuple[str, str]] = []
+    if structured.get("academic_year"):
+        badges.append((structured["academic_year"], "info"))
+    badges.append((kind, "info"))
+    if scope_name:
+        badges.append((scope_name, "baseline"))
+    badges.append((level_text, level))
+    return badges
+
+
+# ---------------------------------------------------------------------------
+# 2) KPI kartları
+# ---------------------------------------------------------------------------
+
+
+def _kpi_comparison(
+    metric: Dict[str, Any], *, title: str, icon: str, formatter,
+    caption: str = "", delta_metric: Optional[Dict[str, Any]] = None,
+    delta_label: Optional[str] = None, good_when: str = "up",
+    scenario_metric: Optional[Dict[str, Any]] = None,
+) -> Component:
+    """Mevcut → senaryo karşılaştırması taşıyan KPI kartı."""
+    scenario_metric = scenario_metric or metric
+    baseline = _num(metric, "baseline")
+    scenario = _num(scenario_metric, "scenario")
+    delta = _num(delta_metric, "change") if delta_metric else None
+    if delta is None and baseline is not None and scenario is not None:
+        delta = round(scenario - baseline, 2)
+
+    sentiment = "neutral"
+    if delta:
+        rising_is_good = good_when == "up"
+        sentiment = "positive" if (delta > 0) == rising_is_good else "negative"
+
+    return Component(
+        type="kpi_card",
+        id="kpi-" + metric["key"],
+        title=title,
+        icon=icon,
+        span=12,
+        unit=metric.get("unit"),
+        value=formatter(scenario),
+        value_number=scenario,
+        baseline_label=formatter(baseline),
+        scenario_label=formatter(scenario),
+        delta_label=delta_label if delta_label is not None else _signed(delta, formatter),
+        trend=_trend(delta),
+        sentiment=sentiment,
+        caption=caption,
+        semantic_type=metric.get("semantic_type"),
+        scope_type=metric.get("scope_type"),
+        scope_name=metric.get("scope_name"),
+        data={"baseline": baseline, "scenario": scenario, "delta": delta},
+        data_source_ids={
+            k: v for k, v in {
+                "baseline": _addr(metric, "baseline"),
+                "scenario": _addr(scenario_metric, "scenario"),
+                "delta": _addr(delta_metric, "change") if delta_metric else None,
+            }.items() if v
+        },
+        source_metric_ids=_ids((metric, "baseline"), (scenario_metric, "scenario")),
+        source_keys=sorted({metric["key"], scenario_metric["key"]}),
+        formula=metric.get("formula"),
+        aria_label=(
+            f"{title}: mevcut {formatter(baseline)}, senaryo {formatter(scenario)}"
+        ),
+    )
+
+
+def _enrollment_kpis(index: Dict[str, Dict[str, Any]]) -> List[Component]:
+    """En fazla 5 KPI kartı. Her değer bir metrikten gelir."""
     cards: List[Component] = []
 
     students = index.get("program_student_count")
     if students:
         cards.append(
-            Component(
-                type="comparison_metric",
+            _kpi_comparison(
+                students,
                 title="Öğrenci sayısı",
-                baseline_label=_fmt_count(_num(students, "baseline"), "öğrenci"),
-                scenario_label=_fmt_count(_num(students, "scenario"), "öğrenci"),
-                delta_label=_signed(
-                    _num(students, "change"), lambda v: _fmt_count(v, "öğrenci")
-                ),
-                trend=_trend(_num(students, "change")),
-                scope_type=students.get("scope_type"),
-                scope_name=students.get("scope_name"),
-                source_keys=["program_student_count"],
+                icon="students",
+                formatter=lambda v: _fmt_count(v, "öğrenci"),
+                caption="Program kaydı",
+                delta_metric=students,
+                good_when="up",
             )
         )
 
@@ -155,40 +350,49 @@ def _enrollment_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
     scenario_gap = index.get("program_scenario_fte_gap")
     marginal = index.get("program_marginal_fte")
     if baseline_gap and scenario_gap:
-        cards.append(
-            Component(
-                type="comparison_metric",
-                title="Program FTE açığı",
-                baseline_label=_fmt_decimal(_num(baseline_gap, "baseline"), "FTE"),
-                scenario_label=_fmt_decimal(_num(scenario_gap, "scenario"), "FTE"),
-                delta_label=(
-                    "Senaryonun etkisi: "
-                    + _signed(_num(marginal, "change"), lambda v: _fmt_decimal(v, "FTE"))
-                ),
-                trend=_trend(_num(marginal, "change")),
-                scope_type=baseline_gap.get("scope_type"),
-                scope_name=baseline_gap.get("scope_name"),
-                source_keys=[
-                    "program_baseline_fte_gap",
-                    "program_scenario_fte_gap",
-                    "program_marginal_fte",
-                ],
-                note="Mevcut açık senaryodan bağımsızdır.",
-            )
+        card = _kpi_comparison(
+            baseline_gap,
+            title="Program FTE açığı",
+            icon="staff",
+            formatter=lambda v: _fmt_decimal(v, "FTE"),
+            caption="Mevcut açık senaryodan bağımsızdır",
+            delta_metric=marginal,
+            delta_label="Senaryonun etkisi: "
+            + _signed(_num(marginal, "change"), lambda v: _fmt_decimal(v, "FTE")),
+            good_when="down",
+            scenario_metric=scenario_gap,
         )
+        card.source_metric_ids = _ids(
+            (baseline_gap, "baseline"), (scenario_gap, "scenario"), (marginal, "change")
+        )
+        card.source_keys = [baseline_gap["key"], scenario_gap["key"], marginal["key"]]
+        cards.append(card)
 
     revenue = index.get("program_revenue_effect")
     if revenue:
+        change = _num(revenue, "change")
         cards.append(
             Component(
-                type="metric_card",
+                type="kpi_card",
+                id="kpi-" + revenue["key"],
                 title="Ek gelir etkisi",
-                value=_signed(_num(revenue, "change"), _fmt_usd),
-                trend=_trend(_num(revenue, "change")),
+                icon="money",
+                span=12,
+                unit="USD",
+                value=_signed(change, _fmt_usd),
+                value_number=change,
+                delta_label=None,
+                trend=_trend(change),
+                sentiment="positive" if (change or 0) > 0 else "negative",
+                caption="Personel ve yatırım maliyetleri hariç",
+                semantic_type=revenue.get("semantic_type"),
                 scope_type=revenue.get("scope_type"),
                 scope_name=revenue.get("scope_name"),
-                source_keys=["program_revenue_effect"],
-                note="Yatırım ve yeni personel maliyetleri hariç.",
+                data={"value": change},
+                data_source_ids={"value": _addr(revenue, "change")},
+                source_metric_ids=_ids((revenue, "change")),
+                source_keys=[revenue["key"]],
+                aria_label=f"Ek gelir etkisi {_signed(change, _fmt_usd)}",
             )
         )
 
@@ -199,299 +403,332 @@ def _enrollment_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
         metric = index.get(key)
         if not metric:
             continue
+        baseline = _num(metric, "baseline")
+        scenario = _num(metric, "scenario")
+        delta = None if None in (baseline, scenario) else round(scenario - baseline, 2)
         cards.append(
             Component(
-                type="comparison_metric",
+                type="kpi_card",
+                id="kpi-" + key,
                 title=title,
-                baseline_label=_fmt_percent(_num(metric, "baseline")),
-                scenario_label=_fmt_percent(_num(metric, "scenario")),
-                trend=_trend(
-                    None
-                    if _num(metric, "scenario") is None or _num(metric, "baseline") is None
-                    else _num(metric, "scenario") - _num(metric, "baseline")
-                ),
+                icon="classroom" if "classroom" in key else "laboratory",
+                span=12,
+                unit="%",
+                value=_fmt_percent(scenario),
+                value_number=scenario,
+                baseline_label=_fmt_percent(baseline),
+                scenario_label=_fmt_percent(scenario),
+                delta_label=_fmt_points(delta),
+                trend=_trend(delta),
+                sentiment="negative" if (delta or 0) < 0 else "positive",
+                caption="Talebin karşılanabilen bölümü",
+                level="critical" if (scenario or 100) < 50 else
+                      "warning" if (scenario or 100) < 80 else None,
+                semantic_type=metric.get("semantic_type"),
                 scope_type=metric.get("scope_type"),
                 scope_name=metric.get("scope_name"),
+                data={"baseline": baseline, "scenario": scenario, "delta": delta},
+                data_source_ids={
+                    "baseline": _addr(metric, "baseline"),
+                    "scenario": _addr(metric, "scenario"),
+                    "delta": f"{_addr(metric, 'scenario')}|{_addr(metric, 'baseline')}",
+                },
+                source_metric_ids=_ids((metric, "baseline"), (metric, "scenario")),
                 source_keys=[key],
                 formula=metric.get("formula"),
+                aria_label=(
+                    f"{title}: mevcut yüzde {baseline}, senaryo yüzde {scenario}"
+                ),
             )
         )
 
-    # Varsayılan görünümde en fazla beş kart.
     return cards[:5]
 
 
-def _enrollment_charts(index: Dict[str, Dict[str, Any]]) -> List[Component]:
-    """En fazla 3 grafik.
-
-    RENK ANLAMI HER GRAFİKTE AYNIDIR: mavi = mevcut durum, turuncu = senaryo
-    sonucu, gri = kullanılabilir kapasite. Bu yüzden legend açıklaması
-    penceredeki İLK grafiğe bir kez konur; sonraki grafikler aynı renk
-    sözlüğünü kullanır ve legend'i TEKRAR ETMEZ.
-    """
-    charts: List[Component] = []
-
-    students = index.get("program_student_count")
-    if students:
-        charts.append(
-            Component(
-                type="bar_chart",
-                title="Öğrenci sayısı",
-                unit="öğrenci",
-                categories=["Öğrenci sayısı"],
-                series=[
-                    ChartSeries(
-                        label="Mevcut durum",
-                        role="baseline",
-                        values=[_num(students, "baseline")],
-                    ),
-                    ChartSeries(
-                        label="Senaryo sonucu",
-                        role="scenario",
-                        values=[_num(students, "scenario")],
-                    ),
-                ],
-                source_keys=["program_student_count"],
-            )
-        )
-
-    fte = index.get("program_staff_fte")
-    required = index.get("program_required_fte")
-    if fte and required:
-        charts.append(
-            Component(
-                type="bar_chart",
-                title="Akademik kapasite",
-                unit="FTE",
-                categories=["Akademik kapasite (FTE)"],
-                series=[
-                    ChartSeries(
-                        label="Kullanılabilir kapasite",
-                        role="capacity",
-                        values=[_num(fte, "baseline")],
-                    ),
-                    ChartSeries(
-                        label="Mevcut gerekli",
-                        role="baseline",
-                        values=[_num(required, "baseline")],
-                    ),
-                    ChartSeries(
-                        label="Senaryo gerekli",
-                        role="scenario",
-                        values=[_num(required, "scenario")],
-                    ),
-                ],
-                source_keys=["program_staff_fte", "program_required_fte"],
-            )
-        )
-
-    classroom_capacity = index.get("program_classroom_capacity")
-    classroom_demand = index.get("program_classroom_demand")
-    lab_capacity = index.get("program_laboratory_capacity")
-    lab_demand = index.get("program_laboratory_demand")
-    if classroom_capacity and classroom_demand:
-        categories = ["Derslik (koltuk-saat)"]
-        capacity_values = [_num(classroom_capacity, "baseline")]
-        baseline_values = [_num(classroom_demand, "baseline")]
-        scenario_values = [_num(classroom_demand, "scenario")]
-        source_keys = ["program_classroom_capacity", "program_classroom_demand"]
-
-        if lab_capacity and lab_demand and _num(lab_capacity, "baseline") is not None:
-            categories.append("Laboratuvar (istasyon-saat)")
-            capacity_values.append(_num(lab_capacity, "baseline"))
-            baseline_values.append(_num(lab_demand, "baseline"))
-            scenario_values.append(_num(lab_demand, "scenario"))
-            source_keys += ["program_laboratory_capacity", "program_laboratory_demand"]
-
-        charts.append(
-            Component(
-                type="bar_chart",
-                title="Fiziksel kapasite",
-                subtitle="Kapasite ve haftalık ihtiyaç",
-                categories=categories,
-                series=[
-                    ChartSeries(label="Kullanılabilir kapasite", role="capacity",
-                                values=capacity_values),
-                    ChartSeries(label="Mevcut talep", role="baseline",
-                                values=baseline_values),
-                    ChartSeries(label="Senaryo talebi", role="scenario",
-                                values=scenario_values),
-                ],
-                source_keys=source_keys,
-            )
-        )
-
-    charts = charts[:3]
-
-    # Legend YALNIZCA bir kez: penceredeki ilk grafiğe, o pencerede kullanılan
-    # bütün rollerin açıklaması konur. Diğer grafiklerin legend'i boş kalır.
-    if charts:
-        roles = {series.role for chart in charts for series in chart.series}
-        legend = [
-            entry
-            for entry, role in (
-                (LEGEND_BASELINE, "baseline"),
-                (LEGEND_SCENARIO, "scenario"),
-                (LEGEND_CAPACITY, "capacity"),
-            )
-            if role in roles
-        ]
-        charts[0].legend = legend
-        for chart in charts[1:]:
-            chart.legend = []
-
-    return charts
-
-
-def _risk_components(
-    structured: Dict[str, Any], index: Dict[str, Dict[str, Any]]
-) -> List[Component]:
-    """Mevcut risk ile senaryonun eklediği etki AYRI kartlarda."""
-    components: List[Component] = []
-
-    baseline_risks = list(structured.get("baseline_risks", []) or [])
-    if baseline_risks:
-        components.append(
-            Component(
-                type="risk_card",
-                title="Mevcut durumdaki riskler",
-                subtitle="Senaryodan bağımsız",
-                level="warning",
-                items=baseline_risks[:3],
-                source_keys=["baseline_risks"],
-            )
-        )
-
-    # Senaryonun EKLEDİĞİ etki: toplam açık değil, marjinal değişim.
-    incremental: List[str] = []
-    for key, label, formatter in (
-        ("program_classroom_demand", "Program derslik ihtiyacı",
-         lambda v: _fmt_decimal(v, "koltuk-saat")),
-        ("program_laboratory_demand", "Program laboratuvar ihtiyacı",
-         lambda v: _fmt_decimal(v, "istasyon-saat")),
-        ("program_marginal_fte", "Program FTE açığı",
-         lambda v: _fmt_decimal(v, "FTE")),
-    ):
-        metric = index.get(key)
-        change = _num(metric, "change")
-        if change:
-            incremental.append(f"{label}: {_signed(change, formatter)}")
-
-    for key, label in (
-        ("university_classroom_gap", "Üniversite derslik açığı"),
-        ("university_laboratory_gap", "Üniversite laboratuvar açığı"),
-    ):
-        metric = index.get(key)
-        baseline = _num(metric, "baseline")
-        scenario = _num(metric, "scenario")
-        if baseline is None or scenario is None:
+def _generic_kpis(structured: Dict[str, Any]) -> List[Component]:
+    """Senaryo dışındaki sonuç türleri için genel KPI kartları."""
+    cards: List[Component] = []
+    for metric in structured.get("metrics", [])[:5]:
+        scenario = metric.get("scenario")
+        baseline = metric.get("baseline")
+        value = scenario if scenario is not None else baseline
+        field = "scenario" if scenario is not None else "baseline"
+        if value is None:
             continue
-        added = scenario - baseline
-        incremental.append(
-            f"{label}: {_fmt_count(baseline)} → {_fmt_count(scenario)} "
-            f"eş zamanlı kişi (senaryonun eklediği: {_signed(added, _fmt_count)})"
+        unit = metric.get("unit", "")
+        formatter = (
+            _fmt_usd if unit == "USD"
+            else _fmt_percent if unit == "%"
+            else (lambda v, u=unit: _fmt_decimal(v, u))
         )
-
-    if incremental:
-        components.append(
+        cards.append(
             Component(
-                type="risk_card",
-                title="Senaryonun eklediği etki",
+                type="kpi_card",
+                id="kpi-" + metric["key"],
+                title=metric["label"],
+                icon="metric",
+                span=12,
+                unit=unit,
+                value=formatter(float(value)),
+                value_number=float(value),
+                baseline_label=formatter(float(baseline)) if baseline is not None else None,
+                scenario_label=formatter(float(scenario)) if scenario is not None else None,
+                semantic_type=metric.get("semantic_type"),
+                scope_type=metric.get("scope_type"),
+                scope_name=metric.get("scope_name"),
+                data={"value": float(value)},
+                data_source_ids={"value": f"{metric['key']}.{field}"},
+                source_metric_ids=[f"{metric['key']}.{field}"],
+                source_keys=[metric["key"]],
+                aria_label=f"{metric['label']}: {formatter(float(value))}",
+            )
+        )
+    return cards[:5]
+
+
+# ---------------------------------------------------------------------------
+# 4) Riskler — kompakt kartlar
+# ---------------------------------------------------------------------------
+
+
+def _capacity_families(index: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Karşılama oranı ile talebi aynı "aile" altında eşleştirir.
+
+    Eşleşme anahtar KÖKÜNE bakar: `program_classroom_coverage` ile
+    `program_classroom_demand` aynı köke sahiptir. Yarın eklenecek
+    `program_workshop_*` metrikleri de aynı kuralla eşleşir.
+    """
+    families: List[Dict[str, Any]] = []
+    for key, metric in index.items():
+        if not key.endswith("_coverage"):
+            continue
+        stem = key[: -len("_coverage")]
+        demand = index.get(stem + "_demand")
+        if demand is None:
+            continue
+        families.append({"stem": stem, "coverage": metric, "demand": demand})
+    # En özel kapsam önce.
+    rank = {"program": 0, "department": 1, "faculty": 2, "university": 3}
+    families.sort(key=lambda f: (rank.get(f["coverage"].get("scope_type"), 4),
+                                 _num(f["coverage"], "scenario") or 100))
+    if families:
+        best = rank.get(families[0]["coverage"].get("scope_type"), 4)
+        families = [f for f in families if rank.get(f["coverage"].get("scope_type"), 4) == best]
+    return families
+
+
+def _family_title(stem: str, label: str) -> str:
+    if "classroom" in stem:
+        return "Derslik kapasitesi"
+    if "laborator" in stem:
+        return "Laboratuvar kapasitesi"
+    return label.replace("talebinin karşılanan oranı", "kapasitesi").strip().capitalize()
+
+
+def _risk_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
+    """En kritik üç risk. Paragraf yok; ikon, rozet, büyük metrik, tek cümle."""
+    cards: List[Component] = []
+
+    marginal = index.get("program_marginal_fte")
+    scenario_gap = index.get("program_scenario_fte_gap")
+    if marginal and scenario_gap and _num(marginal, "change"):
+        cards.append(
+            Component(
+                type="risk_summary_card",
+                id="risk-staffing",
+                title="Akademik kapasite",
+                icon="staff",
                 level="critical",
-                items=incremental,
-                source_keys=[
-                    "program_classroom_demand",
-                    "program_laboratory_demand",
-                    "program_marginal_fte",
-                    "university_classroom_gap",
-                    "university_laboratory_gap",
-                ],
-                note=(
-                    "Kurumun toplam kapasite açığı senaryodan önce de vardı; "
-                    "burada yalnızca senaryonun eklediği fark gösterilir."
+                span=4,
+                value=_signed(_num(marginal, "change"), lambda v: _fmt_decimal(v, "FTE")),
+                caption=(
+                    "Senaryo sonrası toplam açık: "
+                    + _fmt_decimal(_num(scenario_gap, "scenario"), "FTE")
+                ),
+                subtitle="Senaryonun eklediği açık",
+                data={
+                    "marginal": _num(marginal, "change"),
+                    "total": _num(scenario_gap, "scenario"),
+                },
+                data_source_ids={
+                    "marginal": _addr(marginal, "change"),
+                    "total": _addr(scenario_gap, "scenario"),
+                },
+                source_metric_ids=_ids((marginal, "change"), (scenario_gap, "scenario")),
+                source_keys=[marginal["key"], scenario_gap["key"]],
+                aria_label=(
+                    "Akademik kapasite riski kritik. Senaryonun eklediği açık "
+                    + _fmt_decimal(_num(marginal, "change"), "FTE")
                 ),
             )
         )
 
-    return components
+    for family in _capacity_families(index):
+        coverage, demand = family["coverage"], family["demand"]
+        scenario_coverage = _num(coverage, "scenario")
+        extra = _num(demand, "change")
+        if extra is None and None not in (_num(demand, "baseline"), _num(demand, "scenario")):
+            extra = _num(demand, "scenario") - _num(demand, "baseline")
+        level = ("critical" if (scenario_coverage or 100) < 50
+                 else "warning" if (scenario_coverage or 100) < 80 else "info")
+        title = _family_title(family["stem"], coverage["label"])
+        cards.append(
+            Component(
+                type="risk_summary_card",
+                id="risk-" + family["stem"],
+                title=title,
+                icon="classroom" if "classroom" in family["stem"] else "laboratory",
+                level=level,
+                span=4,
+                value=_signed(extra, lambda v: _fmt_decimal(v, demand.get("unit", ""))),
+                subtitle="Ek haftalık ihtiyaç",
+                caption="Karşılama oranı: " + _fmt_percent(scenario_coverage),
+                data={"extra": extra, "coverage": scenario_coverage},
+                data_source_ids={
+                    k: v for k, v in {
+                        "extra": _addr(demand, "change"),
+                        "coverage": _addr(coverage, "scenario"),
+                    }.items() if v
+                },
+                source_metric_ids=_ids((demand, "change"), (coverage, "scenario")),
+                source_keys=[demand["key"], coverage["key"]],
+                aria_label=(
+                    f"{title} riski {LEVEL_LABELS[level].lower()}. Ek haftalık "
+                    f"ihtiyaç {_fmt_decimal(extra, demand.get('unit', ''))}, "
+                    f"karşılama oranı yüzde {scenario_coverage}"
+                ),
+            )
+        )
+
+    order = {"critical": 0, "warning": 1, "info": 2, "positive": 3}
+    cards.sort(key=lambda c: order.get(c.level or "info", 3))
+    return cards[:3]
 
 
-def _detail_components(
-    structured: Dict[str, Any], index: Dict[str, Dict[str, Any]], markdown: str
+# ---------------------------------------------------------------------------
+# 5) Karar önerileri
+# ---------------------------------------------------------------------------
+
+
+def _decisions(index: Dict[str, Dict[str, Any]]) -> List[str]:
+    """En fazla dört, ikişer satırı geçmeyen karar maddesi."""
+    items: List[str] = []
+
+    marginal = _num(index.get("program_marginal_fte"), "change")
+    if marginal:
+        items.append(
+            f"Akademik kadro: En az {_fmt_decimal(marginal, 'FTE')} ek kapasite "
+            "planlanmalı."
+        )
+
+    for family in _capacity_families(index):
+        coverage = family["coverage"]
+        title = _family_title(family["stem"], coverage["label"])
+        baseline = _num(coverage, "baseline")
+        if baseline is not None and baseline < 100:
+            items.append(
+                f"{title}: Mevcut tahsis öğrenci artışından önce de yetersiz."
+            )
+        else:
+            items.append(
+                f"{title}: Senaryo sonrası tahsis yetersiz kalıyor; artırılmalı."
+            )
+
+    if index.get("university_net_balance") or index.get("program_revenue_effect"):
+        items.append(
+            "Finans: Ek gelir olumlu ancak personel ve yatırım maliyetleri "
+            "ayrıca hesaplanmalı."
+        )
+
+    return items[:4]
+
+
+# ---------------------------------------------------------------------------
+# 6) Açılır bölümler — hepsi KAPALI
+# ---------------------------------------------------------------------------
+
+
+def _metric_rows(structured: Dict[str, Any], scope_type: str) -> List[str]:
+    rows = []
+    for m in structured.get("metrics", []):
+        if m.get("scope_type") != scope_type:
+            continue
+        unit = m.get("unit", "")
+        if m.get("baseline") is not None and m.get("scenario") is not None:
+            rows.append(
+                f"{m['label']}: {_fmt_decimal(m['baseline'], unit)} → "
+                f"{_fmt_decimal(m['scenario'], unit)}"
+            )
+        else:
+            value = m.get("scenario") if m.get("scenario") is not None else m.get("baseline")
+            rows.append(f"{m['label']}: {_fmt_decimal(value, unit)}")
+    return rows
+
+
+def _accordion(
+    structured: Dict[str, Any],
+    index: Dict[str, Dict[str, Any]],
+    *,
+    interpretation: Optional[str],
+    markdown: str,
+    data_sources: List[str],
 ) -> List[Component]:
-    """Kapalı açılır bölümler. Varsayılan görünümde YER ALMAZ."""
-    program_rows = [
-        f"{m['label']}: "
-        + (
-            f"{_fmt_decimal(m.get('baseline'), m.get('unit', ''))} → "
-            f"{_fmt_decimal(m.get('scenario'), m.get('unit', ''))}"
-            if m.get("baseline") is not None and m.get("scenario") is not None
-            else _fmt_decimal(
-                m.get("scenario") if m.get("scenario") is not None else m.get("baseline"),
-                m.get("unit", ""),
-            )
-        )
-        for m in structured.get("metrics", [])
-        if m.get("scope_type") == "program"
-    ]
-    university_rows = [
-        f"{m['label']}: "
-        + (
-            f"{_fmt_decimal(m.get('baseline'), m.get('unit', ''))} → "
-            f"{_fmt_decimal(m.get('scenario'), m.get('unit', ''))}"
-            if m.get("baseline") is not None and m.get("scenario") is not None
-            else _fmt_decimal(
-                m.get("scenario") if m.get("scenario") is not None else m.get("baseline"),
-                m.get("unit", ""),
-            )
-        )
-        for m in structured.get("metrics", [])
-        if m.get("scope_type") == "university"
-    ]
-    formulas = [
-        f"{m['label']}: {m['formula']}"
-        for m in structured.get("metrics", [])
-        if m.get("formula")
-    ]
+    """Uzun içerik yalnızca burada. Hepsi `open=False`."""
+    blocks: List[Component] = []
 
-    details: List[Component] = []
-    if program_rows:
-        details.append(
+    def block(title: str, *, items: List[str] = None, body: str = None,
+              markdown_text: str = None, icon: str = "detail") -> None:
+        if not (items or body or markdown_text):
+            return
+        children = []
+        if items:
+            children.append(Component(type="recommendation_list", items=items))
+        blocks.append(
             Component(
                 type="expandable_details",
-                title="Ayrıntılı program sonuçları",
-                components=[
-                    Component(type="recommendation_list", items=program_rows)
-                ],
+                id="acc-" + str(len(blocks)),
+                title=title,
+                icon=icon,
+                span=12,
+                open=False,
+                components=children,
+                body=body,
+                markdown=markdown_text,
             )
         )
-    if university_rows:
-        details.append(
-            Component(
-                type="expandable_details",
-                title="Üniversite geneli etkiler",
-                components=[
-                    Component(type="recommendation_list", items=university_rows)
-                ],
-            )
-        )
-    if formulas:
-        details.append(
-            Component(
-                type="expandable_details",
-                title="Hesaplama yöntemi",
-                components=[Component(type="recommendation_list", items=formulas)],
-            )
-        )
-    if markdown:
-        details.append(
-            Component(
-                type="expandable_details",
-                title="Tam metin rapor",
-                markdown=markdown,
-            )
-        )
-    return details
+
+    block("Detaylı yönetim değerlendirmesi", body=interpretation, icon="comment")
+    block("Program kapsamındaki bütün sonuçlar",
+          items=_metric_rows(structured, "program"), icon="program")
+    block("Üniversite geneli etkiler",
+          items=_metric_rows(structured, "university"), icon="university")
+    block(
+        "Hesaplama yöntemi",
+        items=[f"{m['label']}: {m['formula']}"
+               for m in structured.get("metrics", []) if m.get("formula")]
+        + ([structured["method_note"]] if structured.get("method_note") else []),
+        icon="formula",
+    )
+    block(
+        "Varsayımlar ve hariç tutulan maliyetler",
+        items=list(structured.get("notes", []) or [])
+        + UNCALCULATED_COSTS
+        + [COST_EXCLUSION_WARNING],
+        icon="assumption",
+    )
+    block("Kullanılan veri kaynakları", items=list(data_sources or []), icon="source")
+    block(
+        "Teknik sonuç (structured_result)",
+        markdown_text=json.dumps(structured, ensure_ascii=False, indent=2),
+        icon="code",
+    )
+    block("Ham asistan cevabı", markdown_text=markdown, icon="raw")
+    return blocks
+
+
+# ---------------------------------------------------------------------------
+# Ana giriş
+# ---------------------------------------------------------------------------
 
 
 def build_ui_spec(
@@ -511,101 +748,108 @@ def build_ui_spec(
         return None
 
     index = _index(structured)
-    scope = structured.get("scope", {}) or {}
-    scope_name = scope.get("program") or scope.get("department") or scope.get("faculty")
+    scope = {k: v for k, v in (structured.get("scope") or {}).items() if v}
+    scope_name = scope.get("program") or scope.get("department") or scope.get("faculty") or ""
     academic_year = structured.get("academic_year")
-
     result_type = structured.get("type")
+
     if result_type == "enrollment_change_scenario":
         view_type = "scenario_dashboard"
         students = index.get("program_student_count")
         change = _num(students, "change") if students else None
         base = _num(students, "baseline") if students else None
-        percent = (
-            f"%{round(change / base * 100)}" if change and base else "Senaryo"
-        )
+        percent = f"%{round(change / base * 100)}" if change and base else "Senaryo"
         title = f"{scope_name or 'Senaryo'} — {percent} Öğrenci Değişimi"
-        cards = _enrollment_cards(index)
-        charts = _enrollment_charts(index)
+        kpis = _enrollment_kpis(index)
     elif result_type == "staff_salary_scenario":
         view_type = "financial_dashboard"
         title = "Akademik Personel Maaş Senaryosu"
-        cards = [
-            Component(
-                type="comparison_metric",
-                title=metric["label"],
-                baseline_label=_fmt_usd(metric.get("baseline")),
-                scenario_label=_fmt_usd(metric.get("scenario")),
-                delta_label=_signed(metric.get("change"), _fmt_usd),
-                trend=_trend(metric.get("change")),
-                scope_type=metric.get("scope_type"),
-                scope_name=metric.get("scope_name"),
-                source_keys=[metric["key"]],
-            )
-            for metric in structured["metrics"][:5]
-        ]
-        charts = []
+        kpis = _generic_kpis(structured)
     else:
         view_type = "summary_dashboard"
         title = scope_name or "Kurumsal Özet"
-        cards = [
-            Component(
-                type="metric_card",
-                title=metric["label"],
-                value=_fmt_decimal(
-                    metric.get("scenario")
-                    if metric.get("scenario") is not None
-                    else metric.get("baseline"),
-                    metric.get("unit", ""),
-                ),
-                scope_type=metric.get("scope_type"),
-                scope_name=metric.get("scope_name"),
-                source_keys=[metric["key"]],
-            )
-            for metric in structured["metrics"][:5]
-        ]
-        charts = []
+        kpis = _generic_kpis(structured)
+
+    # KPI kartları 12 kolonluk gridi eşit paylaşır.
+    for card in kpis:
+        card.span = max(2, 12 // max(len(kpis), 1))
 
     sections: List[Section] = [
-        Section(type="metric_grid", title="Temel Sonuçlar", components=cards)
+        Section(
+            type="decision_summary",
+            components=[_decision_summary(structured, index, scope_name)],
+        ),
+        Section(type="metric_grid", title="Temel Göstergeler", components=kpis),
     ]
+
+    # --- grafikler: türü VERİNİN ANLAMI seçer ---
+    charts = ui_planner.plan_charts(structured.get("metrics", []))
     if charts:
-        sections.append(Section(type="chart_grid", components=charts))
+        # Legend tek yerde: panel düzeyinde, ilk grafiğin üstünde.
+        legend = Component(
+            type="legend_panel",
+            id="legend",
+            span=12,
+            legend=[e for e in PANEL_LEGEND
+                    if any(s.role == e["role"] for c in charts for s in c.series)
+                    or e["role"] == "capacity" and any(c.markers for c in charts)],
+        )
+        components: List[Component] = [legend] + charts
 
-    risks = _risk_components(structured, index)
+        # Hesaplanmayan maliyetler grafiğe SIFIR olarak konmaz; ayrı uyarı.
+        if any(c.type == "waterfall_chart" for c in charts):
+            components.append(
+                Component(
+                    type="information_box",
+                    id="cost-warning",
+                    level="warning",
+                    icon="warning",
+                    span=6,
+                    title="Hesaplanmayan maliyetler",
+                    items=UNCALCULATED_COSTS,
+                    note=COST_EXCLUSION_WARNING,
+                    aria_label="Uyarı: " + COST_EXCLUSION_WARNING,
+                )
+            )
+        sections.append(Section(type="chart_grid", components=components))
+
+    risks = _risk_cards(index)
     if risks:
-        sections.append(Section(type="risk_summary", components=risks))
+        sections.append(
+            Section(type="risk_summary", title="En Kritik Riskler", components=risks)
+        )
 
-    if interpretation:
+    decisions = _decisions(index)
+    if decisions:
         sections.append(
             Section(
-                type="management_comment",
-                title="Yönetim değerlendirmesi",
+                type="recommendations",
+                title="Karar Önerileri",
                 components=[
-                    Component(type="information_box", level="info", body=interpretation)
+                    Component(
+                        type="decision_list",
+                        id="decisions",
+                        span=12,
+                        items=decisions,
+                        aria_label="Karar önerileri",
+                    )
                 ],
             )
         )
 
-    # --- İzlenebilirlik ve varsayımlar ---
-    detail_components = _detail_components(structured, index, markdown)
-    detail_components.append(
-        Component(
-            type="data_source_panel",
-            title="Kullanılan veriler",
-            items=list(data_sources or []),
-            source_keys=["data_sources"],
+    sections.append(
+        Section(
+            type="accordion",
+            title="Ayrıntılar",
+            subtitle="Uzun metinler yalnızca açtığınızda görünür",
+            components=_accordion(
+                structured, index,
+                interpretation=interpretation,
+                markdown=markdown,
+                data_sources=list(data_sources or []),
+            ),
         )
     )
-    detail_components.append(
-        Component(
-            type="assumptions_panel",
-            title="Varsayımlar ve hariç tutulan maliyetler",
-            items=list(structured.get("notes", []) or [])
-            + [COST_EXCLUSION_WARNING],
-        )
-    )
-    sections.append(Section(type="details", components=detail_components))
 
     return UiSpec(
         view_type=view_type,
@@ -615,6 +859,6 @@ def build_ui_spec(
         theme=Theme(),
         sections=sections,
         academic_year=academic_year,
-        scope={k: v for k, v in scope.items() if v},
+        scope=scope,
         calculated_at=calculated_at,
     )

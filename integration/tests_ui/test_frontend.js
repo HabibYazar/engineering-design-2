@@ -484,14 +484,14 @@ function check(label, condition, detail = "") {
     "durum: " + emptyResponse.status);
 
   /* ==================================================================
-     DINAMIK SONUC PENCERESI
+     DINAMIK ANALIZ PANELI
      ------------------------------------------------------------------
      Ornek pencere tanimi (`ui_spec`) ve `structured_result`, backend
      testleri tarafindan tests_ui/fixtures/ altina YENIDEN URETILIR.
      Boylece bu bolum her zaman bugunun gercek builder ciktisini cizer;
      elle yazilmis, eskimis bir ornek dogrulanmaz.
      ================================================================== */
-  console.log("\n--- Dinamik sonuc penceresi ---");
+  console.log("\n--- Dinamik analiz paneli ---");
 
   const fs = require("fs");
   const fixtureDir = path.join(__dirname, "fixtures");
@@ -510,305 +510,457 @@ function check(label, condition, detail = "") {
     process.exit(2);
   }
 
-  // Pencere, sohbetten bagimsiz olarak da cizilebilmeli.
   const sandbox = w.document.createElement("div");
   sandbox.id = "aiSandbox";
   w.document.body.appendChild(sandbox);
 
-  const renderInto = (spec) => {
-    sandbox.innerHTML = w.eval("aiRenderView")(spec);
-    return sandbox;
+  const render = (spec, structured) => {
+    sandbox.innerHTML = w.eval("aiRenderView")(spec, structured || STRUCTURED);
+    return sandbox.querySelector(".ai-generated-view");
+  };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const sectionOf = (cls) => sandbox.querySelector(cls);
+  const typesIn = (root) =>
+    Array.from((root || sandbox).querySelectorAll("[data-ai-type]"))
+      .map((el) => el.getAttribute("data-ai-type"));
+
+  // Acilir bolumlerin DISINDA kalan metin = kullanicinin ilk gordugu ekran.
+  const defaultViewText = () => {
+    const copy = sandbox.querySelector(".ai-generated-view").cloneNode(true);
+    copy.querySelectorAll("details.ai-accordion").forEach((d) => d.remove());
+    return squash(copy.textContent);
   };
 
-  const clone = (o) => JSON.parse(JSON.stringify(o));
+  view = render(SPEC);
+  check("panel: ui_spec cizildi", !!view, squash(sandbox.innerHTML).slice(0, 160));
+  check("panel: karar ozeti en ustte",
+    !!sandbox.querySelector('[data-ai-type="decision_summary"]') &&
+      sandbox.querySelector(".ai-section").classList.contains("ai-section-decision"),
+    typesIn().slice(0, 4).join(", "));
+  const summaryText = squash(sandbox.querySelector(".ai-decision-text").textContent);
+  check("panel: karar ozeti tek cumle ve iki satiri asmiyor",
+    summaryText.length > 40 && summaryText.length <= 220,
+    `${summaryText.length} karakter: ${summaryText.slice(0, 120)}`);
+  check("panel: ozetin yaninda rozetler var",
+    sandbox.querySelectorAll(".ai-badge").length >= 3 &&
+      /Yüksek risk|Orta risk|Düşük risk/.test(sandbox.querySelector(".ai-badges").textContent),
+    squash(sandbox.querySelector(".ai-badges").textContent));
 
-  renderInto(SPEC);
-  const viewEl = sandbox.querySelector(".ai-generated-view");
-  check("pencere: ui_spec cizildi", !!viewEl,
-    squash(sandbox.innerHTML).slice(0, 160));
+  // --- 1. Ana gorunumde uzun Markdown YOK ---
+  const visible = defaultViewText();
+  check("1) ana gorunumde uzun Markdown raporu yok",
+    !/Program kapsamındaki sonuçlar/.test(visible) &&
+      !/Üniversite bütçesine ve kaynaklarına etkisi/.test(visible) &&
+      !/#{2,}/.test(visible),
+    `gorunur uzunluk: ${visible.length}`);
+  check("1b) ham rapor DOM'da yalnizca acilir bolum icinde",
+    sandbox.querySelectorAll(".ai-markdown").length > 0 &&
+      Array.from(sandbox.querySelectorAll(".ai-markdown"))
+        .every((m) => m.closest("details.ai-accordion")),
+    "markdown blogu: " + sandbox.querySelectorAll(".ai-markdown").length);
 
-  const viewTextAll = squash(viewEl.textContent);
+  // --- 2. Uzun rapor yalnizca accordion acilinca gorunur ---
+  const accordions = Array.from(sandbox.querySelectorAll("details.ai-accordion"));
+  check("2) sekiz ayrinti bolumu var ve hepsi KAPALI",
+    accordions.length === 8 && accordions.every((d) => d.open === false),
+    accordions.map((d) => d.querySelector("summary").textContent.trim()).join(" | "));
+  const rawBlock = accordions.find((d) => /Ham asistan cevabı/.test(d.textContent));
+  const beforeOpenLength = defaultViewText().length;
+  rawBlock.querySelector("summary").click();
+  check("2b) accordion acilinca uzun metin goruntuleniyor",
+    rawBlock.open === true &&
+      rawBlock.querySelector(".ai-markdown").textContent.length > 1500 &&
+      defaultViewText().length === beforeOpenLength,
+    "acilan metin: " + rawBlock.querySelector(".ai-markdown").textContent.length);
+  rawBlock.querySelector("summary").click();
+  check("2c) accordion tekrar kapaniyor", rawBlock.open === false);
 
-  // --- 1. Kartlardaki butun sayilar structured_result ile ayni ---
-  const specCards = SPEC.sections
-    .filter((s) => s.type === "metric_grid")
-    .flatMap((s) => s.components);
-  const cardEls = viewEl.querySelectorAll(".ai-section-metrics .ai-card");
-  check("pencere: kart sayisi ui_spec ile ayni",
-    cardEls.length === specCards.length && specCards.length > 0,
-    `dom: ${cardEls.length}, spec: ${specCards.length}`);
+  // --- 3. En fazla 5 KPI karti ---
+  const kpiCards = sandbox.querySelectorAll('.ai-section-metrics [data-ai-type="kpi_card"]');
+  check("3) ana gorunumde en fazla 5 KPI karti var",
+    kpiCards.length > 0 && kpiCards.length <= 5, "kart: " + kpiCards.length);
+  // Yalnizca DEGISIM olcen bir gostergenin (ek gelir etkisi) "onceki
+  // degeri" yoktur; oraya 0 yazmak uydurma sayi olurdu. Bu yuzden kosul
+  // "buyuk deger + (onceki deger VEYA degisim VEYA aciklama)".
+  check("3b) her KPI kartinda buyuk deger ve baglam bilgisi var",
+    Array.from(kpiCards).every(
+      (c) => c.querySelector(".ai-kpi-value") &&
+        (c.querySelector(".ai-kpi-prev") || c.querySelector(".ai-kpi-delta") ||
+         c.querySelector(".ai-kpi-caption"))
+    ));
+  check("3b2) karsilastirmali kartlarda onceki deger ve degisim birlikte",
+    Array.from(kpiCards).filter((c) => c.querySelector(".ai-kpi-prev"))
+      .every((c) => !!c.querySelector(".ai-kpi-delta")) &&
+      Array.from(kpiCards).filter((c) => c.querySelector(".ai-kpi-prev")).length === 4,
+    "karsilastirmali kart: " +
+      Array.from(kpiCards).filter((c) => c.querySelector(".ai-kpi-prev")).length);
+  check("3c) KPI aciklamalari tek satir",
+    Array.from(sandbox.querySelectorAll(".ai-kpi-caption"))
+      .every((el) => el.textContent.trim().length <= 70),
+    Array.from(sandbox.querySelectorAll(".ai-kpi-caption"))
+      .map((e) => e.textContent.trim()).join(" | ").slice(0, 160));
 
-  const metricByKey = {};
-  STRUCTURED.metrics.forEach((m) => { metricByKey[m.key] = m; });
+  // --- 4. Ayni grafik turu tekrarlanmiyor ---
+  const chartTypes = Array.from(
+    sandbox.querySelectorAll(".ai-section-charts figure.ai-chart")
+  ).map((el) => el.getAttribute("data-ai-type"));
+  check("4) ayni grafik turu gereksiz tekrarlanmiyor",
+    chartTypes.length > 0 && new Set(chartTypes).size === chartTypes.length,
+    chartTypes.join(", "));
+  check("4b) ana gorunumde en fazla 4 grafik var",
+    chartTypes.length <= 4, chartTypes.join(", "));
+
+  // --- 5-8. Dogru grafik, dogru veri ---
+  const chartByType = (t) => sandbox.querySelector(`figure.ai-chart[data-ai-type="${t}"]`);
+  const acceptedChain = {
+    dumbbell_chart: ["dumbbell_chart", "horizontal_comparison_bar", "bar_chart"],
+    bullet_chart: ["bullet_chart", "grouped_bar_chart", "bar_chart"],
+    gauge_group: ["gauge_group", "grouped_bar_chart", "bar_chart"],
+    waterfall_chart: ["waterfall_chart", "grouped_bar_chart", "bar_chart"],
+  };
+  const oneOf = (chain) => chain.map(chartByType).find(Boolean);
+
+  const dumbbell = oneOf(acceptedChain.dumbbell_chart);
+  check("5) ogrenci degisimi dumbbell (veya gecerli fallback) ile cizildi",
+    !!dumbbell && /370/.test(dumbbell.textContent) && /426/.test(dumbbell.textContent) &&
+      /\+56/.test(dumbbell.textContent),
+    dumbbell ? squash(dumbbell.textContent).slice(0, 160) : "grafik yok");
+  check("5b) dumbbell iki uc nokta ve baglanti cizgisi cizdi",
+    !!dumbbell && dumbbell.querySelectorAll("circle.ai-dot").length === 2 &&
+      !!dumbbell.querySelector(".ai-dumbbell-link"));
+
+  const bullet = oneOf(acceptedChain.bullet_chart);
+  check("6) FTE karsilastirmasi bullet (veya gecerli fallback) ile cizildi",
+    !!bullet && /18/.test(bullet.textContent) && /18,5/.test(bullet.textContent) &&
+      /21,3/.test(bullet.textContent),
+    bullet ? squash(bullet.textContent).slice(0, 160) : "grafik yok");
+  check("6b) bullet grafiginde kapasite sinir isareti var",
+    !!bullet && (!!bullet.querySelector(".ai-marker") ||
+      bullet.getAttribute("data-ai-type") !== "bullet_chart"));
+
+  const gauges = oneOf(acceptedChain.gauge_group);
+  const gaugeCells = gauges
+    ? gauges.querySelectorAll('[data-ai-type="radial_gauge"]') : [];
+  check("7) derslik ve laboratuvar oranlari gauge ile cizildi",
+    !!gauges && gaugeCells.length === 2 &&
+      /%38,96/.test(gauges.textContent) && /%65,87/.test(gauges.textContent),
+    gauges ? squash(gauges.textContent).slice(0, 200) : "grafik yok");
+  check("7b) gauge merkezinde senaryo, altinda mevcut oran ve degisim",
+    !!gauges &&
+      /%38,96/.test(gauges.querySelector(".ai-gauge-main").textContent) &&
+      /Mevcut: %44,86/.test(squash(gauges.textContent)) &&
+      /5,90 puan/.test(squash(gauges.textContent)),
+    gauges ? squash(gauges.textContent).slice(0, 200) : "");
+
+  const waterfall = oneOf(acceptedChain.waterfall_chart);
+  check("8) mali etki waterfall (veya gecerli fallback) ile cizildi",
+    !!waterfall && /\+329\.840/.test(waterfall.textContent) &&
+      /\+257\.040/.test(waterfall.textContent) && /-72\.800/.test(waterfall.textContent),
+    waterfall ? squash(waterfall.textContent).slice(0, 200) : "grafik yok");
+
+  // --- 9. Butun sayilar structured_result ile ayni ---
+  const metricIndex = {};
+  STRUCTURED.metrics.forEach((m) => {
+    ["baseline", "scenario", "change"].forEach((f) => {
+      if (m[f] !== null && m[f] !== undefined) metricIndex[m.key + "." + f] = Number(m[f]);
+    });
+  });
   const numbersIn = (text) =>
     (squash(text).match(/-?\d[\d.]*(?:,\d+)?/g) || [])
       .map((t) => Number(t.replace(/\./g, "").replace(",", ".")));
 
-  let cardNumbersChecked = 0;
-  let cardNumberMismatch = "";
-  specCards.forEach((component, i) => {
-    const allowed = new Set();
-    (component.source_keys || []).forEach((key) => {
-      const metric = metricByKey[key];
-      if (!metric) return;
-      ["baseline", "scenario", "change"].forEach((field) => {
-        if (metric[field] === null || metric[field] === undefined) return;
-        const v = Number(metric[field]);
-        [v, Math.abs(v), Math.round(v), Math.abs(Math.round(v))].forEach((x) =>
-          allowed.add(Number(x.toFixed(2)))
-        );
+  let checkedNumbers = 0;
+  let mismatch = "";
+  SPEC.sections
+    .filter((s) => s.type === "metric_grid")
+    .flatMap((s) => s.components)
+    .forEach((component, i) => {
+      const allowed = new Set();
+      (component.source_metric_ids || []).forEach((id) => {
+        if (metricIndex[id] === undefined) return;
+        allowed.add(Number(metricIndex[id].toFixed(2)));
+        allowed.add(Number(Math.abs(metricIndex[id]).toFixed(2)));
+      });
+      const ids = component.source_metric_ids || [];
+      if (ids.length >= 2 && metricIndex[ids[0]] !== undefined &&
+          metricIndex[ids[1]] !== undefined) {
+        const d = metricIndex[ids[1]] - metricIndex[ids[0]];
+        allowed.add(Number(d.toFixed(2)));
+        allowed.add(Number(Math.abs(d).toFixed(2)));
+      }
+      const el = kpiCards[i];
+      if (!el) return;
+      const shown = Array.from(
+        el.querySelectorAll(".ai-kpi-value, .ai-kpi-prev b, .ai-kpi-delta")
+      ).map((n) => n.textContent).join(" ");
+      numbersIn(shown).forEach((n) => {
+        checkedNumbers++;
+        if (!allowed.has(Number(n.toFixed(2))) && !allowed.has(Number(Math.abs(n).toFixed(2)))
+            && !mismatch) {
+          mismatch = `${component.title}: ${n} structured_result'ta yok ` +
+            `(izinli: ${Array.from(allowed).join(", ")})`;
+        }
       });
     });
-    const el = cardEls[i];
-    if (!el) return;
-    const shown = squash(
-      Array.from(el.querySelectorAll(".ai-card-value, .ai-card-compare, .ai-card-delta"))
-        .map((n) => n.textContent).join(" ")
-    );
-    numbersIn(shown).forEach((n) => {
-      cardNumbersChecked++;
-      if (!allowed.has(Number(n.toFixed(2))) && !cardNumberMismatch) {
-        cardNumberMismatch =
-          `${component.title}: ${n} sayisi structured_result'ta yok ` +
-          `(izinli: ${Array.from(allowed).join(", ")})`;
-      }
-    });
+  check("9) KPI kartlarindaki butun sayilar structured_result ile ayni",
+    checkedNumbers >= 8 && !mismatch, mismatch || `dogrulanan: ${checkedNumbers}`);
+
+  // ui_spec bozulursa KAYNAK kazanir.
+  const tampered = clone(SPEC);
+  const studentCard = tampered.sections
+    .find((s) => s.type === "metric_grid").components
+    .find((c) => c.title === "Öğrenci sayısı");
+  const tamperedChart = tampered.sections
+    .find((s) => s.type === "chart_grid").components
+    .find((c) => c.type === "dumbbell_chart");
+  tamperedChart.series[0].values[0] = 99999;
+  tamperedChart.data.baseline = 99999;
+  render(tampered);
+  const fixedChart = chartByType("dumbbell_chart");
+  check("9b) ui_spec ile structured_result celisirse KAYNAK esas alinir",
+    !!fixedChart && !/99\.999/.test(fixedChart.textContent) &&
+      /370/.test(fixedChart.textContent),
+    fixedChart ? squash(fixedChart.textContent).slice(0, 160) : "grafik yok");
+  render(SPEC);
+
+  // --- 10. Ham LLM metninden sayi ayristirilmaz ---
+  check("10) uydurma sayilar ana gorunumde yok",
+    !/68,42/.test(defaultViewText()) && !/9\.876\.543/.test(defaultViewText()) &&
+      !/1\.111/.test(defaultViewText()),
+    defaultViewText().slice(0, 200));
+
+  // --- 11. Hesaplanmayan maliyetler sifir olarak gosterilmez ---
+  const costWarning = sandbox.querySelector('.ai-section-charts [data-ai-type="information_box"]');
+  check("11) hesaplanmayan maliyetler ayri uyarida, sifir kalem degil",
+    !!costWarning &&
+      /Ek personel maliyeti hesaplanmadı/.test(costWarning.textContent) &&
+      /Fiziksel yatırım maliyeti hesaplanmadı/.test(costWarning.textContent) &&
+      !!waterfall && !/\b0 USD\b/.test(waterfall.textContent),
+    costWarning ? squash(costWarning.textContent).slice(0, 200) : "uyari yok");
+  check("11b) uyari ana ekranda, acilir bolumun disinda",
+    !!costWarning && !costWarning.closest("details"));
+
+  // --- 12-13. Legend ---
+  const legends = sandbox.querySelectorAll(".ai-legend");
+  check("13) legend panelde tek bir kez cizildi", legends.length === 1,
+    "legend sayisi: " + legends.length);
+  // "Tekrar etmiyor" olcutu: legend metni yalnizca legend panelinde gecer.
+  // Grafiklerin kendi veri tablolari ve tooltiplari legend DEGILDIR — onlar
+  // erisilebilirlik icin zorunlu metinsel karsiliklardir ve farkli
+  // etiketler kullanir.
+  const panelLegendLabels = Array.from(legends[0].querySelectorAll(".ai-legend-item"))
+    .map((el) => squash(el.textContent));
+  const chartsText = squash(sandbox.querySelector(".ai-section-charts").textContent);
+  check("13b) legend etiketleri grafik kartlarinda tekrar edilmiyor",
+    panelLegendLabels.length >= 2 &&
+      panelLegendLabels.every(
+        (label) => (chartsText.split(label).length - 1) === 1
+      ),
+    panelLegendLabels
+      .map((l) => `${l}=${chartsText.split(l).length - 1}`).join(", "));
+  check("13c) hicbir grafik kendi legend'ini cizmiyor",
+    sandbox.querySelectorAll(".ai-section-charts figure.ai-chart .ai-legend").length === 0);
+
+  // Renk anlami butun grafiklerde ayni: her renk kapsamli degiskenden gelir
+  // ve rol adiyla birebir eslesir.
+  const colourUses = Array.from(
+    sandbox.querySelectorAll("[style*='--ai-'], [fill^='var(--ai-'], [stroke^='var(--ai-']")
+  );
+  const roleColours = {};
+  let colourConflict = "";
+  Array.from(legends[0].querySelectorAll(".ai-legend-item")).forEach((item) => {
+    const swatch = item.querySelector(".ai-swatch").getAttribute("style");
+    const label = item.textContent.trim();
+    const colour = (swatch.match(/var\(--ai-[a-z]+\)/) || [""])[0];
+    if (roleColours[colour] && roleColours[colour] !== label) {
+      colourConflict = `${colour} iki anlam tasiyor: ${roleColours[colour]} / ${label}`;
+    }
+    roleColours[colour] = label;
   });
-  check("pencere: kart sayilari structured_result ile ayni",
-    cardNumbersChecked >= 8 && !cardNumberMismatch,
-    cardNumberMismatch || `dogrulanan sayi: ${cardNumbersChecked}`);
+  check("12) legend renkleri tek anlam tasiyor ve kapsamli degiskenden geliyor",
+    !colourConflict && Object.keys(roleColours).every((c) => /^var\(--ai-/.test(c)),
+    colourConflict || Object.entries(roleColours).map(([c, l]) => `${c}=${l}`).join(", "));
+  check("12b) grafiklerde dogrudan renk kodu yazilmamis",
+    !/#[0-9a-f]{6}/i.test(
+      sandbox.querySelector(".ai-section-charts").innerHTML
+    ),
+    (sandbox.querySelector(".ai-section-charts").innerHTML.match(/#[0-9a-f]{6}/i) || [""])[0]);
 
-  // --- 2. Serbest metinden sayi ayristirilmaz ---
-  // Modelin uydurdugu sayilar yalnizca "Tam metin rapor" acilir bolumunde,
-  // ham metin olarak kalabilir; kart ve grafiklere sizamaz.
-  const detailsEls = Array.from(viewEl.querySelectorAll("details.ai-details"));
-  const outsideDetails = (() => {
-    const copy = viewEl.cloneNode(true);
-    copy.querySelectorAll("details.ai-details").forEach((d) => d.remove());
-    return squash(copy.textContent);
-  })();
-  check("pencere: uydurma sayilar varsayilan gorunumde yok",
-    !/68,42/.test(outsideDetails) && !/9\.876\.543/.test(outsideDetails) &&
-      !/1\.111/.test(outsideDetails),
-    outsideDetails.slice(0, 200));
-
-  // --- 3. Bilinmeyen component type reddedilir ---
-  const poisonedTypes = clone(SPEC);
-  poisonedTypes.sections[0].components.push(
-    { type: "script_block", title: "zararli", markdown: "<script>alert(1)</script>" },
-    { type: "iframe", title: "zararli-2" }
+  // --- 14. Bilinmeyen grafik tipi reddedilir ---
+  const bogus = clone(SPEC);
+  bogus.sections.find((s) => s.type === "chart_grid").components.push(
+    { type: "sankey_chart", title: "zararli-grafik" },
+    { type: "script_block", title: "zararli-kod" }
   );
   const jsErrorsBefore = jsErrors.length;
-  renderInto(poisonedTypes);
-  check("pencere: bilinmeyen bilesen turu cizilmiyor",
+  render(bogus);
+  check("14) bilinmeyen grafik tipi cizilmiyor",
     !/zararli/.test(sandbox.textContent) &&
       sandbox.querySelectorAll("script, iframe").length === 0,
-    squash(sandbox.textContent).slice(0, 160));
-  check("pencere: bilinmeyen tur uygulamayi cokertmiyor",
+    squash(sandbox.textContent).slice(0, 120));
+  check("14b) bilinmeyen tur paneli cokertmiyor",
     !!sandbox.querySelector(".ai-generated-view") &&
-      jsErrors.length === jsErrorsBefore);
+      jsErrors.length === jsErrorsBefore &&
+      sandbox.querySelectorAll("figure.ai-chart").length >= 3);
 
-  // --- 4. Global CSS uretilemez ---
-  renderInto(SPEC);
-  const styleEls = sandbox.querySelectorAll("style");
-  const styleText = Array.from(styleEls).map((s) => s.textContent).join("\n");
-  check("pencere: tek bir stil blogu var", styleEls.length === 1,
-    "stil blogu: " + styleEls.length);
-  check("pencere: her seciciyi data-view-id sinirliyor",
-    styleText.split("{")[0].trim() ===
-      `.ai-generated-view[data-view-id="${SPEC.view_id}"]`,
-    styleText.slice(0, 160));
-  check("pencere: yasak secicilere stil yazilmiyor",
-    !/(^|[\s,{}])(body|html|\*)\s*[{,]/.test(styleText) &&
-      !/#sidebar|\bheader\b|\.sidebar/.test(styleText),
-    styleText.slice(0, 200));
-  check("pencere: stil yalnizca CSS degiskeni tanimliyor",
-    styleText.split("{")[1].split("}")[0].split(";").filter(Boolean)
-      .every((d) => d.trim().startsWith("--ai-")),
-    styleText.slice(0, 220));
-
-  // Zararli tema belirteci: listede olmayan deger yok sayilir.
-  const poisonedTheme = clone(SPEC);
-  poisonedTheme.theme.accent = "red;} body { display:none } .x{color:";
-  poisonedTheme.theme.card_radius = "9999px; position:fixed";
-  renderInto(poisonedTheme);
-  const poisonedStyle = sandbox.querySelector("style").textContent;
-  check("pencere: tanimsiz tema belirteci varsayilana duser",
-    /--ai-accent:#4f46e5/.test(poisonedStyle) &&
-      !/display:none/.test(poisonedStyle) && !/position:fixed/.test(poisonedStyle),
-    poisonedStyle.slice(0, 200));
-
-  // --- 5. Program ve universite metrikleri ayri bolumlerde ---
-  renderInto(SPEC);
-  const metricsSection = sandbox.querySelector(".ai-section-metrics");
-  const badgeScopes = Array.from(metricsSection.querySelectorAll(".ai-scope-badge"))
-    .map((b) => b.textContent);
-  check("pencere: ozet kartlari yalnizca program kapsaminda",
-    badgeScopes.length > 0 && badgeScopes.every((t) => /^Program:/.test(t)),
-    badgeScopes.join(" | ").slice(0, 160));
-  const detailTitles = Array.from(sandbox.querySelectorAll("details.ai-details > summary"))
-    .map((s) => s.textContent.trim());
-  check("pencere: universite etkileri ayri bolumde",
-    detailTitles.includes("Ayrıntılı program sonuçları") &&
-      detailTitles.includes("Üniversite geneli etkiler"),
-    detailTitles.join(" | "));
-  const universityBlock = Array.from(sandbox.querySelectorAll("details.ai-details"))
-    .find((d) => /Üniversite geneli etkiler/.test(d.querySelector("summary").textContent));
-  const programBlock = Array.from(sandbox.querySelectorAll("details.ai-details"))
-    .find((d) => /Ayrıntılı program sonuçları/.test(d.querySelector("summary").textContent));
-  check("pencere: program bolumunde universite satiri yok",
-    !/Üniversite/.test(programBlock.querySelector(".ai-details-body").textContent) &&
-      /Üniversite/.test(universityBlock.querySelector(".ai-details-body").textContent));
-
-  // --- 6-7-8. Aciklar: mevcut -> senaryo ve marjinal etki ---
-  const riskText = squash(sandbox.querySelector(".ai-section-risks").textContent);
-  check("pencere: derslik acigi 380 -> 400 (+20) yaziyor",
-    /Üniversite derslik açığı: 380 → 400 eş zamanlı kişi \(senaryonun eklediği: \+20\)/
-      .test(riskText),
-    riskText.slice(0, 300));
-  check("pencere: laboratuvar acigi 392 -> 402 (+10) yaziyor",
-    /Üniversite laboratuvar açığı: 392 → 402 eş zamanlı kişi \(senaryonun eklediği: \+10\)/
-      .test(riskText),
-    riskText.slice(0, 300));
-  const fteCard = Array.from(metricsSection.querySelectorAll(".ai-card"))
-    .find((c) => /Program FTE açığı/.test(c.textContent));
-  check("pencere: FTE acigi 0,50 -> 3,30 ve marjinal +2,80",
-    !!fteCard &&
-      /0,50 FTE → 3,30 FTE/.test(squash(fteCard.querySelector(".ai-card-compare").textContent)) &&
-      /Senaryonun etkisi: \+2,80 FTE/.test(fteCard.querySelector(".ai-card-delta").textContent),
-    fteCard ? squash(fteCard.textContent) : "kart yok");
-  check("pencere: mevcut riskler ile senaryo etkisi ayri kartlarda",
-    sandbox.querySelectorAll(".ai-section-risks .ai-risk").length === 2 &&
-      /Mevcut durumdaki riskler/.test(riskText) &&
-      /Senaryonun eklediği etki/.test(riskText),
-    riskText.slice(0, 160));
-
-  // --- 9. Legend yalnizca bir kez ---
-  const legends = sandbox.querySelectorAll(".ai-legend");
-  check("pencere: legend aciklamasi tek bir kez cizildi", legends.length === 1,
-    "legend sayisi: " + legends.length);
-  const legendText = squash(legends[0] ? legends[0].textContent : "");
-  check("pencere: mavi ve turuncu aciklamasi bir kez geciyor",
-    (viewTextAll.match(/Mevcut durum(?!daki)/g) || []).length === 1 &&
-      (viewTextAll.match(/Senaryo sonucu/g) || []).length === 1,
-    legendText);
-  const swatchColors = Array.from(legends[0].querySelectorAll(".ai-swatch"))
-    .map((s) => s.getAttribute("style"));
-  check("pencere: legend renkleri kapsamli degiskenlerden geliyor",
-    swatchColors.length >= 2 && swatchColors.every((s) => /var\(--ai-/.test(s)),
-    swatchColors.join(" | "));
-
-  // --- 10. Uzun Markdown varsayilan gorunumde yok ---
-  const reportBlock = Array.from(sandbox.querySelectorAll("details.ai-details"))
-    .find((d) => /Tam metin rapor/.test(d.querySelector("summary").textContent));
-  check("pencere: tam metin rapor acilir bolumde ve KAPALI",
-    !!reportBlock && reportBlock.open === false,
-    reportBlock ? "open=" + reportBlock.open : "bolum yok");
-  const visibleText = (() => {
-    const copy = sandbox.querySelector(".ai-generated-view").cloneNode(true);
-    copy.querySelectorAll("details.ai-details").forEach((d) => d.remove());
-    return squash(copy.textContent);
-  })();
-  // Olcut sabit bir karakter sayisi degil, RAPORUN KENDI uzunlugu: varsayilan
-  // gorunum tam metnin ucte birinden kisa olmali ve rapor basliklarini
-  // hic tasimamalı.
-  const fullReport = (reportBlock
-    ? reportBlock.querySelector(".ai-details-body").textContent
-    : "");
-  check("pencere: 40 satirlik markdown varsayilan gorunumde degil",
-    fullReport.length > 1500 &&
-      visibleText.length < fullReport.length / 2 &&
-      !/Program kapsamındaki sonuçlar/.test(visibleText) &&
-      !/Üniversite bütçesine ve kaynaklarına etkisi/.test(visibleText),
-    `gorunur: ${visibleText.length}, tam rapor: ${fullReport.length}`);
-  check("pencere: yonetim yorumu ham Markdown isareti gostermiyor",
-    !/#{2,}/.test(visibleText) &&
-      !!sandbox.querySelector(".ai-info-body .ai-sub-head"),
-    squash(sandbox.querySelector(".ai-info-body").textContent).slice(0, 160));
-  check("pencere: varsayilan gorunumde en fazla 5 kart ve 3 grafik",
-    cardEls.length <= 5 && sandbox.querySelectorAll(".ai-chart").length <= 3,
-    `kart: ${cardEls.length}, grafik: ${sandbox.querySelectorAll(".ai-chart").length}`);
-
-  // --- 12. Acilir teknik detaylar calisiyor ---
-  const methodBlock = Array.from(sandbox.querySelectorAll("details.ai-details"))
-    .find((d) => /Hesaplama yöntemi/.test(d.querySelector("summary").textContent));
-  check("pencere: hesaplama yontemi bolumu var", !!methodBlock);
-  const beforeOpen = methodBlock.open;
-  methodBlock.querySelector("summary").click();
-  check("pencere: acilir teknik detay acilip icerigi gosteriyor",
-    beforeOpen === false && methodBlock.open === true &&
-      methodBlock.querySelector(".ai-details-body").textContent.trim().length > 20,
-    squash(methodBlock.querySelector(".ai-details-body").textContent).slice(0, 120));
-
-  // --- 13. Finansal maliyet harici uyarisi gorunur ---
-  check("pencere: maliyet haric uyarisi varsayilan gorunumde",
-    /Finansal sonuçlar gerekli yeni personel ve kapasite yatırımlarının maliyetini içermemektedir/
-      .test(visibleText),
-    visibleText.slice(-260));
-  check("pencere: altbilgide ek maliyet notu var",
-    /Ek maliyetler/.test(squash(sandbox.querySelector(".ai-view-foot").textContent)) &&
-      /Hesaba katılmadı/.test(squash(sandbox.querySelector(".ai-view-foot").textContent)));
-  check("pencere: altbilgi akademik yil ve kapsam yaziyor",
-    /2025-2026/.test(sandbox.querySelector(".ai-view-foot").textContent) &&
-      /Bilgisayar Mühendisliği/.test(sandbox.querySelector(".ai-view-foot").textContent),
-    squash(sandbox.querySelector(".ai-view-foot").textContent));
-  check("pencere: kullanilan veriler paneli teknik arac adi gostermiyor",
-    !!sandbox.querySelector(".ai-sources") &&
-      !/get_|run_[a-z_]+scenario/.test(sandbox.querySelector(".ai-sources").textContent),
-    squash(sandbox.querySelector(".ai-sources").textContent).slice(0, 160));
-
-  // --- 14. XSS ve zararli CSS engellenir ---
+  // --- 15. Zararli HTML, JavaScript ve CSS ---
   const attack = clone(SPEC);
   attack.view_id = 'aiv-x"] , * { display:none } .y[a="';
   attack.title = '<img src=x onerror="window.__pwned=1">Baslik';
-  attack.sections[0].components[0].baseline_label =
-    '<script>window.__pwned=2</script>370';
-  attack.sections.push({
-    type: "management_comment",
-    title: "Yorum",
-    components: [{
-      type: "information_box",
-      level: "info",
-      body: '<script>window.__pwned=3</script><style>body{display:none}</style>metin',
-    }],
-  });
-  const detailsSection = attack.sections.find((s) => s.type === "details");
-  detailsSection.components.push({
+  attack.theme.accent = "red;} body { display:none } .x{color:";
+  attack.sections.find((s) => s.type === "decision_summary").components[0].title =
+    '<script>window.__pwned=2</script>Karar';
+  attack.sections.find((s) => s.type === "accordion").components.push({
     type: "expandable_details",
     title: "<svg onload=alert(1)>",
     markdown: '<iframe src="javascript:alert(1)"></iframe>',
   });
   w.__pwned = 0;
-  renderInto(attack);
-  check("pencere: XSS etiketi DOM'a girmiyor",
-    sandbox.querySelectorAll("script, iframe, img, svg, object, embed").length === 0,
+  render(attack);
+  check("15) XSS etiketi DOM'a girmiyor",
+    sandbox.querySelectorAll("script, iframe, img, svg[onload], object, embed").length === 0,
     squash(sandbox.innerHTML).slice(0, 200));
-  check("pencere: enjekte edilen kod calismadi", !w.__pwned, "pwned=" + w.__pwned);
-  check("pencere: zararli etiket duz metne donustu",
-    /<img src=x onerror=/.test(sandbox.textContent) ||
-      /&lt;img/.test(sandbox.innerHTML),
-    squash(sandbox.textContent).slice(0, 160));
+  check("15b) enjekte edilen kod calismadi", !w.__pwned, "pwned=" + w.__pwned);
   const attackStyle = sandbox.querySelector("style").textContent;
-  check("pencere: zararli view_id secicisi temizlendi",
-    attackStyle.split("{")[0].trim() === '.ai-generated-view[data-view-id="aiv-xdisplaynoneya"]',
+  check("15c) zararli view_id secicisi temizlendi",
+    attackStyle.split("{")[0].trim() ===
+      '.ai-generated-view[data-view-id="aiv-xdisplaynoneya"]',
     attackStyle.slice(0, 200));
-  check("pencere: zararli view_id ile bile global secici uretilmiyor",
-    (attackStyle.match(/{/g) || []).length === 1 && !/display:none/.test(attackStyle),
-    attackStyle.slice(0, 200));
-  check("pencere: sayfanin geri kalanina stil sizmadi",
+  check("15d) global CSS uretilemiyor",
+    (attackStyle.match(/{/g) || []).length === 1 &&
+      !/display:none/.test(attackStyle) &&
+      !/(^|[\s,{}])(body|html|\*)\s*[{,]/.test(attackStyle) &&
+      !/#sidebar|\.sidebar/.test(attackStyle),
+    attackStyle.slice(0, 220));
+  check("15e) stil yalnizca --ai- degiskeni tanimliyor",
+    attackStyle.split("{")[1].split("}")[0].split(";").filter(Boolean)
+      .every((d) => d.trim().startsWith("--ai-")),
+    attackStyle.slice(0, 220));
+  check("15f) tanimsiz tema belirteci varsayilana dusuyor",
+    /--ai-accent:#6366f1/.test(attackStyle));
+  check("15g) sayfanin geri kalanina stil sizmadi",
     w.getComputedStyle(w.document.body).display !== "none");
 
-  // --- 11. "Analizi Goruntule" dugmesi calisiyor ---
+  // --- 16. Bir grafik hata verdiginde digerleri calisir ---
+  const broken = clone(SPEC);
+  const chartSection = broken.sections.find((s) => s.type === "chart_grid");
+  const brokenChart = chartSection.components.find((c) => c.type === "bullet_chart");
+  brokenChart.series = [];          // cizilemez hale getir
+  brokenChart.data = {};
+  brokenChart.fallback = null;
+  render(broken);
+  check("16) bozuk grafik yalnizca kendi kartini etkiliyor",
+    sandbox.querySelectorAll("figure.ai-chart").length >= 3 &&
+      !!chartByType("dumbbell_chart") &&
+      !!sandbox.querySelector('[data-ai-type="gauge_group"]'),
+    typesIn(sectionOf(".ai-section-charts")).join(", "));
+  check("16b) bozuk grafik ya fallback'e dustu ya da hata kutusu gosterdi",
+    !!sandbox.querySelector('[data-ai-type="failed"]') ||
+      !!sandbox.querySelector('figure.ai-chart[data-ai-type="grouped_bar_chart"]') ||
+      !!sandbox.querySelector('figure.ai-chart[data-ai-type="bar_chart"]'),
+    typesIn(sectionOf(".ai-section-charts")).join(", "));
+  check("16c) panelin geri kalani hala calisiyor",
+    sandbox.querySelectorAll('[data-ai-type="kpi_card"]').length === 5 &&
+      sandbox.querySelectorAll('[data-ai-type="risk_summary_card"]').length === 3);
+  render(SPEC);
+
+  // --- 17. Mobil gorunum tek kolona duser ---
+  const mobileRules = [];
+  Array.from(w.document.styleSheets).forEach((sheet) => {
+    let rules;
+    try { rules = sheet.cssRules; } catch { return; }
+    Array.from(rules || []).forEach((rule) => {
+      if (rule.media && /max-width:\s*860px/.test(rule.conditionText || rule.media.mediaText)) {
+        Array.from(rule.cssRules || []).forEach((inner) => mobileRules.push(inner.cssText));
+      }
+    });
+  });
+  check("17) mobil kirilim noktasi tanimli", mobileRules.length > 0,
+    "kural: " + mobileRules.length);
+  check("17b) mobilde grid tek kolona dusuyor",
+    mobileRules.some((r) => /\.ai-grid/.test(r) && /grid-template-columns:\s*1fr/.test(r)) &&
+      mobileRules.some((r) => /\.ai-cell/.test(r) && /grid-column:\s*1\s*\/\s*-1/.test(r)),
+    mobileRules.filter((r) => /ai-grid|ai-cell/.test(r)).join(" || ").slice(0, 220));
+  check("17c) masaustunde 12 kolonlu grid kullaniliyor",
+    Array.from(sandbox.querySelectorAll(".ai-cell"))
+      .every((el) => /--ai-span:\s*\d+/.test(el.getAttribute("style") || "")),
+    (sandbox.querySelector(".ai-cell") || {}).outerHTML);
+
+  // --- 18. Accordion klavyeyle kullanilabiliyor ---
+  const firstAccordion = sandbox.querySelector("details.ai-accordion");
+  const summary = firstAccordion.querySelector("summary");
+  summary.focus();
+  check("18) accordion basligi klavyeyle odaklanabiliyor",
+    w.document.activeElement === summary &&
+      !summary.hasAttribute("tabindex"),
+    "aktif: " + (w.document.activeElement || {}).tagName);
+  summary.click();
+  check("18b) odaktayken acilip kapanabiliyor", firstAccordion.open === true);
+  summary.click();
+  check("18c) tekrar kapaniyor", firstAccordion.open === false);
+  check("18d) kapat dugmesinde aria-label var",
+    (sandbox.querySelector("[data-ai-close]") || {}).getAttribute?.("aria-label") ===
+      "Analiz penceresini kapat");
+  check("18e) grafiklerde metinsel aciklama var (renk tek tasiyici degil)",
+    Array.from(sandbox.querySelectorAll("figure.ai-chart svg[role='img']"))
+      .every((svg) => (svg.getAttribute("aria-label") || "").length > 5),
+    Array.from(sandbox.querySelectorAll("figure.ai-chart svg[role='img']"))
+      .map((s) => s.getAttribute("aria-label")).join(" | ").slice(0, 200));
+  check("18f) risk seviyeleri metinle de yaziyor",
+    Array.from(sandbox.querySelectorAll('[data-ai-type="risk_summary_card"]'))
+      .every((c) => /Kritik|Yüksek|İzlenmeli|Uygun/.test(c.textContent)),
+    squash(sectionOf(".ai-section-risks").textContent).slice(0, 200));
+
+  // --- 19. KPI kartlari birim ve kapsam tasiyor ---
+  check("19) her KPI kartinda kapsam rozeti var",
+    Array.from(kpiCards).length === 5 &&
+      Array.from(sandbox.querySelectorAll('.ai-section-metrics [data-ai-type="kpi_card"]'))
+        .every((c) => /^Program:/.test(
+          (c.querySelector(".ai-scope-badge") || {}).textContent || "")),
+    Array.from(sandbox.querySelectorAll(".ai-section-metrics .ai-scope-badge"))
+      .map((b) => b.textContent).join(" | ").slice(0, 200));
+  check("19b) KPI degerlerinde birim yaziyor",
+    /öğrenci/.test(sandbox.querySelector(".ai-section-metrics").textContent) &&
+      /FTE/.test(sandbox.querySelector(".ai-section-metrics").textContent) &&
+      /USD/.test(sandbox.querySelector(".ai-section-metrics").textContent) &&
+      /%/.test(sandbox.querySelector(".ai-section-metrics").textContent));
+  check("19c) her KPI kartinda ikon var",
+    Array.from(sandbox.querySelectorAll('.ai-section-metrics [data-ai-type="kpi_card"]'))
+      .every((c) => !!c.querySelector("svg.ai-icon")));
+
+  // --- risk ve karar bolumleri ---
+  const riskCards = sandbox.querySelectorAll('[data-ai-type="risk_summary_card"]');
+  check("risk: uc kompakt risk karti var", riskCards.length === 3,
+    "kart: " + riskCards.length);
+  check("risk: her kartta ikon, seviye rozeti ve buyuk metrik var",
+    Array.from(riskCards).every(
+      (c) => c.querySelector("svg.ai-icon") && c.querySelector(".ai-chip") &&
+        c.querySelector(".ai-risk-value")
+    ));
+  check("risk: uzun paragraf yok",
+    Array.from(riskCards).every((c) => squash(c.textContent).length < 180),
+    Array.from(riskCards).map((c) => squash(c.textContent).length).join(", "));
+
+  const decisions = sandbox.querySelectorAll(".ai-decisions li");
+  check("karar: en fazla dort kisa madde var",
+    decisions.length > 0 && decisions.length <= 4, "madde: " + decisions.length);
+  check("karar: hicbir madde iki satiri asmiyor",
+    Array.from(decisions).every((li) => squash(li.textContent).length <= 130),
+    Array.from(decisions).map((li) => squash(li.textContent).length).join(", "));
+
+  // --- "Analizi Goruntule" akisi ---
   await openView("assistant");
   await sleep(500);
   w.__TEST_SPEC = SPEC;
+  w.__TEST_STRUCTURED = STRUCTURED;
   w.eval(`
     THREAD.length = 0;
     THREAD.push({ role: "user", text: "Bilgisayar Mühendisliği %15 artarsa ne olur?" });
     THREAD.push({
       role: "assistant",
-      text: window.__TEST_SPEC ? "uzun markdown metni ".repeat(120) : "",
+      text: "uzun markdown metni ".repeat(120),
       uiSpec: window.__TEST_SPEC,
+      structured: window.__TEST_STRUCTURED,
       dataSources: ["Öğrenci kayıtları"],
       academicYear: "2025-2026",
     });
@@ -817,37 +969,45 @@ function check(label, condition, detail = "") {
   await sleep(200);
   view = $("#view");
   const openButton = view.querySelector(".ai-open-view");
-  check("asistan: 'Analizi Görüntüle' dugmesi cizildi",
-    !!openButton && /Analizi Görüntüle/.test(openButton.textContent),
-    openButton ? openButton.textContent : "dugme yok");
+  check("akis: 'Analizi Görüntüle' dugmesi cizildi",
+    !!openButton && /Analizi Görüntüle/.test(openButton.textContent));
 
   const bubbleBody = view.querySelector(".assistant-msg.assistant .body");
-  check("asistan: balonda uzun markdown yerine kisa ozet var",
+  check("akis: balonda uzun markdown yerine kisa ozet var",
     !!bubbleBody && bubbleBody.textContent.length < 400 &&
-      !/uzun markdown metni uzun markdown metni/.test(bubbleBody.textContent) &&
-      /Öğrenci sayısı/.test(bubbleBody.textContent),
+      !/uzun markdown metni uzun markdown metni/.test(bubbleBody.textContent),
     squash(bubbleBody ? bubbleBody.textContent : "").slice(0, 200));
 
-  const panelBefore = $("#assistantViewPanel");
-  check("asistan: analiz paneli baslangicta gizli", panelBefore.hidden === true);
+  check("akis: panel baslangicta gizli", $("#assistantViewPanel").hidden === true);
   openButton.click();
   await sleep(600);
   const panel = $("#assistantViewPanel");
-  check("asistan: dugme pencereyi acti",
+  check("akis: dugme paneli acti",
     panel.hidden === false && !!panel.querySelector(".ai-generated-view"),
     squash(panel.textContent).slice(0, 160));
-  check("asistan: acilan pencerede dogru sayilar var",
-    /370 öğrenci/.test(panel.textContent) && /426 öğrenci/.test(panel.textContent),
-    squash(panel.textContent).slice(0, 200));
-  const closeButton = panel.querySelector("[data-ai-close]");
-  check("asistan: pencerede kapat dugmesi var", !!closeButton);
-  closeButton.click();
+  check("akis: KPI kartlari, dumbbell, bullet, gauge ve waterfall gorunuyor",
+    panel.querySelectorAll('[data-ai-type="kpi_card"]').length === 5 &&
+      !!panel.querySelector('[data-ai-type="dumbbell_chart"]') &&
+      !!panel.querySelector('[data-ai-type="bullet_chart"]') &&
+      !!panel.querySelector('[data-ai-type="gauge_group"]') &&
+      !!panel.querySelector('[data-ai-type="waterfall_chart"]'),
+    typesIn(panel).join(", "));
+  check("akis: detayli rapor baslangicta kapali",
+    Array.from(panel.querySelectorAll("details.ai-accordion")).every((d) => !d.open));
+  const panelAccordion = panel.querySelector("details.ai-accordion");
+  panelAccordion.querySelector("summary").click();
+  check("akis: accordion acilinca ayrintili metin gorunuyor",
+    panelAccordion.open === true &&
+      panelAccordion.querySelector(".ai-acc-body").textContent.trim().length > 20,
+    squash(panelAccordion.querySelector(".ai-acc-body").textContent).slice(0, 140));
+  panel.querySelector("[data-ai-close]").click();
   await sleep(150);
-  check("asistan: pencere kapaniyor",
+  check("akis: pencere kapaniyor",
     $("#assistantViewPanel").hidden === true &&
       $("#assistantViewPanel").innerHTML === "");
 
   sandbox.remove();
+
 
   console.log("\n--- Yonetim Panosu ---");
 

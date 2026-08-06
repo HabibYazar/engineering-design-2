@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from app.services.assistant import metric_semantics
+
 logger = logging.getLogger(__name__)
 
 MISSING = "Veri bulunamadı"
@@ -189,13 +191,19 @@ def _plain(value: Any) -> Any:
 
 
 def _metric_from_scoped(metric: Any) -> Dict[str, Any]:
-    """structured_result kaydı. Kapsam, birim ve formül HER metrikte bulunur."""
+    """structured_result kaydı. Kapsam, birim ve formül HER metrikte bulunur.
+
+    `semantic_type` metriğin ANLAMINI taşır ve arayüzün grafik seçimini
+    besler. Araç bunu kendisi bildirebilir; bildirmezse birime ve anahtara
+    bakan merkezî sınıflandırıcı belirler.
+    """
     return {
         "key": metric.key,
         "label": metric.label,
         "scope_type": metric.scope_type,
         "scope_name": metric.scope_name,
         "unit": metric.unit,
+        "semantic_type": metric_semantics.resolve(metric),
         "baseline": _plain(metric.baseline),
         "scenario": _plain(metric.scenario),
         "change": _plain(metric.change),
@@ -215,6 +223,7 @@ def _metric(key: str, label: str, baseline: Any, scenario: Any,
         "scope_type": scope_type,
         "scope_name": scope_name,
         "unit": unit,
+        "semantic_type": metric_semantics.classify(key, unit, label),
         "baseline": _plain(baseline),
         "scenario": _plain(scenario),
         "change": _plain(change),

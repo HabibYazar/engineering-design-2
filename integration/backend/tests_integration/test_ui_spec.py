@@ -1,38 +1,54 @@
-"""Dinamik sonuç penceresi (`ui_spec`) testleri.
+"""Dinamik analiz paneli (`ui_spec`) testleri — sunucu tarafı.
 
-Bu dosya, kullanıcının istediği 15 kontrolün SUNUCU TARAFINDAKİ kısmını
-doğrular. Arayüz tarafındaki kısımlar (düğme, açılır bölüm, XSS, global CSS)
-`tests_ui/test_frontend.js` içindedir; her testin başlığında hangi maddeye
-karşılık geldiği yazar.
+Arayüz tarafındaki karşılıkları `tests_ui/test_frontend.js` içindedir; her
+testin başlığı hangi maddeye karşılık geldiğini söyler.
 
-Testlerin ortak ilkesi: pencerede görünen HER SAYI `structured_result`
+Testlerin ortak ilkesi: panelde görünen HER SAYI `structured_result`
 içindeki bir metrikten gelmelidir. Modelin serbest metni sayı kaynağı
 DEĞİLDİR.
+
+Grafik seçimi de test edilir: kural CENG senaryosuna değil, metriğin
+ANLAMINA (`semantic_type`) bağlıdır. `test_chart_rules_are_generic_*`
+testleri uydurma bir kuruma ait sentetik metriklerle aynı kuralların
+işlediğini gösterir.
 """
 
 import re
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List
 
 import pytest
 from pydantic import ValidationError
 
 from app.database import SessionLocal
-from app.services.assistant import response_composer, ui_spec_builder
+from app.services.assistant import (
+    metric_semantics,
+    response_composer,
+    ui_planner,
+    ui_spec_builder,
+)
 from app.services.assistant.tool_registry import registry
-from app.services.assistant.ui_spec import Component, Theme, UiSpec, component_types
+from app.services.assistant.ui_spec import (
+    CHART_TYPES,
+    FALLBACK_CHAIN,
+    SMALL_MULTIPLE_TYPES,
+    Component,
+    Theme,
+    UiSpec,
+    component_types,
+)
 
 YEAR = "2025-2026"
 
-# Modelin uydurabileceği sayılar. Hiçbiri structured_result'ta yoktur; bu
-# yüzden hiçbir kartta veya grafikte görünmemelidir.
+# Modelin uydurabileceği sayılar. Hiçbiri structured_result'ta yoktur.
 FABRICATED_MARKDOWN = (
     "### Yönetim değerlendirmesi\n"
     "- Talebin %68,42'i karşılanamıyor.\n"
     "- Toplam maliyet 9.876.543 USD olarak hesaplanmıştır.\n"
     "- Öğrenci sayısı 1.111 kişiye çıkacaktır.\n"
 ) + ("- Ek satır: kapasite planlaması gözden geçirilmelidir.\n" * 30)
+
+FABRICATED_NUMBERS = ["68,42", "9.876.543", "1.111"]
 
 
 @pytest.fixture(scope="module")
@@ -90,10 +106,9 @@ def spec(structured, composed) -> UiSpec:
 NUMBER = re.compile(r"-?\d[\d.]*(?:,\d+)?")
 
 
-def _numbers(text: str) -> List[str]:
-    """Metindeki sayı belirteçlerini noktalama olmadan döndürür."""
+def _numbers(text: str) -> List[float]:
     return [
-        m.group(0).replace(".", "").replace(",", ".").lstrip("+")
+        float(m.group(0).replace(".", "").replace(",", ".").lstrip("+"))
         for m in NUMBER.finditer(text or "")
     ]
 
@@ -106,7 +121,7 @@ def _walk(components: List[Component]) -> List[Component]:
     return out
 
 
-def _all_components(spec: UiSpec) -> List[Component]:
+def _all(spec: UiSpec) -> List[Component]:
     out: List[Component] = []
     for section in spec.sections:
         out.extend(_walk(section.components))
@@ -117,137 +132,389 @@ def _section(spec: UiSpec, type_: str):
     return next((s for s in spec.sections if s.type == type_), None)
 
 
-def _default_view_components(spec: UiSpec) -> List[Component]:
-    """Varsayılan görünümde okunan bileşenler.
+def _default_view(spec: UiSpec) -> List[Component]:
+    """Kullanıcı hiçbir şeye tıklamadan gördüğü bileşenler.
 
-    `expandable_details` kapalı gelir; içindekiler varsayılan görünüme
-    dâhil sayılmaz.
+    `expandable_details` kapalı gelir; içindekiler varsayılan görünümün
+    parçası DEĞİLDİR.
     """
     out: List[Component] = []
     for section in spec.sections:
         for component in section.components:
             if component.type == "expandable_details":
                 continue
-            out.append(component)
+            out.extend(_walk([component]))
     return out
 
 
-def _card_text(component: Component) -> str:
+def _charts(spec: UiSpec) -> List[Component]:
+    return [c for c in _all(spec) if c.type in CHART_TYPES]
+
+
+def _card_text(c: Component) -> str:
     return " ".join(
-        filter(
-            None,
-            [
-                component.value,
-                component.baseline_label,
-                component.scenario_label,
-                component.delta_label,
-            ],
-        )
+        filter(None, [c.value, c.baseline_label, c.scenario_label, c.delta_label])
     )
 
 
-# ---------------------------------------------------------------------------
-# 1. Kartlardaki bütün sayılar structured_result ile aynıdır
-# ---------------------------------------------------------------------------
+def _addresses(spec: UiSpec) -> List[str]:
+    out: List[str] = []
+    for component in _all(spec):
+        out.extend(component.source_metric_ids)
+        for series in component.series:
+            out.extend([i for i in series.source_metric_ids if i])
+        for marker in component.markers:
+            if marker.source_metric_id:
+                out.append(marker.source_metric_id)
+    return out
 
 
-def test_every_card_number_comes_from_structured_result(spec, structured) -> None:
-    """Her kart sayısı, kartın `source_keys` metriklerinden birine eşit olmalı."""
+def _resolve(address: str, structured: Dict[str, Any]) -> float:
+    """"anahtar.alan" adresini çözer; "a|b" iki kaynağın farkıdır."""
     index = {m["key"]: m for m in structured["metrics"]}
 
-    checked = 0
-    for component in _all_components(spec):
-        if component.type not in {"metric_card", "comparison_metric"}:
-            continue
-        assert component.source_keys, f"Kaynak metrik bildirilmemiş: {component.title}"
+    def one(addr: str) -> float:
+        key, field = addr.rsplit(".", 1)
+        return float(index[key][field])
 
-        allowed: set = set()
-        for key in component.source_keys:
-            metric = index.get(key)
-            if metric is None:
-                continue
-            for field in ("baseline", "scenario", "change"):
-                value = metric.get(field)
-                if value is None:
-                    continue
-                allowed.add(round(float(value), 2))
-                allowed.add(round(abs(float(value)), 2))
-                allowed.add(float(int(round(float(value)))))
-                allowed.add(float(abs(int(round(float(value))))))
-
-        for token in _numbers(_card_text(component)):
-            checked += 1
-            assert round(float(token), 2) in allowed, (
-                f"'{component.title}' kartındaki {token} sayısı "
-                f"structured_result'ta yok. İzinli: {sorted(allowed)}"
-            )
-
-    assert checked >= 10, "Yeterli sayıda kart sayısı doğrulanmadı."
+    if "|" in address:
+        left, right = address.split("|")
+        return one(left) - one(right)
+    return one(address)
 
 
-def test_every_chart_value_comes_from_structured_result(spec, structured) -> None:
-    """Grafik serilerindeki her değer bir metriğe eşit olmalı."""
-    index = {m["key"]: m for m in structured["metrics"]}
+# ===========================================================================
+# 1-2. Uzun Markdown ana görünümde YOK, yalnızca accordion içinde
+# ===========================================================================
 
-    charts = [c for c in _all_components(spec) if c.series]
-    assert charts, "Hiç grafik üretilmemiş."
 
-    for chart in charts:
-        allowed = set()
-        for key in chart.source_keys:
-            metric = index.get(key)
-            if metric is None:
-                continue
-            for field in ("baseline", "scenario", "change"):
-                if metric.get(field) is not None:
-                    allowed.add(round(float(metric[field]), 2))
+def test_long_markdown_is_absent_from_the_default_view(spec, composed) -> None:
+    """40+ satırlık rapor varsayılan görünümde hiç yer almaz."""
+    for component in _default_view(spec):
+        assert component.markdown is None, (
+            f"'{component.title}' varsayılan görünümde ham markdown taşıyor."
+        )
+        assert component.body is None or len(component.body) < 400, (
+            f"'{component.title}' varsayılan görünümde uzun metin taşıyor."
+        )
+
+
+def test_long_report_lives_only_inside_a_closed_accordion(spec, composed) -> None:
+    """Tam rapor yalnızca KAPALI bir açılır bölümdedir."""
+    accordion = _section(spec, "accordion")
+    assert accordion is not None, "Ayrıntı bölümü yok."
+
+    raw = next(c for c in accordion.components if c.title == "Ham asistan cevabı")
+    assert raw.type == "expandable_details"
+    assert raw.open is False
+    assert composed.facts_markdown[:60] in (raw.markdown or "")
+
+    # Bölümün TAMAMI kapalı gelir.
+    for component in accordion.components:
+        assert component.open is False, f"'{component.title}' açık geliyor."
+
+
+def test_accordion_carries_every_requested_long_section(spec) -> None:
+    """İstenen sekiz uzun bölümün hepsi accordion'dadır."""
+    titles = [c.title for c in _section(spec, "accordion").components]
+    for expected in (
+        "Detaylı yönetim değerlendirmesi",
+        "Program kapsamındaki bütün sonuçlar",
+        "Üniversite geneli etkiler",
+        "Hesaplama yöntemi",
+        "Varsayımlar ve hariç tutulan maliyetler",
+        "Kullanılan veri kaynakları",
+        "Teknik sonuç (structured_result)",
+        "Ham asistan cevabı",
+    ):
+        assert expected in titles, f"Açılır bölüm eksik: {expected}"
+
+
+# ===========================================================================
+# 3. En fazla 5 KPI kartı — ve bilgi hiyerarşisinin geri kalanı
+# ===========================================================================
+
+
+def test_default_view_respects_the_information_hierarchy(spec) -> None:
+    """5 KPI, 4 grafik, 3 risk, 4 karar maddesi sınırları."""
+    kpis = _section(spec, "metric_grid").components
+    assert 0 < len(kpis) <= 5, f"KPI kartı sayısı: {len(kpis)}"
+    assert all(c.type == "kpi_card" for c in kpis)
+
+    assert len(_charts(spec)) <= 4, [c.type for c in _charts(spec)]
+
+    risks = _section(spec, "risk_summary")
+    assert risks is not None and len(risks.components) <= 3
+
+    decisions = _section(spec, "recommendations").components[0]
+    assert len(decisions.items) <= 4
+    for item in decisions.items:
+        assert len(item) <= 120, f"Karar maddesi iki satırı aşıyor: {item}"
+
+
+def test_decision_summary_is_one_short_sentence_with_badges(spec) -> None:
+    """Üst özet en fazla iki satır ve rozetli."""
+    summary = _section(spec, "decision_summary").components[0]
+    assert summary.type == "decision_summary"
+    assert summary.title and len(summary.title) <= 220, summary.title
+    labels = [b.label for b in summary.badges]
+    assert YEAR in labels
+    assert "Program senaryosu" in labels
+    assert any("risk" in label.lower() for label in labels)
+
+
+# ===========================================================================
+# 4-8. Grafik seçimi verinin ANLAMINA göre
+# ===========================================================================
+
+
+def test_no_chart_type_is_repeated_unnecessarily(spec) -> None:
+    """Aynı grafik türü art arda gösterilmez."""
+    types = [c.type for c in _charts(spec)]
+    repeated = [t for t in set(types) if types.count(t) > 1
+                and t not in SMALL_MULTIPLE_TYPES]
+    assert not repeated, f"Tekrarlanan grafik türü: {repeated}"
+
+
+def test_student_change_uses_a_dumbbell_or_valid_fallback(spec) -> None:
+    """Öğrenci değişimi önce–sonra grafiğiyle gösterilir."""
+    chart = next(
+        (c for c in _charts(spec) if c.semantic_type == "count_change"), None
+    )
+    assert chart is not None, "Öğrenci değişimi grafiği üretilmemiş."
+    assert chart.type in _accepted("dumbbell_chart")
+    assert {s.role for s in chart.series} == {"baseline", "scenario"}
+    assert chart.data["baseline"] == 370
+    assert chart.data["scenario"] == 426
+    assert chart.data["delta"] == 56
+
+
+def test_fte_comparison_uses_a_bullet_or_valid_fallback(spec) -> None:
+    """Kapasite / mevcut ihtiyaç / senaryo ihtiyacı aynı eksende."""
+    chart = next(
+        (c for c in _charts(spec) if c.semantic_type == "target_comparison"), None
+    )
+    assert chart is not None, "Kapasite karşılaştırma grafiği üretilmemiş."
+    assert chart.type in _accepted("bullet_chart")
+    assert chart.data == {"capacity": 18.0, "baseline": 18.5, "scenario": 21.3}
+    assert [s.role for s in chart.series] == ["capacity", "baseline", "scenario"]
+    assert chart.markers and chart.markers[0].value == 18.0
+
+
+def test_coverage_uses_gauges_or_valid_fallback(spec) -> None:
+    """Derslik ve laboratuvar karşılama oranları gauge ile gösterilir."""
+    group = next(
+        (c for c in _charts(spec) if c.semantic_type == "capacity_coverage"), None
+    )
+    assert group is not None, "Kapasite karşılama grafiği üretilmemiş."
+    assert group.type in _accepted("gauge_group")
+
+    gauges = group.components
+    assert len(gauges) == 2
+    assert all(g.type == "radial_gauge" for g in gauges)
+    values = {round(g.data["scenario"], 2) for g in gauges}
+    assert values == {38.96, 65.87}
+    # Merkezdeki büyük değer senaryo oranıdır; mevcut oran da kartta durur.
+    for gauge in gauges:
+        assert gauge.percent == gauge.data["scenario"]
+        assert gauge.data["baseline"] is not None
+
+
+def test_financial_impact_uses_a_waterfall_or_valid_fallback(spec) -> None:
+    """Gelir → operasyonel etki → net bütçe zinciri."""
+    chart = next(
+        (c for c in _charts(spec) if c.semantic_type == "monetary_change"), None
+    )
+    assert chart is not None, "Mali etki grafiği üretilmemiş."
+    assert chart.type in _accepted("waterfall_chart")
+    assert chart.categories == [
+        "Ek brüt gelir", "Ek operasyonel etki", "Net bütçe değişimi"
+    ]
+    series = chart.series[0]
+    assert series.kinds == ["increase", "decrease", "total"]
+    assert series.values[0] == 329840.0
+    assert series.values[2] == 257040.0
+    # Ortadaki kalem TÜRETİLMİŞ: net − brüt.
+    assert series.derivation == "difference"
+    assert "|" in series.source_metric_ids[1]
+
+
+def _accepted(preferred: str) -> set:
+    """Tercih edilen tür ve geçerli fallback zinciri."""
+    accepted = {preferred}
+    current = preferred
+    while current in FALLBACK_CHAIN:
+        current = FALLBACK_CHAIN[current]
+        accepted.add(current)
+    return accepted
+
+
+# --- kuralların GENELLİĞİ: uydurma bir kuruma ait sentetik metrikler ---
+
+
+def _metric(key, label, unit, baseline=None, scenario=None, change=None,
+            scope_type="program", scope_name="Deneme Programı"):
+    return {
+        "key": key, "label": label, "unit": unit,
+        "scope_type": scope_type, "scope_name": scope_name,
+        "baseline": baseline, "scenario": scenario, "change": change,
+        "semantic_type": metric_semantics.classify(key, unit, label),
+        "formula": None, "note": None,
+    }
+
+
+def test_chart_rules_are_generic_for_an_unrelated_dataset() -> None:
+    """Kurallar CENG'e değil, metriğin anlamına bağlıdır.
+
+    Hiç görülmemiş anahtarlarla, hiç görülmemiş bir kurum için aynı grafik
+    türleri seçilmeli.
+    """
+    metrics = [
+        _metric("program_trainee_count", "Kursiyer sayısı", "öğrenci", 90, 120, 30),
+        _metric("program_instructor_fte", "Eğitmen kapasitesi", "FTE", 6),
+        _metric("program_required_instructor_fte", "Gerekli eğitmen", "FTE", 6.4, 8.2, 1.8),
+        _metric("program_studio_coverage", "Stüdyo karşılama oranı", "%", 80.0, 61.5),
+        _metric("program_grant_effect", "Ek hibe etkisi", "USD", change=125000),
+        _metric("university_net_balance", "Net bütçe", "USD", 1000, 1080, 80,
+                scope_type="university", scope_name="Üniversite geneli"),
+    ]
+    charts = ui_planner.plan_charts(metrics)
+    by_semantic = {c.semantic_type: c.type for c in charts}
+
+    assert by_semantic.get("count_change") == "dumbbell_chart"
+    assert by_semantic.get("target_comparison") == "bullet_chart"
+    assert by_semantic.get("capacity_coverage") == "gauge_group"
+    assert by_semantic.get("monetary_change") == "waterfall_chart"
+    # Hiçbir sayı uydurulmadı: hepsi verilen metriklerden.
+    change_chart = next(c for c in charts if c.semantic_type == "count_change")
+    assert change_chart.data == {"baseline": 90.0, "scenario": 120.0, "delta": 30.0}
+
+
+def test_planner_picks_other_chart_families_for_other_semantics() -> None:
+    """Sıralama, dağılım ve risk verileri kendi grafiklerini seçer."""
+    ranking = [
+        dict(_metric(f"faculty_score_{i}", f"Fakülte {i}", "%", 60 + i * 4,
+                     scope_type="faculty", scope_name=f"Fakülte {i}"),
+             semantic_type="ranking")
+        for i in range(4)
+    ]
+    assert ui_planner.plan_charts(ranking)[0].type == "radar_chart"
+
+    distribution = [
+        dict(_metric(f"budget_share_{i}", f"Kalem {i}", "USD", 100 * (i + 1)),
+             semantic_type="distribution")
+        for i in range(3)
+    ]
+    assert ui_planner.plan_charts(distribution)[0].type == "treemap"
+
+    risks = [
+        dict(_metric(f"risk_{i}", f"Risk {i}", "%", 40 + i * 10, 70 + i * 5),
+             semantic_type="risk_score")
+        for i in range(3)
+    ]
+    assert ui_planner.plan_charts(risks)[0].type == "risk_matrix"
+
+
+def test_planner_never_exceeds_the_chart_budget() -> None:
+    """Ne kadar metrik gelirse gelsin ana ekranda dört grafikten fazlası yok."""
+    metrics = []
+    for i in range(30):
+        metrics.append(_metric(f"program_thing_{i}", f"Gösterge {i}", "öğrenci",
+                               10 + i, 20 + i, 10))
+        metrics.append(_metric(f"program_thing_{i}_coverage", f"Oran {i}", "%",
+                               80 - i, 70 - i))
+    assert len(ui_planner.plan_charts(metrics)) <= ui_planner.MAX_CHARTS
+
+
+def test_semantic_classification_is_driven_by_unit_and_key() -> None:
+    """Sınıflandırma kuralları — yeni metrikler de doğru sınıflanır."""
+    cases = [
+        ("anything_revenue", "USD", "monetary_change"),
+        ("program_x_coverage", "%", "capacity_coverage"),
+        ("program_x_utilization", "%", "utilization"),
+        ("program_x_fte_gap", "FTE", "staffing_gap"),
+        ("program_required_fte", "FTE", "target_comparison"),
+        ("program_x_demand", "koltuk-saat", "capacity_demand"),
+        ("program_x_capacity", "istasyon-saat", "target_comparison"),
+        ("university_staff_gap", "kişi", "staffing_gap"),
+        ("program_student_count", "öğrenci", "count_change"),
+        ("university_capacity_status", "durum", "status"),
+    ]
+    for key, unit, expected in cases:
+        assert metric_semantics.classify(key, unit, "") == expected, key
+
+
+def test_every_structured_metric_carries_a_semantic_type(structured) -> None:
+    """Grafik seçimi ancak her metrik anlamını bildirirse çalışır."""
+    for metric in structured["metrics"]:
+        assert metric.get("semantic_type") in metric_semantics.SEMANTIC_TYPES, metric["key"]
+
+
+# ===========================================================================
+# 9-10. Sayının kaynağı
+# ===========================================================================
+
+
+def test_every_number_in_the_panel_resolves_to_structured_result(spec, structured) -> None:
+    """Panelin taşıdığı her adres çözülebilir ve değere eşittir."""
+    addresses = _addresses(spec)
+    assert len(addresses) >= 15, "Yeterli sayıda kaynak adresi yok."
+    for address in addresses:
+        _resolve(address, structured)  # çözülemezse KeyError ile düşer
+
+
+def test_chart_values_equal_their_declared_sources(spec, structured) -> None:
+    for chart in _charts(spec) + [c for c in _all(spec) if c.type == "radial_gauge"]:
         for series in chart.series:
-            for value in series.values:
-                if value is None:
+            for i, value in enumerate(series.values):
+                address = (series.source_metric_ids or [None] * len(series.values))[i]
+                if not address or value is None:
                     continue
-                assert round(float(value), 2) in allowed, (
-                    f"'{chart.title}' grafiğindeki {value} değeri "
-                    f"structured_result'ta yok."
+                expected = _resolve(address, structured)
+                assert abs(value - expected) < 0.005, (
+                    f"{chart.type} → {address}: {value} ≠ {expected}"
                 )
 
 
-# ---------------------------------------------------------------------------
-# 2. Serbest metinden sayı ayrıştırılmaz
-# ---------------------------------------------------------------------------
+def test_kpi_card_values_equal_their_declared_sources(spec, structured) -> None:
+    """KPI kartındaki her sayı kaynağıyla birebir aynı."""
+    checked = 0
+    for card in _section(spec, "metric_grid").components:
+        assert card.source_metric_ids, f"Kaynak bildirilmemiş: {card.title}"
+        allowed = {round(_resolve(a, structured), 2) for a in card.source_metric_ids}
+        # Kart farkı da gösterebilir; fark iki kaynaktan türetilir.
+        if len(card.source_metric_ids) >= 2:
+            values = [_resolve(a, structured) for a in card.source_metric_ids[:2]]
+            allowed.add(round(values[1] - values[0], 2))
+            allowed.add(round(abs(values[1] - values[0]), 2))
+        for number in _numbers(_card_text(card)):
+            checked += 1
+            assert round(number, 2) in allowed or round(-number, 2) in allowed, (
+                f"'{card.title}' kartındaki {number} kaynağa bağlanamıyor. "
+                f"İzinli: {sorted(allowed)}"
+            )
+    assert checked >= 10
 
 
-def test_no_number_is_parsed_from_free_text(spec) -> None:
-    """Modelin uydurduğu sayılar kart, grafik ve risklerde GÖRÜNMEZ.
-
-    Uydurma sayılar yalnızca 'Tam metin rapor' açılır bölümünde, ham metnin
-    içinde kalabilir — orası modelin cevabının arşividir, veri kaynağı değil.
-    """
-    fabricated = ["68,42", "9.876.543", "1.111"]
-
-    for component in _all_components(spec):
-        if component.type == "expandable_details":
-            continue  # ham metin arşivi
+def test_no_number_is_parsed_from_the_raw_model_text(spec) -> None:
+    """Modelin uydurduğu sayılar hiçbir kart, grafik veya riske sızmaz."""
+    for component in _default_view(spec):
         haystack = " ".join(
             filter(
                 None,
                 [
-                    _card_text(component),
-                    component.title,
-                    component.subtitle,
-                    component.note,
-                    " ".join(component.items),
+                    _card_text(component), component.title, component.subtitle,
+                    component.caption, component.note, " ".join(component.items),
                 ],
             )
         )
-        for number in fabricated:
+        for number in FABRICATED_NUMBERS:
             assert number not in haystack, (
-                f"Serbest metindeki {number} sayısı '{component.title}' "
-                f"bileşenine sızmış."
+                f"Serbest metindeki {number} '{component.title}' bileşenine sızmış."
             )
 
 
 def test_builder_ignores_markdown_when_structured_result_is_missing() -> None:
-    """structured_result yoksa markdown ne kadar dolu olursa olsun pencere üretilmez."""
     assert ui_spec_builder.build_ui_spec(None, markdown=FABRICATED_MARKDOWN) is None
     assert ui_spec_builder.build_ui_spec({}, markdown=FABRICATED_MARKDOWN) is None
     assert (
@@ -256,308 +523,150 @@ def test_builder_ignores_markdown_when_structured_result_is_missing() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# 3. Bilinmeyen component type reddedilir
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 11. Hesaplanmayan maliyetler sıfır DEĞİLDİR
+# ===========================================================================
 
 
-def test_unknown_component_type_is_rejected() -> None:
-    """Katalog dışı bir tür şemadan geçemez; arayüze hiç ulaşmaz."""
-    with pytest.raises(ValidationError):
-        Component(type="script_block")
-    with pytest.raises(ValidationError):
-        Component(type="iframe")
-    with pytest.raises(ValidationError):
-        Component(type="html")
+def test_uncalculated_costs_never_appear_as_zero(spec) -> None:
+    """Hesaplanmamış maliyet şelaleye sıfır kalem olarak konmaz."""
+    waterfall = next(c for c in _charts(spec) if c.type == "waterfall_chart")
+    for value in waterfall.series[0].values:
+        assert value not in (0, 0.0), "Şelalede sıfır değerli kalem var."
+    assert len(waterfall.categories) == 3, "Beklenmeyen kalem eklenmiş."
+    assert not any("personel maliyeti" in c.lower() for c in waterfall.categories)
+    assert not any("yatırım" in c.lower() for c in waterfall.categories)
 
-    # Kapalı katalog: 12 bileşen.
-    assert len(component_types()) == 12
+
+def test_uncalculated_costs_are_shown_as_a_visible_warning(spec) -> None:
+    """Uyarı ana ekranda, grafiğin yanında ve açılır bölümün DIŞINDA."""
+    warning = next(
+        c for c in _default_view(spec)
+        if c.type == "information_box" and c.id == "cost-warning"
+    )
+    assert warning.level == "warning"
+    assert warning.items == ui_spec_builder.UNCALCULATED_COSTS
+    assert ui_spec_builder.COST_EXCLUSION_WARNING in (warning.note or "")
+
+    # Grafiğin kendisi de aynı uyarıyı taşır.
+    waterfall = next(c for c in _charts(spec) if c.type == "waterfall_chart")
+    assert "HESAPLANMADI" in (waterfall.note or "")
+
+
+# ===========================================================================
+# 12-13. Legend
+# ===========================================================================
+
+
+def test_legend_is_defined_exactly_once_in_the_whole_panel(spec) -> None:
+    """Renk açıklaması panelde tek bir yerde durur."""
+    with_legend = [c for c in _all(spec) if c.legend]
+    assert len(with_legend) == 1, [c.type for c in with_legend]
+    assert with_legend[0].type == "legend_panel"
+
+    roles = [entry["role"] for entry in with_legend[0].legend]
+    assert roles == list(dict.fromkeys(roles)), "Legend rolleri tekrarlıyor."
+    assert {"baseline", "scenario"} <= set(roles)
+
+
+def test_colour_meaning_is_consistent_across_every_chart(spec) -> None:
+    """Bir renk iki grafikte farklı anlam taşıyamaz.
+
+    Renk doğrudan seçilemiyor; yalnızca `role` seçiliyor ve rengi renderer
+    sabit sözlükten veriyor. Bu test rollerin anlamlı kullanıldığını
+    doğrular: "baseline" hep mevcut değerden, "scenario" hep senaryo
+    değerinden beslenir.
+    """
+    for chart in _charts(spec):
+        for series in chart.series:
+            for address in series.source_metric_ids:
+                if not address or "|" in address:
+                    continue
+                field = address.rsplit(".", 1)[1]
+                if series.role == "baseline":
+                    assert field in {"baseline", "change"}, (
+                        f"{chart.type}: mavi seri {field} alanından besleniyor."
+                    )
+                elif series.role == "scenario":
+                    assert field in {"scenario", "change"}, (
+                        f"{chart.type}: turuncu seri {field} alanından besleniyor."
+                    )
+                elif series.role == "capacity":
+                    assert "capacity" in address or "fte" in address, (
+                        f"{chart.type}: gri seri kapasite dışı bir kaynaktan."
+                    )
+
+
+def test_legend_covers_every_role_used_by_the_charts(spec) -> None:
+    legend = next(c for c in _all(spec) if c.type == "legend_panel")
+    explained = {entry["role"] for entry in legend.legend}
+    used = {s.role for c in _charts(spec) for s in c.series
+            if s.role in {"baseline", "scenario", "capacity"}}
+    assert used <= explained, f"Açıklanmayan rol: {used - explained}"
+
+
+# ===========================================================================
+# 14-15. Güvenlik
+# ===========================================================================
+
+
+def test_unknown_chart_type_is_rejected() -> None:
+    """Katalog dışı bir tür şemadan geçemez."""
+    for bogus in ("script_block", "iframe", "html", "sankey_chart", "3d_globe"):
+        with pytest.raises(ValidationError):
+            Component(type=bogus)
     assert "script_block" not in component_types()
+    # Katalogda istenen bütün gelişmiş grafikler var.
+    for expected in (
+        "dumbbell_chart", "slope_chart", "bullet_chart", "radial_gauge",
+        "semi_circle_gauge", "waterfall_chart", "forecast_line_chart",
+        "stacked_area_chart", "heatmap", "risk_matrix", "treemap",
+        "radar_chart", "sparkline", "progress_ring",
+        "horizontal_comparison_bar",
+    ):
+        assert expected in component_types(), expected
 
 
 def test_unknown_component_type_is_rejected_inside_a_ui_spec(spec) -> None:
-    """Geçerli bir pencereye sonradan sahte bileşen eklenemez."""
     payload = spec.model_dump(mode="json")
-    payload["sections"][0]["components"].append(
+    payload["sections"][1]["components"].append(
         {"type": "script_block", "title": "zararlı"}
     )
     with pytest.raises(ValidationError):
         UiSpec.model_validate(payload)
 
 
-def test_extra_fields_are_rejected() -> None:
-    """Şemada olmayan alan (ör. ham HTML) kabul edilmez."""
+def test_extra_fields_and_free_css_are_rejected() -> None:
+    """Ham HTML, JavaScript veya CSS taşıyacak bir alan yok."""
     with pytest.raises(ValidationError):
-        Component(type="metric_card", html="<script>alert(1)</script>")
+        Component(type="kpi_card", html="<script>alert(1)</script>")
     with pytest.raises(ValidationError):
-        Component(type="metric_card", on_click="fetch('/admin')")
-
-
-# ---------------------------------------------------------------------------
-# 4. Global CSS üretilemez
-# ---------------------------------------------------------------------------
-
-
-def test_theme_only_accepts_closed_tokens() -> None:
-    """Tema serbest CSS taşıyamaz; yalnızca beş belirteçten oluşur."""
+        Component(type="kpi_card", on_click="fetch('/admin')")
+    with pytest.raises(ValidationError):
+        Component(type="kpi_card", style="position:fixed")
     with pytest.raises(ValidationError):
         Theme(css="body{display:none}")
     with pytest.raises(ValidationError):
         Theme(accent="red; background:url(x)")
-    with pytest.raises(ValidationError):
-        Theme(style_sheet="* { color: red }")
 
     assert set(Theme().model_dump()) == {
-        "accent",
-        "density",
-        "card_radius",
-        "chart_emphasis",
-        "risk_emphasis",
+        "accent", "density", "card_radius", "chart_emphasis", "risk_emphasis"
     }
 
 
 def test_ui_spec_carries_no_css_or_markup(spec) -> None:
-    """Üretilen pencerede stil bloğu, seçici veya etiket bulunmaz."""
     payload = str(spec.model_dump(mode="json"))
-    for forbidden in ("<style", "</style", "body{", "body {", "html{", "* {", "#sidebar"):
-        assert forbidden not in payload, f"Pencere tanımında yasak parça: {forbidden}"
-
-    # Tema yalnızca belirteç adları taşır.
-    assert spec.theme.accent in {"indigo", "teal", "amber", "slate", "rose"}
+    for forbidden in ("<style", "</style", "body{", "body {", "html{", "* {",
+                      "#sidebar", "<script"):
+        assert forbidden not in payload, f"Yasak parça: {forbidden}"
 
 
 def test_view_id_is_selector_safe(spec) -> None:
-    """view_id doğrudan CSS seçicisine girdiği için yalnızca güvenli karakterler taşır."""
     assert re.fullmatch(r"aiv-[0-9a-f]{12}", spec.view_id), spec.view_id
 
 
-# ---------------------------------------------------------------------------
-# 5. Program ve üniversite metrikleri ayrı bölümlerde
-# ---------------------------------------------------------------------------
-
-
-def test_program_and_university_metrics_stay_in_separate_sections(spec) -> None:
-    """Özet kartları program kapsamındadır; üniversite etkileri ayrı bölümdedir."""
-    cards = _section(spec, "metric_grid").components
-    assert cards, "Özet kartı üretilmemiş."
-    scopes = {c.scope_type for c in cards if c.scope_type}
-    assert scopes == {"program"}, f"Özet kartlarında karışık kapsam: {scopes}"
-    # Kapsam adı her kartta yazıyor — etiketsiz sayı kalmıyor.
-    assert all(c.scope_name for c in cards if c.scope_type)
-
-    detail_titles = [
-        c.title for c in _section(spec, "details").components
-        if c.type == "expandable_details"
-    ]
-    assert "Ayrıntılı program sonuçları" in detail_titles
-    assert "Üniversite geneli etkiler" in detail_titles
-
-    program_block = next(
-        c for c in _section(spec, "details").components
-        if c.title == "Ayrıntılı program sonuçları"
-    )
-    university_block = next(
-        c for c in _section(spec, "details").components
-        if c.title == "Üniversite geneli etkiler"
-    )
-    program_rows = " ".join(program_block.components[0].items)
-    university_rows = " ".join(university_block.components[0].items)
-
-    assert "Üniversite" not in program_rows
-    assert "Üniversite" in university_rows
-
-
-def test_metric_cards_do_not_mix_scopes_within_one_card(spec) -> None:
-    """Tek bir kart iki kapsamdan sayı taşımaz."""
-    for component in _all_components(spec):
-        if component.type not in {"metric_card", "comparison_metric"}:
-            continue
-        if component.scope_name:
-            assert component.scope_type is not None
-
-
-# ---------------------------------------------------------------------------
-# 6-7-8. Açıklar: mevcut → senaryo ve marjinal etki
-# ---------------------------------------------------------------------------
-
-
-def _incremental_card(spec: UiSpec) -> Component:
-    return next(
-        c for c in _all_components(spec) if c.title == "Senaryonun eklediği etki"
-    )
-
-
-def test_classroom_gap_is_shown_as_380_to_400_with_plus_20(spec, structured) -> None:
-    """Derslik açığı 380 → 400, senaryonun eklediği 20."""
-    index = {m["key"]: m for m in structured["metrics"]}
-    gap = index["university_classroom_gap"]
-    assert gap["baseline"] == 380
-    assert gap["scenario"] == 400
-
-    line = next(
-        item
-        for item in _incremental_card(spec).items
-        if item.startswith("Üniversite derslik açığı")
-    )
-    assert "380" in line and "400" in line
-    assert "senaryonun eklediği: +20" in line
-    # Toplam açık senaryoya yazılmıyor.
-    assert "400 eş zamanlı kişi oluşuyor" not in line
-
-
-def test_laboratory_gap_is_shown_as_392_to_402_with_plus_10(spec, structured) -> None:
-    """Laboratuvar açığı 392 → 402, senaryonun eklediği 10."""
-    index = {m["key"]: m for m in structured["metrics"]}
-    gap = index["university_laboratory_gap"]
-    assert gap["baseline"] == 392
-    assert gap["scenario"] == 402
-
-    line = next(
-        item
-        for item in _incremental_card(spec).items
-        if item.startswith("Üniversite laboratuvar açığı")
-    )
-    assert "392" in line and "402" in line
-    assert "senaryonun eklediği: +10" in line
-
-
-def test_fte_gap_card_shows_zero_fifty_to_three_thirty_and_marginal(spec) -> None:
-    """Program FTE açığı 0,50 → 3,30; marjinal +2,80."""
-    card = next(
-        c for c in _all_components(spec) if c.title == "Program FTE açığı"
-    )
-    assert card.baseline_label == "0,50 FTE"
-    assert card.scenario_label == "3,30 FTE"
-    assert card.delta_label == "Senaryonun etkisi: +2,80 FTE"
-    assert "senaryodan bağımsız" in (card.note or "").lower()
-    assert set(card.source_keys) == {
-        "program_baseline_fte_gap",
-        "program_scenario_fte_gap",
-        "program_marginal_fte",
-    }
-
-
-def test_baseline_risks_are_a_separate_card_from_scenario_effect(spec) -> None:
-    """Mevcut riskler ile senaryonun eklediği etki ayrı kartlarda durur."""
-    risk_section = _section(spec, "risk_summary")
-    assert risk_section is not None
-    titles = [c.title for c in risk_section.components]
-    assert "Mevcut durumdaki riskler" in titles
-    assert "Senaryonun eklediği etki" in titles
-
-    baseline_card = next(
-        c for c in risk_section.components if c.title == "Mevcut durumdaki riskler"
-    )
-    assert baseline_card.subtitle == "Senaryodan bağımsız"
-    assert len(baseline_card.items) <= 3
-
-
-# ---------------------------------------------------------------------------
-# 9. Legend yalnızca bir kez
-# ---------------------------------------------------------------------------
-
-
-def test_legend_is_defined_exactly_once_for_the_whole_view(spec) -> None:
-    """Mavi/turuncu/gri açıklaması pencerede bir kez tanımlanır."""
-    charts = [c for c in _all_components(spec) if c.series]
-    with_legend = [c for c in charts if c.legend]
-    assert len(with_legend) == 1, (
-        "Legend birden fazla grafikte tanımlanmış: "
-        + ", ".join(c.title or "?" for c in with_legend)
-    )
-
-    legend = with_legend[0].legend
-    roles = [entry["role"] for entry in legend]
-    assert roles == sorted(set(roles), key=roles.index), "Legend rolleri tekrarlıyor."
-    assert {"baseline", "scenario"} <= set(roles)
-    labels = [entry["label"] for entry in legend]
-    assert "Mevcut durum" in labels and "Senaryo sonucu" in labels
-
-
-def test_every_chart_series_role_is_explained_by_the_legend(spec) -> None:
-    """Grafikte kullanılan her rol legend'de açıklanmış olmalı."""
-    charts = [c for c in _all_components(spec) if c.series]
-    explained = {entry["role"] for c in charts for entry in c.legend}
-    used = {series.role for c in charts for series in c.series}
-    assert used <= explained, f"Açıklanmayan seri rolü: {used - explained}"
-
-
-# ---------------------------------------------------------------------------
-# 10. Uzun markdown varsayılan görünümde yok
-# ---------------------------------------------------------------------------
-
-
-def test_long_markdown_is_not_part_of_the_default_view(spec, composed) -> None:
-    """40+ satırlık rapor yalnızca kapalı açılır bölümde durur."""
-    visible = _default_view_components(spec)
-    for component in visible:
-        assert component.markdown is None, (
-            f"'{component.title}' bileşeni varsayılan görünümde ham markdown taşıyor."
-        )
-
-    archive = next(
-        c for c in _all_components(spec) if c.title == "Tam metin rapor"
-    )
-    assert archive.type == "expandable_details"
-    assert archive.open is False, "Tam metin rapor varsayılan olarak açık geliyor."
-    assert composed.facts_markdown[:60] in (archive.markdown or "")
-
-
-def test_default_view_respects_the_information_hierarchy(spec) -> None:
-    """En fazla 5 kart, 3 grafik, 3 risk maddesi."""
-    assert len(_section(spec, "metric_grid").components) <= 5
-    charts = _section(spec, "chart_grid")
-    assert charts is not None and len(charts.components) <= 3
-    for card in _section(spec, "risk_summary").components:
-        assert len(card.items) <= 3 or card.title == "Senaryonun eklediği etki"
-
-
-def test_details_section_components_are_collapsed(spec) -> None:
-    """Ayrıntı bölümündeki açılır kutular kapalı gelir."""
-    for component in _section(spec, "details").components:
-        if component.type == "expandable_details":
-            assert component.open is False
-
-
-# ---------------------------------------------------------------------------
-# 13. Finansal maliyet hariç uyarısı
-# ---------------------------------------------------------------------------
-
-
-def test_cost_exclusion_warning_is_visible_by_default(spec) -> None:
-    """Maliyet hariç uyarısı açılır bölümün İÇİNDE saklanmaz."""
-    assumptions = next(
-        c for c in _default_view_components(spec) if c.type == "assumptions_panel"
-    )
-    assert ui_spec_builder.COST_EXCLUSION_WARNING in assumptions.items
-
-    revenue_card = next(
-        c for c in _all_components(spec) if c.title == "Ek gelir etkisi"
-    )
-    assert "maliyet" in (revenue_card.note or "").lower()
-
-
-def test_data_source_panel_uses_turkish_names(spec) -> None:
-    """Kullanılan veriler paneli teknik araç adı göstermez."""
-    panel = next(
-        c for c in _default_view_components(spec) if c.type == "data_source_panel"
-    )
-    assert panel.items == ["Öğrenci kayıtları", "Mali dönem kayıtları"]
-    for item in panel.items:
-        assert "get_" not in item and "run_" not in item
-
-
-# ---------------------------------------------------------------------------
-# 14. Zararlı içerik metin olarak kalır
-# ---------------------------------------------------------------------------
-
-
 def test_malicious_interpretation_stays_plain_text(structured, composed) -> None:
-    """Modelin yorumu HTML/CSS taşısa bile şema onu metin alanında tutar.
-
-    Kaçırma (escaping) arayüzde yapılır; burada doğrulanan şey, zararlı
-    içeriğin ASLA bir yapı alanına (tür, tema, seçici) dönüşemediğidir.
-    """
+    """Zararlı içerik metin alanında kalır; yapıyı hiç etkilemez."""
     poisoned = (
         "<script>fetch('/api/users')</script>"
         "<style>body{display:none}</style>"
@@ -572,26 +681,99 @@ def test_malicious_interpretation_stays_plain_text(structured, composed) -> None
     )
     assert built is not None
 
-    box = next(
-        c for c in _all_components(built) if c.type == "information_box"
+    block = next(
+        c for c in _all(built) if c.title == "Detaylı yönetim değerlendirmesi"
     )
-    # İçerik body alanında METİN olarak duruyor.
-    assert "<script>" in (box.body or "")
-    # Ama yapıyı hiç etkilememiş.
-    assert box.type == "information_box"
+    assert "<script>" in (block.body or "")   # metin olarak duruyor
+    assert block.type == "expandable_details"  # yapı değişmedi
+    assert block.open is False
     assert built.theme.accent == "indigo"
-    assert re.fullmatch(r"aiv-[0-9a-f]{12}", built.view_id)
-    for component in _all_components(built):
+    for component in _all(built):
         assert component.type in component_types()
 
 
-# ---------------------------------------------------------------------------
-# API sözleşmesi
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 19. KPI kartlarının birim ve kapsam bilgisi
+# ===========================================================================
+
+
+def test_kpi_cards_carry_unit_and_scope(spec) -> None:
+    """Etiketsiz sayı kalmaz: her kartta birim ve kapsam yazar."""
+    for card in _section(spec, "metric_grid").components:
+        assert card.unit, f"Birim yok: {card.title}"
+        assert card.scope_type == "program", f"Kapsam yanlış: {card.title}"
+        assert card.scope_name, f"Kapsam adı yok: {card.title}"
+        assert card.icon, f"İkon yok: {card.title}"
+        assert card.aria_label, f"aria-label yok: {card.title}"
+        if card.caption:
+            assert len(card.caption) <= 70, f"Açıklama bir satırı aşıyor: {card.title}"
+
+
+def test_expected_kpi_cards_for_an_enrollment_scenario(spec) -> None:
+    """İstenen beş göstergenin değerleri."""
+    cards = {c.title: c for c in _section(spec, "metric_grid").components}
+    assert set(cards) == {
+        "Öğrenci sayısı", "Program FTE açığı", "Ek gelir etkisi",
+        "Derslik karşılama oranı", "Laboratuvar karşılama oranı",
+    }
+
+    students = cards["Öğrenci sayısı"]
+    assert (students.baseline_label, students.scenario_label) == (
+        "370 öğrenci", "426 öğrenci"
+    )
+    assert students.delta_label == "+56 öğrenci"
+
+    fte = cards["Program FTE açığı"]
+    assert (fte.baseline_label, fte.scenario_label) == ("0,50 FTE", "3,30 FTE")
+    assert fte.delta_label == "Senaryonun etkisi: +2,80 FTE"
+
+    revenue = cards["Ek gelir etkisi"]
+    assert revenue.value == "+329.840 USD"
+    assert "maliyetleri hariç" in revenue.caption
+
+    classroom = cards["Derslik karşılama oranı"]
+    assert (classroom.baseline_label, classroom.scenario_label) == ("%44,86", "%38,96")
+    assert classroom.delta_label == "Azalış: -5,90 puan"
+    assert classroom.level == "critical"
+
+    lab = cards["Laboratuvar karşılama oranı"]
+    assert (lab.baseline_label, lab.scenario_label) == ("%75,84", "%65,87")
+    assert lab.delta_label == "Azalış: -9,97 puan"
+
+
+def test_risk_cards_are_compact_and_levelled(spec) -> None:
+    """Üç kompakt risk kartı: ikon, seviye, büyük metrik, tek cümle."""
+    cards = _section(spec, "risk_summary").components
+    titles = [c.title for c in cards]
+    assert titles == ["Akademik kapasite", "Derslik kapasitesi",
+                      "Laboratuvar kapasitesi"]
+
+    for card in cards:
+        assert card.type == "risk_summary_card"
+        assert card.icon and card.level and card.value
+        assert card.aria_label, "Ekran okuyucu metni yok."
+        assert len(card.caption or "") <= 80, card.caption
+        assert not card.items, "Risk kartında uzun paragraf listesi var."
+
+    assert cards[0].level == "critical" and cards[0].value == "+2,80 FTE"
+    assert cards[1].level == "critical" and cards[1].value == "+1.008 koltuk-saat"
+    assert cards[2].level == "warning" and cards[2].value == "+224 istasyon-saat"
+
+
+def test_decisions_are_short_and_actionable(spec) -> None:
+    items = _section(spec, "recommendations").components[0].items
+    assert 0 < len(items) <= 4
+    assert any(i.startswith("Akademik kadro:") for i in items)
+    assert any(i.startswith("Finans:") for i in items)
+
+
+# ===========================================================================
+# 20. API sözleşmesi ve arayüz örnek dosyaları
+# ===========================================================================
 
 
 def test_chat_response_carries_ui_spec(db, monkeypatch) -> None:
-    """`/assistant/chat` cevabı ui_spec alanını taşır ve şemaya uyar."""
+    """`/assistant/chat` cevabı şemaya uyan bir ui_spec taşır."""
     from tests_integration.test_assistant_tools import script_ollama
     from app.services.assistant import chat_service
 
@@ -608,32 +790,40 @@ def test_chat_response_carries_ui_spec(db, monkeypatch) -> None:
     )
     chat_service.reset_conversations()
 
-    assert result["ui_spec"] is not None, "Cevapta dinamik pencere tanımı yok."
-    # Geri gelen sözlük şemaya BİREBİR uymalı; uymayan alan sessizce geçmez.
+    assert result["ui_spec"] is not None
     revalidated = UiSpec.model_validate(result["ui_spec"])
+    assert revalidated.version == "2.0"
     assert revalidated.view_type == "scenario_dashboard"
-    assert revalidated.academic_year == YEAR
 
-    # Aynı sayılar structured_result'ta da var.
     index = {m["key"]: m for m in result["structured_result"]["metrics"]}
     assert index["program_student_count"]["baseline"] == 370
     assert index["program_student_count"]["scenario"] == 426
     card = next(
-        c
-        for c in _all_components(revalidated)
-        if c.title == "Öğrenci sayısı" and c.type == "comparison_metric"
+        c for c in _all(revalidated)
+        if c.type == "kpi_card" and c.title == "Öğrenci sayısı"
     )
     assert card.baseline_label == "370 öğrenci"
     assert card.scenario_label == "426 öğrenci"
 
 
+def test_ui_spec_is_absent_for_general_questions(db, monkeypatch) -> None:
+    from tests_integration.test_assistant_tools import script_ollama
+    from app.services.assistant import chat_service
+
+    script_ollama(monkeypatch, ["Merhaba, size nasıl yardımcı olabilirim?"])
+    chat_service.reset_conversations()
+    result = chat_service.answer("Merhaba", db=db)
+    chat_service.reset_conversations()
+
+    assert result["structured_result"] is None
+    assert result["ui_spec"] is None
+
+
 def test_ui_fixture_for_the_frontend_test_is_regenerated(spec, structured) -> None:
-    """Arayüz testinin kullandığı örnek pencereyi GERÇEK builder çıktısıyla tazeler.
+    """Arayüz testinin örnek dosyalarını GERÇEK builder çıktısıyla tazeler.
 
     Elle yazılmış bir örnek, backend değiştiğinde sessizce eskir ve arayüz
-    testi artık üretilmeyen bir yapıyı doğrulamaya devam ederdi. Dosya her
-    backend koşusunda yeniden yazılır; böylece `tests_ui/test_frontend.js`
-    her zaman bugünün çıktısını çizer.
+    testi artık üretilmeyen bir yapıyı doğrulamaya devam ederdi.
     """
     import json
     import pathlib
@@ -647,25 +837,8 @@ def test_ui_fixture_for_the_frontend_test_is_regenerated(spec, structured) -> No
         )
 
     write("ui_spec_sample.json", spec.model_dump(mode="json"))
-    # Arayüz testi "kartlardaki sayılar structured_result ile aynı mı" sorusunu
-    # ancak iki dosya da yanındayken sorabilir.
     write("structured_result_sample.json", structured)
 
     written = json.loads((folder / "ui_spec_sample.json").read_text(encoding="utf-8"))
-    # Yazılan dosya şemadan geçmeli — arayüz testi geçersiz veriyle çalışmasın.
     UiSpec.model_validate(written)
     assert written["view_type"] == "scenario_dashboard"
-
-
-def test_ui_spec_is_absent_for_general_questions(db, monkeypatch) -> None:
-    """Yapılandırılmış sonuç yoksa pencere üretilmez; arayüz sohbet balonunda kalır."""
-    from tests_integration.test_assistant_tools import script_ollama
-    from app.services.assistant import chat_service
-
-    script_ollama(monkeypatch, ["Merhaba, size nasıl yardımcı olabilirim?"])
-    chat_service.reset_conversations()
-    result = chat_service.answer("Merhaba", db=db)
-    chat_service.reset_conversations()
-
-    assert result["structured_result"] is None
-    assert result["ui_spec"] is None
