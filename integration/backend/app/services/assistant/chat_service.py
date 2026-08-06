@@ -23,6 +23,7 @@ Konuşmalar bellekte tutulur, veritabanına yazılmaz.
 import logging
 import time
 import uuid
+from datetime import datetime
 from collections import OrderedDict
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -33,7 +34,12 @@ from app.services.assistant.ollama_provider import (
     AssistantProviderError,
     OllamaProvider,
 )
-from app.services.assistant import entity_resolver, query_policy, response_composer
+from app.services.assistant import (
+    entity_resolver,
+    query_policy,
+    response_composer,
+    ui_spec_builder,
+)
 from app.services.assistant import tools as _tools  # noqa: F401  (kayıt için)
 from app.services.assistant.tool_registry import registry
 from app.services.assistant.tool_runner import ToolSession
@@ -221,6 +227,7 @@ def answer(
             "scope": {},
             "data_source": query_policy.SOURCE_UNAVAILABLE,
             "structured_result": None,
+            "ui_spec": None,
         }
 
     provider = get_provider()
@@ -268,6 +275,7 @@ def answer(
                 "scope": {},
                 "data_source": query_policy.SOURCE_UNAVAILABLE,
                 "structured_result": None,
+                "ui_spec": None,
             }
 
     # Program özeti zorunluluğu, cümlede GERÇEKTEN bir program adı geçmesine
@@ -318,6 +326,7 @@ def answer(
                         "scope": session.scope(),
                         "data_source": query_policy.SOURCE_UNAVAILABLE,
                         "structured_result": None,
+                        "ui_spec": None,
                     }
 
                 messages.append(
@@ -477,12 +486,30 @@ def answer(
     # Model yorumu boş olsa bile hesaplanan sonuçlar kullanıcıya ulaşır:
     # canlı testte model 370 → 426 değişimini yazmayı atlamıştı.
     structured_result: Optional[Dict[str, Any]] = None
+    ui_spec_payload: Optional[Dict[str, Any]] = None
     if composed is not None and data_source == query_policy.SOURCE_INSTITUTIONAL:
         structured_result = composed.structured_result
         interpretation = _clean_interpretation(visible, composed.facts_markdown)
         visible = composed.facts_markdown
         if interpretation:
             visible += "\n\n" + interpretation
+
+        # DİNAMİK SONUÇ PENCERESİ.
+        # Kartlar ve grafikler modelin metninden DEĞİL, structured_result'tan
+        # üretilir. Üretim başarısız olursa sohbet cevabı yine gösterilir;
+        # pencere isteğe bağlı bir katmandır.
+        try:
+            spec = ui_spec_builder.build_ui_spec(
+                structured_result,
+                data_sources=data_sources,
+                calculated_at=datetime.now(),
+                interpretation=interpretation,
+                markdown=composed.facts_markdown,
+            )
+            ui_spec_payload = spec.model_dump(mode="json") if spec else None
+        except Exception:  # noqa: BLE001
+            logger.exception("Dinamik pencere tanimi uretilemedi")
+            ui_spec_payload = None
 
     if not visible:
         raise AssistantProviderError(
@@ -504,6 +531,7 @@ def answer(
         "scope": scope,
         "data_source": data_source,
         "structured_result": structured_result,
+        "ui_spec": ui_spec_payload,
     }
 
 

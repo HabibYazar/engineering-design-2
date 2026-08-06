@@ -1,0 +1,776 @@
+{
+  "version": "1.0",
+  "view_type": "scenario_dashboard",
+  "view_id": "aiv-809b63e710c0",
+  "title": "Bilgisayar Mühendisliği Lisans Programı — %15 Öğrenci Değişimi",
+  "subtitle": "2025-2026 Akademik Yılı",
+  "theme": {
+    "accent": "indigo",
+    "density": "comfortable",
+    "card_radius": "soft",
+    "chart_emphasis": "normal",
+    "risk_emphasis": "normal"
+  },
+  "sections": [
+    {
+      "type": "metric_grid",
+      "title": "Temel Sonuçlar",
+      "components": [
+        {
+          "type": "comparison_metric",
+          "title": "Öğrenci sayısı",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": "370 öğrenci",
+          "scenario_label": "426 öğrenci",
+          "delta_label": "+56 öğrenci",
+          "trend": "up",
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": "program",
+          "scope_name": "Bilgisayar Mühendisliği Lisans Programı",
+          "source_keys": [
+            "program_student_count"
+          ],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "comparison_metric",
+          "title": "Program FTE açığı",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": "0,50 FTE",
+          "scenario_label": "3,30 FTE",
+          "delta_label": "Senaryonun etkisi: +2,80 FTE",
+          "trend": "up",
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": "program",
+          "scope_name": "Bilgisayar Mühendisliği Lisans Programı",
+          "source_keys": [
+            "program_baseline_fte_gap",
+            "program_scenario_fte_gap",
+            "program_marginal_fte"
+          ],
+          "formula": null,
+          "note": "Mevcut açık senaryodan bağımsızdır."
+        },
+        {
+          "type": "metric_card",
+          "title": "Ek gelir etkisi",
+          "subtitle": null,
+          "value": "+329.840 USD",
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": "up",
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": "program",
+          "scope_name": "Bilgisayar Mühendisliği Lisans Programı",
+          "source_keys": [
+            "program_revenue_effect"
+          ],
+          "formula": null,
+          "note": "Yatırım ve yeni personel maliyetleri hariç."
+        },
+        {
+          "type": "comparison_metric",
+          "title": "Derslik karşılama oranı",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": "%44,86",
+          "scenario_label": "%38,96",
+          "delta_label": null,
+          "trend": "down",
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": "program",
+          "scope_name": "Bilgisayar Mühendisliği Lisans Programı",
+          "source_keys": [
+            "program_classroom_coverage"
+          ],
+          "formula": "min(kapasite, talep) / talep × 100",
+          "note": null
+        },
+        {
+          "type": "comparison_metric",
+          "title": "Laboratuvar karşılama oranı",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": "%75,84",
+          "scenario_label": "%65,87",
+          "delta_label": null,
+          "trend": "down",
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": "program",
+          "scope_name": "Bilgisayar Mühendisliği Lisans Programı",
+          "source_keys": [
+            "program_laboratory_coverage"
+          ],
+          "formula": "min(kapasite, talep) / talep × 100",
+          "note": null
+        }
+      ]
+    },
+    {
+      "type": "chart_grid",
+      "title": null,
+      "components": [
+        {
+          "type": "bar_chart",
+          "title": "Öğrenci sayısı",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [
+            "Öğrenci sayısı"
+          ],
+          "series": [
+            {
+              "label": "Mevcut durum",
+              "role": "baseline",
+              "values": [
+                370.0
+              ]
+            },
+            {
+              "label": "Senaryo sonucu",
+              "role": "scenario",
+              "values": [
+                426.0
+              ]
+            }
+          ],
+          "unit": "öğrenci",
+          "legend": [
+            {
+              "role": "baseline",
+              "label": "Mevcut durum"
+            },
+            {
+              "role": "scenario",
+              "label": "Senaryo sonucu"
+            },
+            {
+              "role": "capacity",
+              "label": "Kullanılabilir kapasite"
+            }
+          ],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "program_student_count"
+          ],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "bar_chart",
+          "title": "Akademik kapasite",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [
+            "Akademik kapasite (FTE)"
+          ],
+          "series": [
+            {
+              "label": "Kullanılabilir kapasite",
+              "role": "capacity",
+              "values": [
+                18.0
+              ]
+            },
+            {
+              "label": "Mevcut gerekli",
+              "role": "baseline",
+              "values": [
+                18.5
+              ]
+            },
+            {
+              "label": "Senaryo gerekli",
+              "role": "scenario",
+              "values": [
+                21.3
+              ]
+            }
+          ],
+          "unit": "FTE",
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "program_staff_fte",
+            "program_required_fte"
+          ],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "bar_chart",
+          "title": "Fiziksel kapasite",
+          "subtitle": "Kapasite ve haftalık ihtiyaç",
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [
+            "Derslik (koltuk-saat)",
+            "Laboratuvar (istasyon-saat)"
+          ],
+          "series": [
+            {
+              "label": "Kullanılabilir kapasite",
+              "role": "capacity",
+              "values": [
+                2987.57,
+                1122.41
+              ]
+            },
+            {
+              "label": "Mevcut talep",
+              "role": "baseline",
+              "values": [
+                6660.0,
+                1480.0
+              ]
+            },
+            {
+              "label": "Senaryo talebi",
+              "role": "scenario",
+              "values": [
+                7668.0,
+                1704.0
+              ]
+            }
+          ],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "program_classroom_capacity",
+            "program_classroom_demand",
+            "program_laboratory_capacity",
+            "program_laboratory_demand"
+          ],
+          "formula": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "type": "risk_summary",
+      "title": null,
+      "components": [
+        {
+          "type": "risk_card",
+          "title": "Mevcut durumdaki riskler",
+          "subtitle": "Senaryodan bağımsız",
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": "warning",
+          "body": null,
+          "items": [
+            "Bilgisayar Mühendisliği Lisans Programı: program derslik kullanım oranı mevcut durumda %222,92 — tahsis edilmiş kapasite zaten aşılmış durumda. Senaryo bu oranı %256,66'e yükseltiyor.",
+            "Bilgisayar Mühendisliği Lisans Programı: program laboratuvar kullanım oranı mevcut durumda %131,86 — tahsis edilmiş kapasite zaten aşılmış durumda. Senaryo bu oranı %151,82'e yükseltiyor."
+          ],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "baseline_risks"
+          ],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "risk_card",
+          "title": "Senaryonun eklediği etki",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": "critical",
+          "body": null,
+          "items": [
+            "Program derslik ihtiyacı: +1.008 koltuk-saat",
+            "Program laboratuvar ihtiyacı: +224 istasyon-saat",
+            "Program FTE açığı: +2,80 FTE",
+            "Üniversite derslik açığı: 380 → 400 eş zamanlı kişi (senaryonun eklediği: +20)",
+            "Üniversite laboratuvar açığı: 392 → 402 eş zamanlı kişi (senaryonun eklediği: +10)"
+          ],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "program_classroom_demand",
+            "program_laboratory_demand",
+            "program_marginal_fte",
+            "university_classroom_gap",
+            "university_laboratory_gap"
+          ],
+          "formula": null,
+          "note": "Kurumun toplam kapasite açığı senaryodan önce de vardı; burada yalnızca senaryonun eklediği fark gösterilir."
+        }
+      ]
+    },
+    {
+      "type": "management_comment",
+      "title": "Yönetim değerlendirmesi",
+      "components": [
+        {
+          "type": "information_box",
+          "title": null,
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": "info",
+          "body": "### Program değerlendirmesi\n- Kapasite zorlanıyor.\n### Üniversite düzeyindeki etki\n- Bütçe olumlu.",
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "type": "details",
+      "title": null,
+      "components": [
+        {
+          "type": "expandable_details",
+          "title": "Ayrıntılı program sonuçları",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [
+            {
+              "type": "recommendation_list",
+              "title": null,
+              "subtitle": null,
+              "value": null,
+              "baseline_label": null,
+              "scenario_label": null,
+              "delta_label": null,
+              "trend": null,
+              "categories": [],
+              "series": [],
+              "unit": null,
+              "legend": [],
+              "percent": null,
+              "level": null,
+              "body": null,
+              "items": [
+                "Öğrenci sayısı: 370 öğrenci → 426 öğrenci",
+                "Programda ders veren öğretim üyesi: 18 kişi",
+                "Program akademik kapasitesi: 18 FTE",
+                "Gerekli akademik kapasite: 18,50 FTE → 21,30 FTE",
+                "Mevcut program açığı: 0,50 FTE",
+                "Senaryo sonrası program açığı: 3,30 FTE",
+                "Senaryodan kaynaklanan ek ihtiyaç: Veri bulunamadı",
+                "Program derslik kapasitesi: 2.987,57 koltuk-saat",
+                "Program haftalık derslik ihtiyacı: 6.660 koltuk-saat → 7.668 koltuk-saat",
+                "Program derslik kullanım oranı: 222,92 % → 256,66 %",
+                "Derslik talebinin karşılanan oranı: 44,86 % → 38,96 %",
+                "Derslik talebinin karşılanamayan oranı: 55,14 % → 61,04 %",
+                "Program laboratuvar kapasitesi: 1.122,41 istasyon-saat",
+                "Program haftalık laboratuvar ihtiyacı: 1.480 istasyon-saat → 1.704 istasyon-saat",
+                "Program laboratuvar kullanım oranı: 131,86 % → 151,82 %",
+                "Laboratuvar talebinin karşılanan oranı: 75,84 % → 65,87 %",
+                "Laboratuvar talebinin karşılanamayan oranı: 24,16 % → 34,13 %",
+                "Bu programdaki artışın ek gelir etkisi: Veri bulunamadı"
+              ],
+              "open": false,
+              "components": [],
+              "markdown": null,
+              "scope_type": null,
+              "scope_name": null,
+              "source_keys": [],
+              "formula": null,
+              "note": null
+            }
+          ],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "expandable_details",
+          "title": "Üniversite geneli etkiler",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [
+            {
+              "type": "recommendation_list",
+              "title": null,
+              "subtitle": null,
+              "value": null,
+              "baseline_label": null,
+              "scenario_label": null,
+              "delta_label": null,
+              "trend": null,
+              "categories": [],
+              "series": [],
+              "unit": null,
+              "legend": [],
+              "percent": null,
+              "level": null,
+              "body": null,
+              "items": [
+                "Üniversite toplam yıllık geliri: 35.960.000 USD → 36.289.840 USD",
+                "Üniversite net bütçesi: 2.900.000 USD → 3.157.040 USD",
+                "Üniversite akademik personeli: 180 kişi → 180 kişi",
+                "Üniversite için önerilen kadro: 200 kişi → 203 kişi",
+                "Üniversite kadro açığı: 20 kişi → 23 kişi",
+                "Üniversite derslik kapasitesi: 1.020 kişi → 1.020 kişi",
+                "Üniversite eş zamanlı derslik talebi: 1.400 eş zamanlı kişi → 1.420 eş zamanlı kişi",
+                "Üniversite derslik kapasite açığı: 380 eş zamanlı kişi → 400 eş zamanlı kişi",
+                "Derslik talebinin karşılanan oranı: 72,86 % → 71,83 %",
+                "Derslik talebinin karşılanamayan oranı: 27,14 % → 28,17 %",
+                "Üniversite laboratuvar kapasitesi: 328 kişi → 328 kişi",
+                "Üniversite eş zamanlı laboratuvar talebi: 720 eş zamanlı kişi → 730 eş zamanlı kişi",
+                "Üniversite laboratuvar kapasite açığı: 392 eş zamanlı kişi → 402 eş zamanlı kişi",
+                "Laboratuvar talebinin karşılanan oranı: 45,56 % → 44,93 %",
+                "Laboratuvar talebinin karşılanamayan oranı: 54,44 % → 55,07 %",
+                "Kapasite durumu: Veri bulunamadı"
+              ],
+              "open": false,
+              "components": [],
+              "markdown": null,
+              "scope_type": null,
+              "scope_name": null,
+              "source_keys": [],
+              "formula": null,
+              "note": null
+            }
+          ],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "expandable_details",
+          "title": "Hesaplama yöntemi",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [
+            {
+              "type": "recommendation_list",
+              "title": null,
+              "subtitle": null,
+              "value": null,
+              "baseline_label": null,
+              "scenario_label": null,
+              "delta_label": null,
+              "trend": null,
+              "categories": [],
+              "series": [],
+              "unit": null,
+              "legend": [],
+              "percent": null,
+              "level": null,
+              "body": null,
+              "items": [
+                "Öğrenci sayısı: mevcut öğrenci × (1 + %15 / 100)",
+                "Programda ders veren öğretim üyesi: programa tahsis edilmiş tekil öğretim üyesi sayısı",
+                "Program akademik kapasitesi: Σ(tahsis yüzdesi / 100). Kişi sayısından farklıdır.",
+                "Gerekli akademik kapasite: öğrenci sayısı / 20 (hedef öğrenci-FTE oranı)",
+                "Mevcut program açığı: mevcut gerekli FTE − mevcut FTE",
+                "Senaryo sonrası program açığı: senaryo gerekli FTE − mevcut FTE",
+                "Senaryodan kaynaklanan ek ihtiyaç: senaryo gerekli FTE − mevcut gerekli FTE",
+                "Program derslik kapasitesi: Σ(derslik koltuk sayısı × tahsisli haftalık saat × paylaşım payı)",
+                "Program haftalık derslik ihtiyacı: öğrenci sayısı × 18 (öğrenci başına haftalık ders saati)",
+                "Program derslik kullanım oranı: haftalık ihtiyaç / haftalık kapasite × 100",
+                "Derslik talebinin karşılanan oranı: min(kapasite, talep) / talep × 100",
+                "Derslik talebinin karşılanamayan oranı: 100 − karşılanan oran",
+                "Program laboratuvar kapasitesi: Σ(istasyon sayısı × tahsisli haftalık saat × paylaşım payı)",
+                "Program haftalık laboratuvar ihtiyacı: öğrenci sayısı × 4",
+                "Program laboratuvar kullanım oranı: haftalık ihtiyaç / haftalık kapasite × 100",
+                "Laboratuvar talebinin karşılanan oranı: min(kapasite, talep) / talep × 100",
+                "Laboratuvar talebinin karşılanamayan oranı: 100 − karşılanan oran",
+                "Bu programdaki artışın ek gelir etkisi: senaryo motorunun kurum geneli gelir farkı; artış yalnızca bu programdan geldiği için tamamı programa atfedilir",
+                "Üniversite toplam yıllık geliri: öğrenim ücreti (burs sonrası) + araştırma + diğer gelirler",
+                "Üniversite net bütçesi: toplam gelir − toplam gider",
+                "Üniversite akademik personeli: mali dönem bordro kadrosu",
+                "Üniversite için önerilen kadro: üniversite öğrenci sayısı / 20 (hedef öğrenci-öğretim üyesi oranı)",
+                "Üniversite kadro açığı: önerilen kadro − mevcut kadro",
+                "Üniversite derslik kapasitesi: aktif dersliklerin toplam koltuk sayısı",
+                "Üniversite eş zamanlı derslik talebi: üniversite toplam öğrenci sayısı × 0.35",
+                "Üniversite derslik kapasite açığı: eş zamanlı derslik talebi − derslik kapasitesi",
+                "Derslik talebinin karşılanan oranı: min(kapasite, talep) / talep × 100",
+                "Derslik talebinin karşılanamayan oranı: 100 − karşılanan oran",
+                "Üniversite laboratuvar kapasitesi: aktif laboratuvarların toplam koltuk sayısı",
+                "Üniversite eş zamanlı laboratuvar talebi: üniversite toplam öğrenci sayısı × 0.18",
+                "Üniversite laboratuvar kapasite açığı: eş zamanlı laboratuvar talebi − laboratuvar kapasitesi",
+                "Laboratuvar talebinin karşılanan oranı: min(kapasite, talep) / talep × 100",
+                "Laboratuvar talebinin karşılanamayan oranı: 100 − karşılanan oran"
+              ],
+              "open": false,
+              "components": [],
+              "markdown": null,
+              "scope_type": null,
+              "scope_name": null,
+              "source_keys": [],
+              "formula": null,
+              "note": null
+            }
+          ],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "expandable_details",
+          "title": "Tam metin rapor",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [],
+          "open": false,
+          "components": [],
+          "markdown": "**2025-2026 — Bilgisayar Mühendisliği Lisans Programı**\n\nSenaryo: program öğrenci sayısında %15 değişim (+56 öğrenci).\n\n### Program kapsamındaki sonuçlar — Bilgisayar Mühendisliği Lisans Programı\n- Öğrenci sayısı: 370 öğrenci → 426 öğrenci (+56 öğrenci)\n- Programda ders veren öğretim üyesi: 18 kişi\n- Program akademik kapasitesi: 18 FTE\n- Gerekli akademik kapasite: 18,50 FTE → 21,30 FTE (+2,80 FTE)\n- Mevcut program açığı: 0,50 FTE\n  - Bu açık senaryodan bağımsızdır; şu anda da vardır.\n- Senaryo sonrası program açığı: 3,30 FTE\n- Senaryodan kaynaklanan ek ihtiyaç: 2,80 FTE\n- Program derslik kapasitesi: 2.987,57 koltuk-saat\n  - Bazı mekânlar başka programlarla paylaşılıyor; kapasite yalnızca bu programa düşen pay kadar sayıldı.\n- Program haftalık derslik ihtiyacı: 6.660 koltuk-saat → 7.668 koltuk-saat (+1.008 koltuk-saat)\n- Program derslik kullanım oranı: %222,92 → %256,66\n  - Program MEVCUT durumda da tahsisli derslik kapasitesini aşıyor; senaryo bu sorunu oluşturmuyor, büyütüyor.\n- Derslik talebinin karşılanan oranı: %44,86 → %38,96\n- Derslik talebinin karşılanamayan oranı: %55,14 → %61,04\n- Program laboratuvar kapasitesi: 1.122,41 istasyon-saat\n  - Bazı mekânlar başka programlarla paylaşılıyor; kapasite yalnızca bu programa düşen pay kadar sayıldı.\n- Program haftalık laboratuvar ihtiyacı: 1.480 istasyon-saat → 1.704 istasyon-saat (+224 istasyon-saat)\n- Program laboratuvar kullanım oranı: %131,86 → %151,82\n  - Program MEVCUT durumda da tahsisli laboratuvar kapasitesini aşıyor.\n- Laboratuvar talebinin karşılanan oranı: %75,84 → %65,87\n- Laboratuvar talebinin karşılanamayan oranı: %24,16 → %34,13\n- Bu programdaki artışın ek gelir etkisi: +329.840 USD\n\n### Bölüm kapsamındaki sonuçlar — Bilgisayar Mühendisliği\n- Bölüm akademik personeli: 18 kişi\n\n### Üniversite bütçesine ve kaynaklarına etkisi — Üniversite geneli\n- Üniversite toplam yıllık geliri: 35.960.000 USD → 36.289.840 USD (+329.840 USD)\n- Üniversite net bütçesi: 2.900.000 USD → 3.157.040 USD (+257.040 USD)\n  - Bu sonuç, gerekli EK PERSONEL ALIMI ve FİZİKSEL KAPASİTE YATIRIMLARI uygulanmadan öncesine aittir. Bu maliyetler hesaplandıktan sonra net finansal sürdürülebilirlik yeniden değerlendirilmelidir.\n- Üniversite akademik personeli: 180 kişi → 180 kişi (0 kişi)\n- Üniversite için önerilen kadro: 200 kişi → 203 kişi (+3 kişi)\n- Üniversite kadro açığı: 20 kişi → 23 kişi (+3 kişi)\n  - Kurumun 20 kişilik kadro açığı senaryodan ÖNCE de vardı. Bu senaryonun eklediği ihtiyaç 3 kişidir.\n- Üniversite derslik kapasitesi: 1.020 kişi → 1.020 kişi\n- Üniversite eş zamanlı derslik talebi: 1.400 eş zamanlı kişi → 1.420 eş zamanlı kişi (+20 eş zamanlı kişi)\n- Üniversite derslik kapasite açığı: 380 eş zamanlı kişi → 400 eş zamanlı kişi\n- Derslik talebinin karşılanan oranı: %72,86 → %71,83\n- Derslik talebinin karşılanamayan oranı: %27,14 → %28,17\n- Üniversite laboratuvar kapasitesi: 328 kişi → 328 kişi\n- Üniversite eş zamanlı laboratuvar talebi: 720 eş zamanlı kişi → 730 eş zamanlı kişi (+10 eş zamanlı kişi)\n- Üniversite laboratuvar kapasite açığı: 392 eş zamanlı kişi → 402 eş zamanlı kişi\n- Laboratuvar talebinin karşılanan oranı: %45,56 → %44,93\n- Laboratuvar talebinin karşılanamayan oranı: %54,44 → %55,07\n- Kapasite durumu: yetersiz\n\n### Mevcut durumdaki riskler (senaryodan bağımsız)\n- Bilgisayar Mühendisliği Lisans Programı: program derslik kullanım oranı mevcut durumda %222,92 — tahsis edilmiş kapasite zaten aşılmış durumda. Senaryo bu oranı %256,66'e yükseltiyor.\n- Bilgisayar Mühendisliği Lisans Programı: program laboratuvar kullanım oranı mevcut durumda %131,86 — tahsis edilmiş kapasite zaten aşılmış durumda. Senaryo bu oranı %151,82'e yükseltiyor.\n\n### Senaryonun eklediği etki (üniversite geneli)\n- Derslik kapasitesi yetersiz: aynı anda derslikte olması beklenen 1420 öğrenciye karşılık 1020 kapasite var. 400 kişilik açık oluşuyor.\n- Laboratuvar kapasitesi yetersiz: aynı anda laboratuvarda olması beklenen 730 öğrenciye karşılık 328 kapasite var. 402 kişilik açık oluşuyor.\n### Yönetim değerlendirmesi\n- Talebin %68,42'i karşılanamıyor.\n- Toplam maliyet 9.876.543 USD olarak hesaplanmıştır.\n- Öğrenci sayısı 1.111 kişiye çıkacaktır.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n- Ek satır: kapasite planlaması gözden geçirilmelidir.\n",
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "data_source_panel",
+          "title": "Kullanılan veriler",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [
+            "Öğrenci kayıtları",
+            "Mali dönem kayıtları"
+          ],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [
+            "data_sources"
+          ],
+          "formula": null,
+          "note": null
+        },
+        {
+          "type": "assumptions_panel",
+          "title": "Varsayımlar ve hariç tutulan maliyetler",
+          "subtitle": null,
+          "value": null,
+          "baseline_label": null,
+          "scenario_label": null,
+          "delta_label": null,
+          "trend": null,
+          "categories": [],
+          "series": [],
+          "unit": null,
+          "legend": [],
+          "percent": null,
+          "level": null,
+          "body": null,
+          "items": [
+            "Taban: 2025-2026 mali dönemi gerçek gelir/gider kayıtları.",
+            "Bu bir simülasyondur; veritabanına kayıt yazılmamıştır.",
+            "Finansal sonuçlar gerekli yeni personel ve kapasite yatırımlarının maliyetini içermemektedir."
+          ],
+          "open": false,
+          "components": [],
+          "markdown": null,
+          "scope_type": null,
+          "scope_name": null,
+          "source_keys": [],
+          "formula": null,
+          "note": null
+        }
+      ]
+    }
+  ],
+  "academic_year": "2025-2026",
+  "scope": {
+    "faculty": "Mühendislik ve Mimarlık Fakültesi",
+    "department": "Bilgisayar Mühendisliği",
+    "program": "Bilgisayar Mühendisliği Lisans Programı"
+  },
+  "calculated_at": "2026-01-01T12:00:00"
+}

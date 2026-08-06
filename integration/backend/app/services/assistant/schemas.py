@@ -143,6 +143,14 @@ class ChatResponse(BaseModel):
             }
         ],
     )
+    ui_spec: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Dinamik sonuç penceresinin tanımı. Kartlar ve grafikler "
+            "structured_result'tan üretilir; modelin serbest metninden sayı "
+            "ayıklanmaz. Bileşen türleri kapalı bir listedir."
+        ),
+    )
     data_source: str = Field(
         description=(
             "Cevabın dayanağı. 'institutional_data' araç sonuçlarına, "

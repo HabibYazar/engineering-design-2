@@ -68,6 +68,8 @@ VIEWS["assistant"] = {
       </div>
     </div>
 
+    <div id="assistantViewPanel" class="ai-panel" hidden></div>
+
     ${ux.details(
       "Bu asistan nasıl çalışıyor?",
       `<div id="assistantArchitecture">${ux.skeleton(3)}</div>`,
@@ -175,6 +177,68 @@ function renderThread(initial) {
   }
   el.innerHTML = THREAD.map(bubble).join("");
   el.scrollTop = el.scrollHeight;
+
+  // Her çizimden sonra düğmeler yeniden bağlanır (innerHTML dinleyicileri siler).
+  el.querySelectorAll(".ai-open-view").forEach((button) =>
+    button.addEventListener("click", () =>
+      openAssistantView(Number(button.dataset.viewIndex))
+    )
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Dinamik sonuç penceresi                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Bir sohbet balonuna ait analiz penceresini açar.
+ *
+ * Pencere `structured_result`tan üretilmiş `ui_spec` ile çizilir; konuşma
+ * geçmişindeki tanım korunduğu için aynı sonuç sonradan yeniden açılabilir.
+ */
+function openAssistantView(index) {
+  const panel = document.getElementById("assistantViewPanel");
+  const item = THREAD[index];
+  if (!panel) return;
+
+  if (!item || !item.uiSpec) {
+    panel.hidden = false;
+    panel.innerHTML = `<div class="state error">
+      Bu cevap için görüntülenecek bir analiz sonucu bulunamadı.
+    </div>`;
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML = ui.loading("Analiz penceresi hazırlanıyor…");
+
+  // Çizim senkron; yükleme durumu bir kare görünsün diye bir sonraki
+  // çerçeveye bırakılıyor.
+  requestAnimationFrame(() => {
+    try {
+      panel.innerHTML = aiRenderView(item.uiSpec);
+      const close = panel.querySelector("[data-ai-close]");
+      if (close) {
+        close.addEventListener("click", () => {
+          panel.hidden = true;
+          panel.innerHTML = "";
+        });
+      }
+    } catch (error) {
+      panel.innerHTML = `<div class="state error">
+        Analiz penceresi çizilemedi: ${fmt.esc(error.message)}
+      </div>`;
+      return;
+    }
+
+    // Kaydırma ÇİZİMDEN SONRA ve ayrı bir denemede yapılır. Aynı try
+    // bloğunda olsaydı, kaydırma desteklenmeyen bir ortamda çizilmiş
+    // pencere silinip yerine hata kutusu geçerdi — çalışan bir özelliği
+    // yardımcı bir davranış yüzünden kaybetmek olurdu.
+    if (typeof panel.scrollIntoView === "function") {
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
 }
 
 function bubble(item) {
@@ -182,12 +246,44 @@ function bubble(item) {
     return `<div class="assistant-note">${fmt.esc(item.text)}</div>`;
   }
   const who = item.role === "user" ? "Siz" : "Asistan";
+  // UZUN MARKDOWN VARSAYILAN OLARAK GÖSTERİLMEZ.
+  // Dinamik pencere varsa balonda yalnızca kısa özet + düğme durur; tam
+  // metin pencerenin içindeki açılır bölümdedir.
+  const hasView = Boolean(item.uiSpec);
+  const bodyText = hasView ? assistantSummaryOf(item) : item.text;
+
   return `<div class="assistant-msg ${item.role}">
     <div class="who">${who}</div>
     <div class="body">${
-      item.pending ? `<span class="typing">Yanıt oluşturuluyor…</span>` : safeText(item.text)
+      item.pending ? `<span class="typing">Yanıt oluşturuluyor…</span>` : safeText(bodyText)
     }</div>
+    ${hasView && !item.pending ? assistantViewButton(item) : ""}
     ${item.pending ? "" : sourceBlock(item)}
+  </div>`;
+}
+
+/** Balonda gösterilecek kısa özet. Tam rapor pencerededir. */
+function assistantSummaryOf(item) {
+  const spec = item.uiSpec;
+  const cards = (spec.sections || [])
+    .filter((s) => s.type === "metric_grid")
+    .flatMap((s) => s.components || [])
+    .slice(0, 2)
+    .map((c) => {
+      if (c.baseline_label && c.scenario_label) {
+        return `${c.title}: ${c.baseline_label} → ${c.scenario_label}`;
+      }
+      return `${c.title}: ${c.value || ""}`;
+    });
+  const lines = [spec.title];
+  if (spec.subtitle) lines.push(spec.subtitle);
+  return lines.join(" · ") + (cards.length ? "\n\n- " + cards.join("\n- ") : "");
+}
+
+function assistantViewButton(item) {
+  return `<div class="ai-open-row">
+    <button class="primary ai-open-view" type="button"
+            data-view-index="${THREAD.indexOf(item)}">Analizi Görüntüle</button>
   </div>`;
 }
 
@@ -337,6 +433,9 @@ async function sendMessage(rawMessage) {
     pending.academicYear = result.academic_year || null;
     pending.scope = result.scope || null;
     pending.generalKnowledge = result.data_source === "general_model_knowledge";
+    // Dinamik pencere tanımı balonla birlikte saklanır; konuşma geçmişinden
+    // yeniden açılabilsin diye.
+    pending.uiSpec = result.ui_spec || null;
     renderThread();
     await refreshAssistantStatus();
   } catch (err) {
