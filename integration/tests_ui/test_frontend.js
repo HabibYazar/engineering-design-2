@@ -654,9 +654,22 @@ function check(label, condition, detail = "") {
 
   const waterfall = oneOf(acceptedChain.waterfall_chart);
   check("8) mali etki waterfall (veya gecerli fallback) ile cizildi",
-    !!waterfall && /\+329\.840/.test(waterfall.textContent) &&
-      /\+257\.040/.test(waterfall.textContent) && /-72\.800/.test(waterfall.textContent),
-    waterfall ? squash(waterfall.textContent).slice(0, 200) : "grafik yok");
+    !!waterfall && /2\.900\.000/.test(waterfall.textContent) &&
+      /3\.157\.040/.test(waterfall.textContent) &&
+      /\+329\.840/.test(waterfall.textContent),
+    waterfall ? squash(waterfall.textContent).slice(0, 220) : "grafik yok");
+  // GERCEK KADEMELI SELALE: ilk sutun mevcut butce, son sutun senaryo
+  // butcesi; aradaki kalemler o seviyeden hareket eder ve sutunlar
+  // birbirine baglanti cizgileriyle baglidir.
+  check("8b) selale baslangic butcesinden sonuc butcesine iniyor",
+    !!waterfall &&
+      /mevcut/i.test(waterfall.querySelector(".ai-values").textContent) &&
+      /senaryo/i.test(waterfall.querySelector(".ai-values").textContent) &&
+      waterfall.querySelectorAll(".ai-wf-link").length >= 2,
+    waterfall ? "baglanti: " + waterfall.querySelectorAll(".ai-wf-link").length : "");
+  check("8c) toplam sutunlari isaretli degil MUTLAK deger yaziyor",
+    !!waterfall && !/\+2\.900\.000/.test(waterfall.textContent),
+    waterfall ? squash(waterfall.textContent).slice(0, 200) : "");
 
   // --- 9. Butun sayilar structured_result ile ayni ---
   const metricIndex = {};
@@ -1006,6 +1019,157 @@ function check(label, condition, detail = "") {
     $("#assistantViewPanel").hidden === true &&
       $("#assistantViewPanel").innerHTML === "");
 
+  /* ==================================================================
+     MAAS SENARYOSU — semantik ve mali sunum
+     ------------------------------------------------------------------
+     Bulunan hata: %10 zam senaryosunda selale grafigi 612.000 USD'yi
+     once "ek brut gelir" olarak gosteriyor, sonra ayni tutari gider
+     tarafinda bir kez daha sayiyordu. Maas artisi gelir degildir ve
+     ayni tutar iki kez sayilmaz.
+     ================================================================== */
+  console.log("\n--- Maas senaryosu paneli ---");
+
+  let SALARY_SPEC = null;
+  let SALARY_STRUCTURED = null;
+  try {
+    SALARY_SPEC = JSON.parse(
+      fs.readFileSync(path.join(fixtureDir, "ui_spec_salary_sample.json"), "utf8"));
+    SALARY_STRUCTURED = JSON.parse(
+      fs.readFileSync(path.join(fixtureDir, "structured_result_salary_sample.json"), "utf8"));
+  } catch (e) {
+    console.error("Maas senaryosu ornegi bulunamadi; once backend testlerini calistirin.");
+    process.exit(2);
+  }
+
+  const salaryBox = w.document.createElement("div");
+  w.document.body.appendChild(salaryBox);
+  salaryBox.innerHTML = w.eval("aiRenderView")(SALARY_SPEC, SALARY_STRUCTURED);
+  const salaryView = salaryBox.querySelector(".ai-generated-view");
+  const salaryText = squash(salaryView.textContent);
+  const salaryChart = (t) => salaryBox.querySelector(`figure.ai-chart[data-ai-type="${t}"]`);
+  const cardText = squash(salaryBox.querySelector(".ai-section-metrics").textContent);
+
+  check("maas: panel cizildi ve basligi zammi soyluyor",
+    !!salaryView && /%10 Zam/.test(salaryBox.querySelector(".ai-view-title").textContent),
+    salaryBox.querySelector(".ai-view-title").textContent);
+
+  check("maas: karar ozeti karar odakli",
+    !/hesaplanan sonuçlar aşağıdadır/i.test(salaryText) &&
+      /612\.000 USD/.test(salaryBox.querySelector(".ai-decision-text").textContent),
+    squash(salaryBox.querySelector(".ai-decision-text").textContent).slice(0, 180));
+  check("maas: risk seviyesinin SEBEBI ekranda yaziyor",
+    !!salaryBox.querySelector(".ai-decision-reason") &&
+      /eşik/i.test(salaryBox.querySelector(".ai-decision-reason").textContent),
+    squash((salaryBox.querySelector(".ai-decision-reason") || {}).textContent || ""));
+
+  const salaryCards = salaryBox.querySelectorAll(
+    '.ai-section-metrics [data-ai-type="kpi_card"]');
+  check("maas: sorulan butun metrikler kart olarak var",
+    salaryCards.length <= 5 &&
+      /Akademik personel gideri/.test(cardText) && /Net bütçe/.test(cardText) &&
+      /Personel gideri payı/.test(cardText) && /Toplam kurum harcaması/.test(cardText),
+    cardText.slice(0, 220));
+  check("maas: gider 6.120.000 -> 6.732.000 ve +612.000 gosteriliyor",
+    /6\.120\.000 USD/.test(cardText) && /6\.732\.000 USD/.test(cardText) &&
+      /\+612\.000 USD/.test(cardText) && /%10 artış/.test(cardText),
+    cardText.slice(0, 220));
+  check("maas: net butce 2.900.000 -> 2.288.000",
+    /2\.900\.000 USD/.test(cardText) && /2\.288\.000 USD/.test(cardText) &&
+      /-612\.000 USD/.test(cardText));
+  check("maas: personel gideri orani ekranda",
+    /%18,51/.test(cardText) && /%19,99/.test(cardText) && /puan/.test(cardText),
+    cardText.slice(0, 220));
+  check("maas: idari personel gideri AYRI kart ve degismedi",
+    /İdari personel gideri/.test(cardText) && /2\.090\.000 USD/.test(cardText) &&
+      /Değişmedi/.test(cardText),
+    cardText.slice(0, 260));
+
+  const salaryWaterfall = salaryChart("waterfall_chart");
+  check("maas: gercek kademeli selale cizildi",
+    !!salaryWaterfall &&
+      /2\.900\.000/.test(salaryWaterfall.textContent) &&
+      /2\.288\.000/.test(salaryWaterfall.textContent) &&
+      /-612\.000/.test(salaryWaterfall.textContent),
+    salaryWaterfall ? squash(salaryWaterfall.textContent).slice(0, 220) : "grafik yok");
+  check("maas: selale sutunlari baglanti cizgileriyle bagli",
+    !!salaryWaterfall && salaryWaterfall.querySelectorAll(".ai-wf-link").length >= 2,
+    salaryWaterfall
+      ? "baglanti: " + salaryWaterfall.querySelectorAll(".ai-wf-link").length : "");
+  check("maas: selalede GELIR sutunu yok",
+    !!salaryWaterfall && !/gelir/i.test(salaryWaterfall.textContent),
+    salaryWaterfall ? squash(salaryWaterfall.textContent).slice(0, 200) : "");
+  // Olcut metinde kac kez GECTIGI degil, kac SUTUN oldugudur: ayni tutar
+  // tooltip'te, deger etiketinde ve erisilebilirlik tablosunda da yazar.
+  check("maas: 612.000 selalede tek bir SUTUN olarak var",
+    !!salaryWaterfall &&
+      Array.from(salaryWaterfall.querySelectorAll(".ai-wf-bar"))
+        .filter((g) => /612\.000/.test(g.textContent)).length === 1,
+    salaryWaterfall
+      ? "sutun: " + Array.from(salaryWaterfall.querySelectorAll(".ai-wf-bar"))
+          .filter((g) => /612\.000/.test(g.textContent)).length
+      : "");
+  check("maas: gider artisi selalede ASAGI iniyor",
+    !!salaryWaterfall && !/\+612\.000/.test(salaryWaterfall.textContent),
+    salaryWaterfall ? squash(salaryWaterfall.textContent).slice(0, 200) : "");
+
+  // Kural ANA EKRANDAKI bilesenler icindir. "Öğrenci başına maliyet"
+  // metrigi maas senaryosunda da anlamlidir ve acilir bolumde durur;
+  // orayi kapsam disi tutmak testi anlamsiz kilardi.
+  const salaryMainText = (() => {
+    const copy = salaryView.cloneNode(true);
+    copy.querySelectorAll("details.ai-accordion").forEach((d) => d.remove());
+    return squash(copy.textContent);
+  })();
+  check("maas: ana ekranda ogrenci/derslik/laboratuvar bileseni yok",
+    !/öğrenci/i.test(salaryMainText) && !/derslik/i.test(salaryMainText) &&
+      !/laboratuvar/i.test(salaryMainText),
+    salaryMainText.slice(0, 220));
+  check("maas: kapasite yatirim uyarisi HICBIR YERDE gosterilmiyor",
+    !/Fiziksel yatırım maliyeti hesaplanmadı/.test(salaryText) &&
+      !/Ek personel maliyeti hesaplanmadı/.test(salaryText));
+
+  const scopeBox = salaryBox.querySelector('[data-ai-type="information_box"]');
+  check("maas: senaryonun kendi varsayimlari gorunuyor",
+    !!scopeBox && /kadro sayısı sabit/i.test(scopeBox.textContent) &&
+      /ek ders/i.test(scopeBox.textContent) && /yan haklar/i.test(scopeBox.textContent) &&
+      /döviz kuru sabit/i.test(scopeBox.textContent),
+    scopeBox ? squash(scopeBox.textContent).slice(0, 240) : "kutu yok");
+
+  const salaryTypes = Array.from(
+    salaryBox.querySelectorAll(".ai-section-charts figure.ai-chart")
+  ).map((el) => el.getAttribute("data-ai-type"));
+  check("maas: grafik turleri verinin anlamina uygun",
+    salaryTypes.includes("dumbbell_chart") &&
+      salaryTypes.includes("waterfall_chart") &&
+      salaryTypes.length <= 4 &&
+      new Set(salaryTypes).size === salaryTypes.length,
+    salaryTypes.join(", "));
+  check("maas: oran gauge grubu cizildi",
+    !!salaryBox.querySelector('[data-ai-type="gauge_group"]') &&
+      /%19,99/.test(salaryBox.querySelector('[data-ai-type="gauge_group"]').textContent),
+    squash((salaryBox.querySelector('[data-ai-type="gauge_group"]') || {}).textContent || "")
+      .slice(0, 160));
+  check("maas: butun sayilar structured_result ile ayni",
+    (() => {
+      const idx = {};
+      SALARY_STRUCTURED.metrics.forEach((m) => {
+        ["baseline", "scenario", "change"].forEach((f) => {
+          if (m[f] !== null && m[f] !== undefined) idx[m.key + "." + f] = Number(m[f]);
+        });
+      });
+      let ok = true;
+      SALARY_SPEC.sections.forEach((sec) => sec.components.forEach((c) => {
+        (c.series || []).forEach((sr) => (sr.values || []).forEach((v, i) => {
+          const id = (sr.source_metric_ids || [])[i];
+          if (!id || idx[id] === undefined || v === null) return;
+          const sign = (sr.value_signs || [])[i] || 1;
+          if (Math.abs(v - idx[id] * sign) > 0.005) ok = false;
+        }));
+      }));
+      return ok;
+    })());
+
+  salaryBox.remove();
   sandbox.remove();
 
 

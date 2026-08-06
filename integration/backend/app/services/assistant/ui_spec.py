@@ -168,6 +168,11 @@ class ChartSeries(BaseModel):
     derivation: Optional[Literal["difference", "sum"]] = None
     #: Şelale grafiğinde her çubuğun türü: increase | decrease | total.
     kinds: List[Optional[str]] = Field(default_factory=list)
+    #: Kaynaktan çözülen değere uygulanacak işaret (+1 / -1).
+    #: Bir GİDER ARTIŞI kaynakta pozitiftir (+612.000 USD) ama bütçeyi
+    #: AZALTIR. İşaret burada açıkça taşınmazsa doğrulama katmanı çubuğu
+    #: yukarı çevirir ve maaş artışı bütçe artışı gibi görünür.
+    value_signs: List[Optional[int]] = Field(default_factory=list)
     #: Tahmin grafiklerinde güven aralığı.
     lower: List[Optional[float]] = Field(default_factory=list)
     upper: List[Optional[float]] = Field(default_factory=list)

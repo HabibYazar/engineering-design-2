@@ -19,7 +19,7 @@ başına bir sayı uydurmaktansa kapsamı dürüstçe söylemek doğrudur.
 """
 
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select
@@ -1053,6 +1053,7 @@ def _handle_enrollment_scenario(
             key="program_revenue_effect", label="Bu programdaki artışın ek gelir etkisi",
             scope_type=SCOPE_PROGRAM, scope_name=program_name, unit="USD",
             change=revenue.absolute_change if revenue else None,
+            flow="inflow",
             formula=(
                 "senaryo motorunun kurum geneli gelir farkı; artış yalnızca bu "
                 "programdan geldiği için tamamı programa atfedilir"
@@ -1080,6 +1081,11 @@ def _handle_enrollment_scenario(
             baseline=revenue.baseline_value if revenue else None,
             scenario=revenue.projected_value if revenue else None,
             change=revenue.absolute_change if revenue else None,
+            flow="inflow",
+            # TOPLAMDIR: aynı 329.840 USD hem burada hem "programdaki artışın
+            # ek gelir etkisi" kaleminde durur. İkisi birden şelaleye katkı
+            # sayılsaydı gelir iki kez hesaplanırdı.
+            is_total=True,
             formula="öğrenim ücreti (burs sonrası) + araştırma + diğer gelirler",
         ),
         ScopedMetric(
@@ -1088,6 +1094,7 @@ def _handle_enrollment_scenario(
             baseline=balance.baseline_value if balance else None,
             scenario=balance.projected_value if balance else None,
             change=balance.absolute_change if balance else None,
+            flow="balance", is_total=True,
             formula="toplam gelir − toplam gider",
             note=(
                 "Bu sonuç, gerekli EK PERSONEL ALIMI ve FİZİKSEL KAPASİTE "
@@ -1383,6 +1390,20 @@ def _handle_enrollment_scenario(
 def _handle_salary_scenario(
     db: Session, payload: SalaryScenarioInput
 ) -> SalaryScenarioOutput:
+    """Akademik maaş zammının mali etkisi.
+
+    KRİTİK AYRIM — MAAŞ ARTIŞI GELİR DEĞİLDİR
+    -----------------------------------------
+    Zam yalnızca AKADEMİK personel giderini artırır. Gelir değişmez, idari
+    maaşlar değişmez. Aynı tutarı hem gelir hem gider tarafına yazmak (ya da
+    "toplam gider etkisi" ile "akademik personel gideri" kalemlerini birlikte
+    katkı saymak) 612.000 USD'lik etkiyi iki kez saymak olurdu.
+
+    Bu yüzden her parasal metrik iki alan taşır:
+      * `flow`     — inflow (gelir) / outflow (gider) / balance (net sonuç)
+      * `is_total` — bu kalem başka kalemlerin toplamı mı?
+    Şelale grafiği yalnızca `is_total=False` katkıları kullanır.
+    """
     year, faculty, department, _ = _resolve(db, payload)
     notes: List[str] = []
 
@@ -1402,60 +1423,196 @@ def _handle_salary_scenario(
     def _find(key: str) -> Optional[MetricChange]:
         return next((m for m in metrics if m.key == key), None)
 
-    personnel = _find("personnel_expense")
+    academic = _find("personnel_expense")
+    administrative = _find("administrative_personnel_expense")
+    total_personnel = _find("total_personnel_expense")
     expenditure = _find("total_expenditure")
+    revenue = _find("total_revenue")
     balance = _find("balance")
     cost_per_student = _find("cost_per_student")
+    average_salary = _find("average_salary")
+    staff_count = _find("staff_count")
+
+    def _ratio(part: Optional[Decimal], whole: Optional[Decimal]) -> Optional[Decimal]:
+        """Oran hesabı TEK YERDE. Payda yoksa uydurma değer üretilmez."""
+        if part is None or not whole:
+            return None
+        return (Decimal(part) / Decimal(whole) * Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+    baseline_ratio = _ratio(
+        academic.baseline_value if academic else None,
+        expenditure.baseline_value if expenditure else None,
+    )
+    scenario_ratio = _ratio(
+        academic.projected_value if academic else None,
+        expenditure.projected_value if expenditure else None,
+    )
+    baseline_total_ratio = _ratio(
+        total_personnel.baseline_value if total_personnel else None,
+        expenditure.baseline_value if expenditure else None,
+    )
+    scenario_total_ratio = _ratio(
+        total_personnel.projected_value if total_personnel else None,
+        expenditure.projected_value if expenditure else None,
+    )
 
     university_name = "Üniversite geneli"
     percent = Decimal(str(payload.salary_change_percentage))
+
+    def _money(
+        key: str, label: str, source: Optional[MetricChange], *,
+        flow: Optional[str], is_total: bool = False, formula: Optional[str] = None,
+        note: Optional[str] = None,
+    ) -> ScopedMetric:
+        return ScopedMetric(
+            key=key, label=label,
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
+            baseline=source.baseline_value if source else None,
+            scenario=source.projected_value if source else None,
+            change=source.absolute_change if source else None,
+            semantic_type="monetary_change",
+            flow=flow, is_total=is_total, formula=formula, note=note,
+        )
+
     salary_scoped = [
-        ScopedMetric(
-            key="annual_staff_cost", label="Yıllık akademik personel gideri",
-            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
-            baseline=personnel.baseline_value if personnel else None,
-            scenario=personnel.projected_value if personnel else None,
-            change=personnel.absolute_change if personnel else None,
-            formula=f"bordro kadrosu × ortalama maaş × (1 + %{percent} / 100)",
+        _money(
+            "annual_staff_cost", "Akademik personel gideri", academic,
+            flow="outflow",
+            formula=f"akademik kadro × ortalama maaş × (1 + %{percent} / 100)",
+        ),
+        _money(
+            "administrative_staff_cost", "İdari personel gideri", administrative,
+            flow="outflow",
+            formula="idari kadro × ortalama idari maaş",
+            note="Bu senaryoda idari maaşlara zam yapılmamıştır; değer sabittir.",
+        ),
+        _money(
+            "total_personnel_cost", "Toplam personel gideri", total_personnel,
+            flow="outflow", is_total=True,
+            formula="akademik personel gideri + idari personel gideri",
+        ),
+        _money(
+            "total_expenditure", "Toplam kurum harcaması", expenditure,
+            flow="outflow", is_total=True,
+            formula="personel + eğitim + Ar-Ge + altyapı + teknoloji giderleri",
+        ),
+        _money(
+            "university_total_revenue", "Üniversite toplam yıllık geliri", revenue,
+            flow="inflow",
+            formula="öğrenim ücreti (burs sonrası) + araştırma + diğer gelirler",
+            note="Maaş artışı bir GELİR kalemi değildir; gelir bu senaryoda değişmez.",
+        ),
+        _money(
+            "university_net_balance", "Net bütçe", balance,
+            flow="balance", is_total=True,
+            formula="toplam gelir − toplam harcama",
         ),
         ScopedMetric(
-            key="total_expenditure_change", label="Toplam gider etkisi",
-            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
-            change=expenditure.absolute_change if expenditure else None,
-            formula="senaryo toplam gideri − taban toplam gideri",
+            key="academic_personnel_expense_ratio",
+            label="Akademik personel giderinin toplam harcamaya oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=baseline_ratio, scenario=scenario_ratio,
+            semantic_type="utilization",
+            formula="akademik personel gideri / toplam kurum harcaması × 100",
         ),
         ScopedMetric(
-            key="net_balance_change", label="Net bütçe etkisi",
-            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
-            change=balance.absolute_change if balance else None,
-            formula="senaryo dengesi − taban dengesi",
+            key="total_personnel_expense_ratio",
+            label="Toplam personel giderinin toplam harcamaya oranı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="%",
+            baseline=baseline_total_ratio, scenario=scenario_total_ratio,
+            semantic_type="utilization",
+            formula="toplam personel gideri / toplam kurum harcaması × 100",
         ),
         ScopedMetric(
-            key="cost_per_student_change", label="Öğrenci başına maliyet etkisi",
+            key="average_academic_salary", label="Ortalama akademik maaş",
             scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="USD",
-            change=cost_per_student.absolute_change if cost_per_student else None,
-            formula="toplam gider / öğrenci sayısı farkı",
+            baseline=average_salary.baseline_value if average_salary else None,
+            scenario=average_salary.projected_value if average_salary else None,
+            change=average_salary.absolute_change if average_salary else None,
+            semantic_type="monetary_change",
+            # Ortalama maaş bir BİRİM FİYATTIR, bütçe akışı değil; şelale
+            # grafiği onu katkı kalemi sanmamalı.
+            flow="unit_price",
+            formula="akademik personel gideri / akademik kadro sayısı",
         ),
+        ScopedMetric(
+            key="academic_staff_count", label="Akademik kadro sayısı",
+            scope_type=SCOPE_UNIVERSITY, scope_name=university_name, unit="kişi",
+            baseline=staff_count.baseline_value if staff_count else None,
+            scenario=staff_count.projected_value if staff_count else None,
+            change=staff_count.absolute_change if staff_count else None,
+            semantic_type="count_change",
+            note="Bu senaryoda kadro sayısı SABİT tutulmuştur.",
+        ),
+        _money(
+            # Öğrenci başına maliyet de bir birim fiyattır; bütçe kalemi değil.
+            "cost_per_student", "Öğrenci başına maliyet", cost_per_student,
+            flow="unit_price", is_total=True,
+            formula="toplam kurum harcaması / öğrenci sayısı",
+        ),
+    ]
+
+    # Senaryonun kapsamı. Bunlar VARSAYIMDIR, sonuç değil; ayrı alanda
+    # taşınır ki arayüz doğru kutuya koysun.
+    assumptions = [
+        f"Yalnızca akademik personel maaşları %{_plain_percent(percent)} "
+        "artırılmıştır; idari personel maaşları ve akademik kadro sayısı "
+        "sabit tutulmuştur.",
+        "Ek ders ödemeleri kapsam dışıdır; mali kayıtta ayrı kalem olarak "
+        "tutulmuyor.",
+        "Yan haklar ve işveren yükleri kapsam dışıdır; personel gideri "
+        "kalemi brüt maaş toplamı olarak alınmıştır.",
+        "Döviz kuru sabit kabul edilmiştir; bu senaryoda kur değişimi "
+        "uygulanmamıştır.",
+        "Enflasyon uygulanmamıştır; diğer gider kalemleri taban değerinde "
+        "kalmıştır.",
     ]
 
     return SalaryScenarioOutput(
         scope=_scope_info(year, faculty, department, None),
         scoped_metrics=salary_scoped,
-        salary_change_percentage=Decimal(str(payload.salary_change_percentage)),
-        previous_annual_staff_cost_usd=personnel.baseline_value if personnel else None,
-        new_annual_staff_cost_usd=personnel.projected_value if personnel else None,
-        cost_change_usd=personnel.absolute_change if personnel else None,
+        salary_change_percentage=percent,
+        previous_annual_staff_cost_usd=academic.baseline_value if academic else None,
+        new_annual_staff_cost_usd=academic.projected_value if academic else None,
+        cost_change_usd=academic.absolute_change if academic else None,
+        previous_administrative_cost_usd=(
+            administrative.baseline_value if administrative else None
+        ),
+        new_administrative_cost_usd=(
+            administrative.projected_value if administrative else None
+        ),
+        previous_total_personnel_cost_usd=(
+            total_personnel.baseline_value if total_personnel else None
+        ),
+        new_total_personnel_cost_usd=(
+            total_personnel.projected_value if total_personnel else None
+        ),
+        previous_total_expenditure_usd=expenditure.baseline_value if expenditure else None,
+        new_total_expenditure_usd=expenditure.projected_value if expenditure else None,
         total_expenditure_change_usd=expenditure.absolute_change if expenditure else None,
+        previous_total_revenue_usd=revenue.baseline_value if revenue else None,
+        new_total_revenue_usd=revenue.projected_value if revenue else None,
+        revenue_change_usd=revenue.absolute_change if revenue else None,
+        previous_net_balance_usd=balance.baseline_value if balance else None,
+        new_net_balance_usd=balance.projected_value if balance else None,
         net_balance_change_usd=balance.absolute_change if balance else None,
+        previous_personnel_expense_ratio_percent=baseline_ratio,
+        new_personnel_expense_ratio_percent=scenario_ratio,
+        previous_total_personnel_ratio_percent=baseline_total_ratio,
+        new_total_personnel_ratio_percent=scenario_total_ratio,
         cost_per_student_change_usd=cost_per_student.absolute_change
         if cost_per_student
         else None,
         risks=[r.message for r in risks],
         recommendations=[recommendation] if recommendation else [],
+        assumptions=assumptions,
         method_note=(
-            f"Personel gideri = akademik personel sayısı × ortalama maaş. "
-            f"%{payload.salary_change_percentage} zam yalnızca ortalama maaşı değiştirir; "
-            f"kadro sayısı sabit kalır."
+            f"Akademik personel gideri = akademik kadro sayısı × ortalama maaş. "
+            f"%{_plain_percent(percent)} zam yalnızca ortalama maaşı değiştirir; "
+            f"kadro sayısı ve idari personel gideri sabit kalır. Gelir tarafı "
+            f"bu senaryodan etkilenmez."
         ),
         notes=notes
         + [
@@ -1463,6 +1620,12 @@ def _handle_salary_scenario(
             "Bu bir simülasyondur; veritabanına kayıt yazılmamıştır.",
         ],
     )
+
+
+def _plain_percent(value: Decimal) -> str:
+    """Yüzdeyi gereksiz sıfırlar olmadan yazar: 10.00 -> "10"."""
+    text = f"{Decimal(str(value)):.2f}".rstrip("0").rstrip(".")
+    return text.replace(".", ",")
 
 
 # ---------------------------------------------------------------------------

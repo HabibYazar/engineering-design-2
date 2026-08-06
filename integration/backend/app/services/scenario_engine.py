@@ -120,6 +120,11 @@ class ScenarioComputation:
     projected_average_academic_salary: Decimal
     baseline_academic_personnel_expense: Decimal
     projected_academic_personnel_expense: Decimal
+    # İdari personel AYRI tutulur: akademik maaş zammından etkilenmez.
+    baseline_administrative_personnel_expense: Decimal
+    projected_administrative_personnel_expense: Decimal
+    baseline_total_personnel_expense: Decimal
+    projected_total_personnel_expense: Decimal
 
     # --- Eş zamanlı kapasite talebi (yeni) ---
     simultaneous_classroom_demand: int
@@ -231,8 +236,16 @@ def calculate(
         + baseline.annual_other_revenue
     )
 
+    # İdari personel gideri ayrı bir kalemdir. Daha önce (Türkçe küçük harf
+    # hatası yüzünden) teknoloji kalemine düşüyordu ve DÖVİZ KURUYLA birlikte
+    # artıyordu; idari maaşların kurla artması anlamsızdır.
+    baseline_administrative_personnel: Decimal = (
+        getattr(baseline, "annual_administrative_personnel_expense", None) or ZERO
+    )
+
     baseline_expenditure: Decimal = (
         baseline.annual_personnel_expense
+        + baseline_administrative_personnel
         + baseline.annual_education_expense
         + baseline.annual_rd_expense
         + baseline.annual_building_energy_expense
@@ -330,18 +343,23 @@ def calculate(
     )
     projected_personnel_expense: Decimal = projected_staff_count * projected_average_salary
 
-    # İdari personel değişimi de personel giderine yansır. İdari kadro ayrı
-    # bir baseline alanı olarak tutulmadığı için etkisi, akademik ortalama
-    # maaşın %65'i varsayımıyla hesaplanır ve bu varsayım açıkça belgelenir.
+    # İdari personel gideri KENDİ kaleminden yürür; akademik personel
+    # giderine karıştırılmaz. Akademik maaş zammı bu kalemi etkilemez.
+    # Kadro değişiminin birim maliyeti, idari giderin mevcut kadroya
+    # bölünmesiyle bulunur; idari kadro sayısı yoksa akademik ortalamanın
+    # %65'i varsayılır ve bu varsayım çıktıda açıkça yazılır.
     ADMIN_SALARY_RATIO = Decimal("0.65")
-    if data.administrative_staff_change != 0 or data.administrative_salary_change_percent != ZERO:
+    projected_administrative_personnel: Decimal = (
+        baseline_administrative_personnel
+        * growth_factor(data.administrative_salary_change_percent)
+    )
+    if data.administrative_staff_change != 0:
         admin_unit_cost = baseline_average_salary * ADMIN_SALARY_RATIO
-        admin_delta = (
+        projected_administrative_personnel = projected_administrative_personnel + (
             Decimal(data.administrative_staff_change)
             * admin_unit_cost
             * growth_factor(data.administrative_salary_change_percent)
         )
-        projected_personnel_expense = projected_personnel_expense + admin_delta
 
     # Eğitim gideri öğrenci sayısıyla ve enflasyonla birlikte artar.
     projected_education_expense: Decimal = (
@@ -376,6 +394,7 @@ def calculate(
         category = data.target_expense_category.lower()
         if "personel" in category or "maaş" in category or "salary" in category:
             projected_personnel_expense = projected_personnel_expense * factor
+            projected_administrative_personnel = projected_administrative_personnel * factor
         elif "eğitim" in category or "laboratuvar" in category:
             projected_education_expense = projected_education_expense * factor
         elif "araştırma" in category or "geliştirme" in category or "ar-ge" in category:
@@ -387,6 +406,7 @@ def calculate(
 
     projected_expenditure: Decimal = (
         projected_personnel_expense
+        + projected_administrative_personnel
         + projected_education_expense
         + projected_rd_expense
         + projected_building_energy_expense
@@ -461,6 +481,18 @@ def calculate(
             baseline.annual_personnel_expense
         ),
         projected_academic_personnel_expense=quantize_money(projected_personnel_expense),
+        baseline_administrative_personnel_expense=quantize_money(
+            baseline_administrative_personnel
+        ),
+        projected_administrative_personnel_expense=quantize_money(
+            projected_administrative_personnel
+        ),
+        baseline_total_personnel_expense=quantize_money(
+            baseline.annual_personnel_expense + baseline_administrative_personnel
+        ),
+        projected_total_personnel_expense=quantize_money(
+            projected_personnel_expense + projected_administrative_personnel
+        ),
         simultaneous_classroom_demand=int(classroom_demand),
         simultaneous_laboratory_demand=int(laboratory_demand),
     )
@@ -497,10 +529,19 @@ def build_comparison(computation: ScenarioComputation):
                 c.baseline_balance, c.projected_balance, "Mali etki",
                 higher_is_better=True,
                 description="Toplam gelir eksi toplam gider. Negatif değer bütçe açığıdır."),
-        compare("personnel_expense", "Personel gideri", "usd",
+        compare("personnel_expense", "Akademik personel gideri", "usd",
                 c.baseline_academic_personnel_expense, c.projected_academic_personnel_expense,
                 "Mali etki", higher_is_better=False,
                 description="Akademik personel sayısı × ortalama maaş. Zam ve kadro değişimi buraya yansır."),
+        compare("administrative_personnel_expense", "İdari personel gideri", "usd",
+                c.baseline_administrative_personnel_expense,
+                c.projected_administrative_personnel_expense,
+                "Mali etki", higher_is_better=False,
+                description="İdari kadro gideri. Akademik maaş zammından etkilenmez."),
+        compare("total_personnel_expense", "Toplam personel gideri", "usd",
+                c.baseline_total_personnel_expense, c.projected_total_personnel_expense,
+                "Mali etki", higher_is_better=False,
+                description="Akademik ve idari personel giderlerinin toplamı."),
         compare("average_salary", "Ortalama akademik maaş", "usd",
                 c.baseline_average_academic_salary, c.projected_average_academic_salary,
                 "Mali etki", higher_is_better=None,

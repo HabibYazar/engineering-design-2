@@ -72,6 +72,18 @@ class MetricIndex:
         self.by_key = {m["key"]: m for m in self.all}
         for metric in self.all:
             metric.setdefault("semantic_type", metric_semantics.resolve(metric))
+            # Parasal yön ve "toplam mı" bilgisi de burada tamamlanır:
+            # araç bildirmediyse merkezî sınıflandırıcı karar verir. Aksi
+            # hâlde şelale kuralı bu alanları hiç göremezdi.
+            if metric.get("flow") is None:
+                metric["flow"] = metric_semantics.classify_flow(
+                    metric.get("key", ""), metric.get("unit", ""),
+                    metric.get("label", ""),
+                )
+            if "is_total" not in metric:
+                metric["is_total"] = metric_semantics.looks_like_total(
+                    metric.get("key", "")
+                )
 
     # --- sorgular ---
 
@@ -127,10 +139,29 @@ def _pick(candidates: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 
 def _rule_change(index: MetricIndex) -> Optional[Component]:
-    """Önce–sonra değişimi → dumbbell."""
-    metric = _pick(
-        [m for m in index.by_semantic("count_change") if index.has_both(m)]
-    )
+    """Önce–sonra değişimi → dumbbell.
+
+    HAREKET ETMEYEN METRİK GRAFİK ÜRETMEZ: 180 → 180 çizmek ekranda yer
+    kaplamaktan başka bir şey yapmaz. Sayım metriği değişmiyorsa parasal bir
+    kalemin önce–sonra karşılaştırması kullanılır (maaş senaryosunda
+    akademik personel gideri gibi).
+    """
+    def _moved(metric: Dict[str, Any]) -> bool:
+        if not index.has_both(metric):
+            return False
+        change = metric.get("change")
+        if change is None:
+            change = index.num(metric, "scenario") - index.num(metric, "baseline")
+        return bool(change)
+
+    metric = _pick([m for m in index.by_semantic("count_change") if _moved(m)])
+    if metric is None:
+        # Parasal kalem: toplam olmayan, gerçek bir bütçe akışı.
+        metric = _pick([
+            m for m in index.by_semantic("monetary_change")
+            if _moved(m) and not m.get("is_total")
+            and m.get("flow") in ("inflow", "outflow")
+        ])
     if metric is None:
         return None
 
@@ -150,7 +181,9 @@ def _rule_change(index: MetricIndex) -> Optional[Component]:
         # yazılır, kartlar kendi kısa açıklamalarını kullanır.
         subtitle="Senaryo öncesi ve sonrası",
         unit=metric.get("unit"),
-        semantic_type="count_change",
+        # Seçilen metriğin GERÇEK anlamı taşınır: sayım da olabilir parasal
+        # da. Sabit "count_change" yazmak testleri de yanıltırdı.
+        semantic_type=metric.get("semantic_type", "count_change"),
         scope_type=metric.get("scope_type"),
         scope_name=metric.get("scope_name"),
         span=SPAN["dumbbell_chart"],
@@ -335,78 +368,256 @@ def _rule_coverage(index: MetricIndex) -> Optional[Component]:
 
 
 def _rule_money(index: MetricIndex) -> Optional[Component]:
-    """Gelir → operasyonel etki → net bütçe zinciri → şelale grafiği.
+    """Net bütçe şelalesi: başlangıç → katkı kalemleri → sonuç.
 
-    Hesaplanmamış maliyetler grafiğe SIFIR olarak konmaz; grafiğin yanındaki
-    uyarı alanında ayrıca yazılır (bkz. `ui_spec_builder`).
+    GERÇEK KADEMELİ ŞELALE
+    ----------------------
+    İlk sütun mevcut net bütçedir. Ara sütunlar bu seviyeden başlayarak
+    yukarı/aşağı hareket eder. Son sütun senaryo net bütçesidir. Bağımsız üç
+    sütun çizmek şelale değil, gruplanmış çubuk grafiğidir.
+
+    ÇİFT SAYMA KORUMASI
+    -------------------
+    Katkı kalemleri yalnızca `is_total=False` olan gerçek bütçe akışlarıdır.
+    "Toplam gider" ile "akademik personel gideri" aynı 612.000 USD'yi taşır;
+    ikisi birden katkı sayılsaydı etki iki kez hesaplanırdı.
+
+    Ayrıca katkıların toplamı, net bütçe değişimine EŞİT OLMAK ZORUNDADIR.
+    Eşit değilse grafik uydurulmuş bir zincir göstermek yerine iki adımlı
+    (başlangıç → net değişim → sonuç) güvenli biçime düşer ve bunu yazar.
     """
-    money = [m for m in index.by_semantic("monetary_change")
-             if m.get("change") not in (None, 0)]
-    if not money:
-        return None
-
-    # Zincirin SONU: net/bakiye metriği. Zincirin BAŞI: en özel kapsamdaki
-    # diğer parasal kalem. Belirli bir gelir kaleminin adı aranmaz — "hibe",
-    # "bağış", "proje geliri" gibi yeni kalemler de zinciri kurabilsin.
-    net = next(
-        (m for m in money if any(w in m["key"] for w in ("net", "balance", "bakiye"))),
+    balance = next(
+        (m for m in index.by_semantic("monetary_change")
+         if m.get("flow") == "balance" and index.has_both(m)),
         None,
     )
-    inflows = [m for m in money if m is not net]
-    gross = _pick(inflows) if inflows else None
-    if net is None or gross is None:
-        # Zincir kurulamıyor: tek kalemlik şelale bilgi taşımaz.
+    if balance is None:
         return None
 
-    gross_change = index.num(gross, "change")
-    net_change = index.num(net, "change")
+    start = index.num(balance, "baseline")
+    end = index.num(balance, "scenario")
+    if start is None or end is None:
+        return None
+    net_change = index.num(balance, "change")
+    if net_change is None:
+        net_change = end - start
 
-    categories = ["Ek brüt gelir", "Ek operasyonel etki", "Net bütçe değişimi"]
+    # Katkı adayları: gerçek bütçe akışı olan, toplam OLMAYAN, değişimi
+    # sıfırdan farklı kalemler. Sıfır değişimli kalem (bu senaryoda gelir ve
+    # idari maaşlar) grafiğe SIFIR SÜTUN olarak konmaz — sıfır bir ölçüm
+    # sonucudur, çizilecek bir hareket değildir.
+    contributions: List[Dict[str, Any]] = []
+    for metric in index.by_semantic("monetary_change"):
+        if metric.get("is_total") or metric.get("flow") not in ("inflow", "outflow"):
+            continue
+        change = index.num(metric, "change")
+        if change is None and index.has_both(metric):
+            change = index.num(metric, "scenario") - index.num(metric, "baseline")
+        if not change:
+            continue
+        # Gider artışı bütçeyi AZALTIR; işaret burada çevrilir.
+        signed = change if metric["flow"] == "inflow" else -change
+        contributions.append({"metric": metric, "signed": signed})
+
+    contributions.sort(key=lambda c: -abs(c["signed"]))
+
+    explained = sum(c["signed"] for c in contributions)
+    residual = net_change - explained
+
+    note = None
+    if not contributions:
+        # Hiç kalem yok: net değişim tek adımda gösterilir.
+        contributions = [{"metric": None, "signed": net_change, "label": "Net değişim"}]
+    elif abs(residual) >= 0.51:  # kuruş yuvarlaması payı
+        # Kalemler net değişimi TAM AÇIKLAMIYOR. Farkı görünmez yapmak
+        # (veya bir kalemi şişirmek) grafiği yalancı yapardı; fark açıkça
+        # "diğer kalemler" olarak yazılır.
+        contributions.append(
+            {"metric": None, "signed": residual, "label": "Diğer kalemlerin etkisi"}
+        )
+        note = (
+            "«Diğer kalemlerin etkisi» ayrıntılı kalemlerle net bütçe değişimi "
+            "arasındaki farktır; tek tek raporlanmayan gider kalemlerini içerir."
+        )
+
+    categories = [balance.get("label", "Mevcut net bütçe") + " (mevcut)"]
+    values: List[Optional[float]] = [start]
+    kinds: List[Optional[str]] = ["total"]
+    ids: List[Optional[str]] = [index.address(balance, "baseline")]
+    signs: List[Optional[int]] = [1]
+
+    for item in contributions:
+        metric = item["metric"]
+        categories.append(metric["label"] if metric else item.get("label", "Net değişim"))
+        values.append(item["signed"])
+        kinds.append("increase" if item["signed"] > 0 else "decrease")
+        # Artık kalemin KAYNAK ADRESİ YOKTUR: o bir metrik değil, net
+        # değişim ile raporlanan kalemler arasındaki farktır. Buraya net
+        # bütçe değişimini yazmak, renderer'ın doğrulama katmanında bu
+        # sütunu net değişime "düzeltmesine" ve grafiğin bozulmasına yol
+        # açardı.
+        ids.append(index.address(metric, "change") if metric else None)
+        # Gider kalemi kaynakta POZİTİF durur (gider arttı) ama bütçeyi
+        # azaltır; işaret burada bildirilir.
+        signs.append(
+            -1 if metric and metric.get("flow") == "outflow" else 1
+        )
+
+    categories.append(balance.get("label", "Net bütçe") + " (senaryo)")
+    values.append(end)
+    kinds.append("total")
+    ids.append(index.address(balance, "scenario"))
+    signs.append(1)
+
     return Component(
         type="waterfall_chart",
         id="money-waterfall",
-        title="Mali Etki Zinciri",
-        subtitle="Brüt gelirden net bütçe değişimine",
+        title="Net Bütçe Etkisi",
+        subtitle="Mevcut bütçeden senaryo bütçesine",
         unit="USD",
         semantic_type="monetary_change",
-        scope_type=net.get("scope_type"),
-        scope_name=net.get("scope_name"),
+        scope_type=balance.get("scope_type"),
+        scope_name=balance.get("scope_name"),
         span=SPAN["waterfall_chart"],
         categories=categories,
-        data={"gross": gross_change, "net": net_change},
+        data={"start": start, "end": end, "change": net_change},
         data_source_ids={
-            "gross": index.address(gross, "change"),
-            "net": index.address(net, "change"),
+            "start": index.address(balance, "baseline"),
+            "end": index.address(balance, "scenario"),
+            "change": index.address(balance, "change"),
         },
         series=[
             ChartSeries(
-                label="Mali etki",
-                role="positive" if net_change and net_change > 0 else "critical",
-                values=[gross_change, net_change - gross_change, net_change],
-                kinds=["increase", "decrease", "total"],
-                # Ortadaki kalem TÜRETİLMİŞTİR: net ile brüt farkı. Renderer
-                # bu farkı iki kaynaktan yeniden hesaplar.
-                derivation="difference",
-                source_metric_ids=[
-                    index.address(gross, "change"),
-                    f"{index.address(net, 'change')}|{index.address(gross, 'change')}",
-                    index.address(net, "change"),
-                ],
+                label="Net bütçe",
+                role="info",
+                values=values,
+                kinds=kinds,
+                value_signs=signs,
+                source_metric_ids=ids,
             )
         ],
-        source_metric_ids=[
-            index.address(gross, "change"),
-            index.address(net, "change"),
-        ],
-        source_keys=[gross["key"], net["key"]],
-        note=(
-            "Ek personel alımı ve fiziksel yatırım maliyetleri HESAPLANMADI; "
-            "bu kalemler grafiğe sıfır olarak konmamıştır."
-        ),
+        source_metric_ids=[i for i in ids if i],
+        source_keys=[balance["key"]]
+        + [c["metric"]["key"] for c in contributions if c["metric"]],
+        note=note,
         aria_label=(
-            f"Ek brüt gelir {gross_change:g} USD, net bütçe değişimi "
-            f"{net_change:g} USD"
+            f"Net bütçe {start:g} USD'den {end:g} USD'ye değişiyor; "
+            f"fark {net_change:g} USD"
         ),
+    )
+
+
+def _rule_expense_composition(index: MetricIndex) -> Optional[Component]:
+    """Gider kalemlerinin dağılımı → yatay karşılaştırma çubuğu.
+
+    Toplam kalemler dışarıda bırakılır: "toplam personel gideri" ile onun
+    bileşenlerini aynı grafikte göstermek okuyucuya iki kez saydırır.
+    """
+    outflows = [
+        m for m in index.by_semantic("monetary_change")
+        if m.get("flow") == "outflow" and not m.get("is_total") and index.has_both(m)
+    ]
+    if len(outflows) < 2:
+        return None
+    outflows.sort(key=lambda m: -(index.num(m, "baseline") or 0))
+    outflows = outflows[:4]
+
+    return Component(
+        type="horizontal_comparison_bar",
+        id="expense-composition",
+        title="Gider Kalemlerinin Dağılımı",
+        subtitle="Mevcut ve senaryo değerleri",
+        unit="USD",
+        semantic_type="distribution",
+        scope_type=outflows[0].get("scope_type"),
+        scope_name=outflows[0].get("scope_name"),
+        span=SPAN["horizontal_comparison_bar"],
+        categories=[m["label"] for m in outflows],
+        series=[
+            ChartSeries(
+                label="Mevcut", role="baseline",
+                values=[index.num(m, "baseline") for m in outflows],
+                source_metric_ids=[index.address(m, "baseline") for m in outflows],
+            ),
+            ChartSeries(
+                label="Senaryo", role="scenario",
+                values=[index.num(m, "scenario") for m in outflows],
+                source_metric_ids=[index.address(m, "scenario") for m in outflows],
+            ),
+        ],
+        source_metric_ids=[index.address(m, "baseline") for m in outflows]
+        + [index.address(m, "scenario") for m in outflows],
+        source_keys=[m["key"] for m in outflows],
+        aria_label="Gider kalemlerinin mevcut ve senaryo değerleri",
+    )
+
+
+def _rule_ratio(index: MetricIndex) -> Optional[Component]:
+    """Bir bütünün içindeki pay (%) → gauge grubu.
+
+    Karşılama oranından farkı: bu oran bir talebin karşılanmasını değil, bir
+    toplamın içindeki payı ölçer. Yine de görsel dili aynıdır.
+    """
+    metrics = [
+        m for m in index.by_semantic("utilization")
+        if index.has_both(m) and (index.num(m, "scenario") or 0) <= 100
+    ]
+    if not metrics:
+        return None
+
+    metrics.sort(key=lambda m: (index.scope_rank(m), m["key"]))
+    metrics = metrics[:2]
+
+    gauges: List[Component] = []
+    for metric in metrics:
+        baseline = index.num(metric, "baseline")
+        scenario = index.num(metric, "scenario")
+        gauges.append(
+            Component(
+                type="radial_gauge",
+                id="ratio-" + metric["key"],
+                title=metric["label"],
+                unit="%",
+                percent=scenario,
+                semantic_type="utilization",
+                scope_type=metric.get("scope_type"),
+                scope_name=metric.get("scope_name"),
+                tone="critical" if scenario > 60 else
+                     "warning" if scenario > 40 else "info",
+                data={
+                    "baseline": baseline,
+                    "scenario": scenario,
+                    "delta": round(scenario - baseline, 2),
+                },
+                data_source_ids={
+                    "baseline": index.address(metric, "baseline"),
+                    "scenario": index.address(metric, "scenario"),
+                    "delta": f"{index.address(metric, 'scenario')}|"
+                             f"{index.address(metric, 'baseline')}",
+                },
+                source_metric_ids=[
+                    index.address(metric, "baseline"),
+                    index.address(metric, "scenario"),
+                ],
+                source_keys=[metric["key"]],
+                formula=metric.get("formula"),
+                aria_label=(
+                    f"{metric['label']}: mevcut yüzde {baseline}, "
+                    f"senaryo yüzde {scenario}"
+                ),
+            )
+        )
+
+    return Component(
+        type="gauge_group",
+        id="ratio-group",
+        title="Gider İçindeki Pay",
+        subtitle="Ortadaki büyük değer senaryo sonucudur",
+        span=SPAN["gauge_group"],
+        semantic_type="utilization",
+        components=gauges,
+        source_metric_ids=[i for g in gauges for i in g.source_metric_ids],
+        source_keys=[k for g in gauges for k in g.source_keys],
     )
 
 
@@ -604,12 +815,14 @@ RULES: List[Callable[[MetricIndex], Optional[Component]]] = [
     _rule_target,
     _rule_coverage,
     _rule_money,
+    _rule_ratio,
     _rule_forecast,
     _rule_trend,
     _rule_risk_matrix,
     _rule_ranking,
     _rule_distribution,
     _rule_demand,
+    _rule_expense_composition,
 ]
 
 

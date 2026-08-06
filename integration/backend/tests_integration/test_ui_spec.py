@@ -15,6 +15,7 @@ işlediğini gösterir.
 
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List
 
 import pytest
@@ -321,22 +322,24 @@ def test_coverage_uses_gauges_or_valid_fallback(spec) -> None:
 
 
 def test_financial_impact_uses_a_waterfall_or_valid_fallback(spec) -> None:
-    """Gelir → operasyonel etki → net bütçe zinciri."""
+    """Gerçek kademeli şelale: başlangıç bütçesi → kalemler → sonuç bütçesi."""
     chart = next(
         (c for c in _charts(spec) if c.semantic_type == "monetary_change"), None
     )
     assert chart is not None, "Mali etki grafiği üretilmemiş."
     assert chart.type in _accepted("waterfall_chart")
-    assert chart.categories == [
-        "Ek brüt gelir", "Ek operasyonel etki", "Net bütçe değişimi"
-    ]
+
     series = chart.series[0]
-    assert series.kinds == ["increase", "decrease", "total"]
-    assert series.values[0] == 329840.0
-    assert series.values[2] == 257040.0
-    # Ortadaki kalem TÜRETİLMİŞ: net − brüt.
-    assert series.derivation == "difference"
-    assert "|" in series.source_metric_ids[1]
+    # İlk ve son sütun MUTLAK SEVİYEDİR (total); aradakiler hareket.
+    assert series.kinds[0] == "total" and series.kinds[-1] == "total"
+    assert all(k in ("increase", "decrease") for k in series.kinds[1:-1])
+    assert series.values[0] == 2900000.0     # mevcut net bütçe
+    assert series.values[-1] == 3157040.0    # senaryo net bütçesi
+    assert "mevcut" in chart.categories[0].lower()
+    assert "senaryo" in chart.categories[-1].lower()
+
+    # Ara kalemlerin toplamı, iki uç arasındaki farka EŞİT olmalı.
+    assert abs(sum(series.values[1:-1]) - (series.values[-1] - series.values[0])) < 0.51
 
 
 def _accepted(preferred: str) -> set:
@@ -470,7 +473,8 @@ def test_chart_values_equal_their_declared_sources(spec, structured) -> None:
                 address = (series.source_metric_ids or [None] * len(series.values))[i]
                 if not address or value is None:
                     continue
-                expected = _resolve(address, structured)
+                sign = (series.value_signs or [None] * len(series.values))[i] or 1
+                expected = _resolve(address, structured) * sign
                 assert abs(value - expected) < 0.005, (
                     f"{chart.type} → {address}: {value} ≠ {expected}"
                 )
@@ -533,9 +537,17 @@ def test_uncalculated_costs_never_appear_as_zero(spec) -> None:
     waterfall = next(c for c in _charts(spec) if c.type == "waterfall_chart")
     for value in waterfall.series[0].values:
         assert value not in (0, 0.0), "Şelalede sıfır değerli kalem var."
-    assert len(waterfall.categories) == 3, "Beklenmeyen kalem eklenmiş."
     assert not any("personel maliyeti" in c.lower() for c in waterfall.categories)
     assert not any("yatırım" in c.lower() for c in waterfall.categories)
+    # Açıklanamayan fark uydurulmuş bir kalem adıyla değil, "diğer kalemler"
+    # olarak yazılır ve kaynağı olmadığı açıkça bildirilir.
+    residual = [
+        i for i, label in enumerate(waterfall.categories)
+        if "diğer kalemlerin etkisi" in label.lower()
+    ]
+    for i in residual:
+        assert waterfall.series[0].source_metric_ids[i] is None
+        assert "fark" in (waterfall.note or "").lower()
 
 
 def test_uncalculated_costs_are_shown_as_a_visible_warning(spec) -> None:
@@ -548,9 +560,9 @@ def test_uncalculated_costs_are_shown_as_a_visible_warning(spec) -> None:
     assert warning.items == ui_spec_builder.UNCALCULATED_COSTS
     assert ui_spec_builder.COST_EXCLUSION_WARNING in (warning.note or "")
 
-    # Grafiğin kendisi de aynı uyarıyı taşır.
-    waterfall = next(c for c in _charts(spec) if c.type == "waterfall_chart")
-    assert "HESAPLANMADI" in (waterfall.note or "")
+    # Uyarı öğrenci senaryosuna aittir; maaş senaryosunda görünmez
+    # (bkz. test_salary_panel_does_not_show_capacity_investment_warning).
+    assert warning.title == "Hesaplanmayan maliyetler"
 
 
 # ===========================================================================
@@ -819,7 +831,9 @@ def test_ui_spec_is_absent_for_general_questions(db, monkeypatch) -> None:
     assert result["ui_spec"] is None
 
 
-def test_ui_fixture_for_the_frontend_test_is_regenerated(spec, structured) -> None:
+def test_ui_fixture_for_the_frontend_test_is_regenerated(
+    spec, structured, salary_spec, salary_structured
+) -> None:
     """Arayüz testinin örnek dosyalarını GERÇEK builder çıktısıyla tazeler.
 
     Elle yazılmış bir örnek, backend değiştiğinde sessizce eskir ve arayüz
@@ -838,7 +852,399 @@ def test_ui_fixture_for_the_frontend_test_is_regenerated(spec, structured) -> No
 
     write("ui_spec_sample.json", spec.model_dump(mode="json"))
     write("structured_result_sample.json", structured)
+    # Maaş senaryosu da örnekleniyor: arayüz testi iki farklı senaryo
+    # türünün aynı çiziciyle doğru çizildiğini doğrulayabilsin.
+    write("ui_spec_salary_sample.json", salary_spec.model_dump(mode="json"))
+    write("structured_result_salary_sample.json", salary_structured)
 
     written = json.loads((folder / "ui_spec_sample.json").read_text(encoding="utf-8"))
     UiSpec.model_validate(written)
     assert written["view_type"] == "scenario_dashboard"
+
+
+# ===========================================================================
+# MAAŞ SENARYOSU — semantik ve mali sunum
+#
+# Bulunan hata: %10 zam senaryosunda şelale grafiği 612.000 USD'yi ÖNCE
+# "ek brüt gelir" olarak gösteriyor, sonra aynı tutarı gider tarafında bir
+# kez daha sayıyordu. Maaş artışı gelir değildir ve bir kez sayılır.
+# ===========================================================================
+
+
+@pytest.fixture(scope="module")
+def salary_output(db):
+    tool = registry.get("run_staff_salary_scenario")
+    return tool.handler(
+        db, tool.input_model(academic_year=YEAR, salary_change_percentage=10)
+    )
+
+
+@pytest.fixture(scope="module")
+def salary_composed(salary_output):
+    return response_composer.compose("run_staff_salary_scenario", salary_output)
+
+
+@pytest.fixture(scope="module")
+def salary_structured(salary_composed) -> Dict[str, Any]:
+    return salary_composed.structured_result
+
+
+@pytest.fixture(scope="module")
+def salary_spec(salary_structured, salary_composed) -> UiSpec:
+    built = ui_spec_builder.build_ui_spec(
+        salary_structured,
+        data_sources=["Mali dönem kayıtları", "Akademik personel kayıtları"],
+        calculated_at=datetime(2026, 1, 1, 12, 0, 0),
+        interpretation="### Yönetim değerlendirmesi\n- Bütçe baskısı artıyor.",
+        markdown=salary_composed.facts_markdown,
+    )
+    assert built is not None
+    return built
+
+
+def _salary_index(structured: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {m["key"]: m for m in structured["metrics"]}
+
+
+# --- 1. Hesabın kendisi ---
+
+
+def test_ten_percent_raise_costs_six_hundred_twelve_thousand(salary_output) -> None:
+    """6.120.000 × %10 = 612.000 USD ek gider."""
+    assert salary_output.previous_annual_staff_cost_usd == Decimal("6120000.00")
+    assert salary_output.new_annual_staff_cost_usd == Decimal("6732000.00")
+    assert salary_output.cost_change_usd == Decimal("612000.00")
+    assert (
+        salary_output.new_annual_staff_cost_usd
+        - salary_output.previous_annual_staff_cost_usd
+        == Decimal("612000.00")
+    )
+
+
+def test_net_balance_falls_by_exactly_the_extra_cost(salary_output) -> None:
+    """Taban 2.900.000 ise senaryo 2.288.000 olur; değişim −612.000 USD."""
+    assert salary_output.previous_net_balance_usd == Decimal("2900000.00")
+    assert salary_output.new_net_balance_usd == Decimal("2288000.00")
+    assert salary_output.net_balance_change_usd == Decimal("-612000.00")
+    assert salary_output.net_balance_change_usd == -salary_output.cost_change_usd
+
+
+def test_salary_increase_is_never_reported_as_revenue(salary_structured) -> None:
+    """Maaş artışı bir GELİR metriği değildir; gelir değişmez."""
+    index = _salary_index(salary_structured)
+
+    revenue = index["university_total_revenue"]
+    assert revenue["flow"] == "inflow"
+    assert revenue["change"] == 0
+    assert revenue["baseline"] == revenue["scenario"]
+
+    # Personel gideri kalemleri gelir olarak etiketlenmiş olamaz.
+    for key in ("annual_staff_cost", "administrative_staff_cost",
+                "total_personnel_cost"):
+        assert index[key]["flow"] == "outflow", key
+
+    # 612.000 USD hiçbir gelir kaleminde geçmiyor.
+    for metric in salary_structured["metrics"]:
+        if metric.get("flow") == "inflow":
+            assert metric.get("change") in (0, 0.0, None), metric["key"]
+
+
+def test_the_same_amount_is_not_counted_twice_in_the_waterfall(salary_spec) -> None:
+    """612.000 USD şelalede yalnızca BİR kez yer alır."""
+    waterfall = next(c for c in _charts(salary_spec) if c.type == "waterfall_chart")
+    series = waterfall.series[0]
+
+    steps = series.values[1:-1]   # uçlar mutlak seviye, aradakiler hareket
+    assert steps == [-612000.0], f"Beklenmeyen kalemler: {steps}"
+    assert sum(1 for v in series.values if abs(v) == 612000.0) == 1
+
+    # Toplam kalemler katkı olarak KULLANILMAZ.
+    index = _salary_index(
+        {"metrics": [
+            {"key": k} for k in waterfall.source_keys
+        ]}
+    )
+    assert "total_expenditure" not in index
+    assert "total_personnel_cost" not in index
+
+
+def test_waterfall_runs_from_opening_balance_to_closing_balance(salary_spec) -> None:
+    """Başlangıç bütçesi → gider etkisi → sonuç bütçesi."""
+    waterfall = next(c for c in _charts(salary_spec) if c.type == "waterfall_chart")
+    series = waterfall.series[0]
+
+    assert series.values[0] == 2900000.0
+    assert series.values[-1] == 2288000.0
+    assert series.kinds[0] == "total"
+    assert series.kinds[-1] == "total"
+    assert series.kinds[1] == "decrease"
+    assert "mevcut" in waterfall.categories[0].lower()
+    assert "senaryo" in waterfall.categories[-1].lower()
+
+    # Kademeler kapanıyor: 2.900.000 − 612.000 = 2.288.000
+    assert abs(
+        series.values[0] + sum(series.values[1:-1]) - series.values[-1]
+    ) < 0.51
+
+
+def test_waterfall_has_no_revenue_step_in_a_salary_scenario(salary_spec) -> None:
+    """Gelir değişmediği için şelalede gelir sütunu YOKTUR."""
+    waterfall = next(c for c in _charts(salary_spec) if c.type == "waterfall_chart")
+    labels = " ".join(waterfall.categories).lower()
+    assert "gelir" not in labels
+    assert not any(v > 0 for v in waterfall.series[0].values[1:-1])
+
+
+# --- 2. Sorudaki bütün metrikler ---
+
+
+def test_personnel_expense_ratio_is_visible_on_screen(salary_spec, salary_structured) -> None:
+    """Sorulan oran hem structured_result'ta hem ekranda var."""
+    index = _salary_index(salary_structured)
+    ratio = index["academic_personnel_expense_ratio"]
+    assert ratio["baseline"] == 18.51    # 6.120.000 / 33.060.000
+    assert ratio["scenario"] == 19.99    # 6.732.000 / 33.672.000
+    assert "toplam kurum harcaması" in ratio["formula"].lower()
+
+    card = next(
+        c for c in _section(salary_spec, "metric_grid").components
+        if c.title == "Personel gideri payı"
+    )
+    assert card.baseline_label == "%18,51"
+    assert card.scenario_label == "%19,99"
+    assert "puan" in card.delta_label
+
+
+def test_every_metric_asked_in_the_question_has_a_card(salary_spec) -> None:
+    """Soru gider, net bütçe ve oranı soruyor; üçü de kart olarak var."""
+    titles = [c.title for c in _section(salary_spec, "metric_grid").components]
+    assert "Akademik personel gideri" in titles
+    assert "Net bütçe" in titles
+    assert "Personel gideri payı" in titles
+    assert "Toplam kurum harcaması" in titles
+    assert len(titles) <= 5
+
+
+def test_academic_and_administrative_personnel_are_separate(
+    salary_spec, salary_structured
+) -> None:
+    """Akademik gider "toplam personel gideri" diye etiketlenemez."""
+    index = _salary_index(salary_structured)
+
+    assert index["annual_staff_cost"]["label"] == "Akademik personel gideri"
+    assert index["administrative_staff_cost"]["label"] == "İdari personel gideri"
+    assert index["total_personnel_cost"]["label"] == "Toplam personel gideri"
+    assert index["total_expenditure"]["label"] == "Toplam kurum harcaması"
+
+    # Toplam = akademik + idari, her iki durumda da.
+    for field in ("baseline", "scenario"):
+        assert (
+            index["total_personnel_cost"][field]
+            == index["annual_staff_cost"][field]
+            + index["administrative_staff_cost"][field]
+        ), field
+
+    # İdari maaşlar değişmedi.
+    admin = index["administrative_staff_cost"]
+    assert admin["baseline"] == admin["scenario"] == 2090000.0
+    assert admin["change"] == 0
+
+    card = next(
+        c for c in _section(salary_spec, "metric_grid").components
+        if c.title == "İdari personel gideri"
+    )
+    assert card.delta_label == "Değişmedi"
+
+
+# --- 3. Senaryoya uygun uyarı ---
+
+
+def test_salary_panel_does_not_show_capacity_investment_warning(salary_spec) -> None:
+    """Kapasite yatırım uyarısı ÖĞRENCİ senaryosuna aittir."""
+    text = " ".join(
+        " ".join(filter(None, [c.title, c.note, " ".join(c.items)]))
+        for c in _all(salary_spec)
+    )
+    assert "Fiziksel yatırım maliyeti hesaplanmadı" not in text
+    assert "Ek personel maliyeti hesaplanmadı" not in text
+    assert ui_spec_builder.COST_EXCLUSION_WARNING not in text
+
+
+def test_salary_panel_shows_its_own_assumptions(salary_spec) -> None:
+    """Neyin sabit tutulduğu ve neyin kapsam dışı olduğu ekranda yazar."""
+    box = next(
+        c for c in _default_view(salary_spec)
+        if c.type == "information_box" and c.id == "scenario-assumptions"
+    )
+    joined = " ".join(box.items).lower()
+    assert "akademik kadro sayısı sabit" in joined
+    assert "idari personel maaşları" in joined
+    assert "ek ders" in joined
+    assert "yan haklar" in joined and "işveren yükleri" in joined
+    assert "döviz kuru sabit" in joined
+
+
+# --- 4. Risk ve başlık ---
+
+
+def test_risk_level_is_derived_from_thresholds_with_a_stated_reason(
+    salary_spec, salary_structured
+) -> None:
+    """Risk seviyesi sabit değil; eşikten türetiliyor ve sebebi yazılıyor."""
+    index = _salary_index(salary_structured)
+    level, reason = ui_spec_builder._risk_assessment(index)
+
+    # Net bütçe %21,1 geriliyor; kritik eşik %20.
+    assert level == "critical"
+    assert "net bütçe" in reason.lower()
+    assert "eşik" in reason.lower()
+
+    summary = _section(salary_spec, "decision_summary").components[0]
+    assert summary.level == "critical"
+    assert summary.subtitle == reason
+    assert any("risk" in b.label.lower() for b in summary.badges)
+
+
+def test_risk_level_changes_with_the_data() -> None:
+    """Aynı panel, veri değişince farklı seviye üretmeli."""
+    def build(baseline: float, scenario: float, ratio: float):
+        return {
+            "university_net_balance": {
+                "key": "university_net_balance", "label": "Net bütçe",
+                "baseline": baseline, "scenario": scenario, "change": scenario - baseline,
+            },
+            "total_personnel_expense_ratio": {
+                "key": "total_personnel_expense_ratio", "label": "Pay",
+                "baseline": ratio, "scenario": ratio,
+            },
+        }
+
+    # Küçük gerileme, düşük pay → eşik aşılmıyor.
+    assert ui_spec_builder._risk_assessment(build(1000.0, 990.0, 10.0))[0] == "info"
+    # %15 gerileme → uyarı eşiği.
+    assert ui_spec_builder._risk_assessment(build(1000.0, 850.0, 10.0))[0] == "warning"
+    # Bütçe açığa düşüyor → kritik.
+    assert ui_spec_builder._risk_assessment(build(1000.0, -50.0, 10.0))[0] == "critical"
+    # Personel payı kritik eşiği aşıyor.
+    assert ui_spec_builder._risk_assessment(build(1000.0, 995.0, 45.0))[0] == "critical"
+
+
+def test_decision_summary_is_decision_oriented(salary_spec) -> None:
+    """Genel şablon cümle yerine karar cümlesi."""
+    summary = _section(salary_spec, "decision_summary").components[0]
+    assert "hesaplanan sonuçlar aşağıdadır" not in summary.title.lower()
+    assert "612.000 USD" in summary.title
+    assert "net bütçe" in summary.title.lower()
+    assert summary.title.startswith("%10")
+    assert len(summary.title) <= 220
+
+
+def test_salary_panel_title_states_the_raise(salary_spec) -> None:
+    assert salary_spec.title == "Akademik Personel Maaş Senaryosu — %10 Zam"
+    assert salary_spec.view_type == "financial_dashboard"
+
+
+# --- 5. Grafik seçimi ---
+
+
+def test_salary_panel_shows_no_student_or_capacity_charts(salary_spec) -> None:
+    """Öğrenci, derslik veya laboratuvar bileşeni gösterilmez."""
+    text = " ".join(
+        " ".join(filter(None, [c.title, c.subtitle]))
+        for c in _all(salary_spec) if c.type in CHART_TYPES or c.type == "kpi_card"
+    ).lower()
+    for forbidden in ("öğrenci sayısı", "derslik", "laboratuvar", "fte"):
+        assert forbidden not in text, forbidden
+
+
+def test_salary_panel_charts_match_the_data_meaning(salary_spec) -> None:
+    """Önce–sonra, net bütçe, oran ve dağılım grafikleri."""
+    types = [c.type for c in _charts(salary_spec)]
+    assert "dumbbell_chart" in types      # maaş gideri önce–sonra
+    assert "waterfall_chart" in types     # net bütçe etkisi
+    assert "gauge_group" in types         # personel gider oranı
+    assert len(types) <= 4
+    assert len(types) == len(set(types))
+
+    dumbbell = next(c for c in _charts(salary_spec) if c.type == "dumbbell_chart")
+    assert dumbbell.data == {
+        "baseline": 6120000.0, "scenario": 6732000.0, "delta": 612000.0
+    }
+
+
+def test_unchanged_metrics_do_not_produce_charts(salary_spec) -> None:
+    """180 → 180 kadro sayısı grafik üretmez."""
+    for chart in _charts(salary_spec):
+        for series in chart.series:
+            values = [v for v in series.values if v is not None]
+            if len(values) >= 2 and chart.type == "dumbbell_chart":
+                assert values[0] != values[1], f"{chart.title} hareketsiz"
+
+
+# --- 6. Sayının kaynağı ---
+
+
+def test_every_salary_number_resolves_to_structured_result(
+    salary_spec, salary_structured
+) -> None:
+    """KPI ve grafiklerin bütün değerleri structured_result içinden gelir."""
+    for address in _addresses(salary_spec):
+        _resolve(address, salary_structured)
+
+    for card in _section(salary_spec, "metric_grid").components:
+        assert card.source_metric_ids, card.title
+        for address in card.source_metric_ids:
+            _resolve(address, salary_structured)
+
+    for chart in _charts(salary_spec):
+        for series in chart.series:
+            for i, value in enumerate(series.values):
+                address = (series.source_metric_ids or [None] * len(series.values))[i]
+                if not address or value is None:
+                    continue
+                # İşaret bildirilmişse uygulanır: gider ARTIŞI kaynakta
+                # pozitiftir ama bütçe şelalesinde aşağı iner.
+                sign = (series.value_signs or [None] * len(series.values))[i] or 1
+                expected = _resolve(address, salary_structured) * sign
+                assert abs(value - expected) < 0.005, (
+                    f"{chart.type} → {address}: {value} ≠ {expected}"
+                )
+
+
+def test_administrative_salaries_are_not_inflated_by_the_exchange_rate(db) -> None:
+    """İdari personel gideri artık teknoloji kalemine düşmüyor.
+
+    Türkçe küçük harf hatası yüzünden "İdari personel giderleri" teknoloji
+    kovasına yazılıyordu; teknoloji kalemi projeksiyonda DÖVİZ KURUYLA
+    büyüdüğü için idari maaşlar kur değişiminden etkileniyordu.
+    """
+    from app.schemas.scenarios import ScenarioInputCreate
+    from app.services.scenario_baseline_builder import build_from_financial_period
+    from app.services.scenario_engine import calculate
+
+    baseline = build_from_financial_period(db, YEAR)
+    assert baseline.annual_personnel_expense == Decimal("6120000.00")
+    assert baseline.annual_administrative_personnel_expense == Decimal("2090000.00")
+
+    # Kur %50 artsa bile idari personel gideri değişmez.
+    computation = calculate(
+        baseline, ScenarioInputCreate(exchange_rate_change_percent=Decimal("50"))
+    )
+    assert (
+        computation.projected_administrative_personnel_expense
+        == computation.baseline_administrative_personnel_expense
+    )
+
+    # Toplam taban gideri, düzeltmeden ÖNCEKİ değerle aynı kalmalı.
+    assert computation.baseline_expenditure == Decimal("33060000.00")
+
+
+def test_old_enrollment_panel_still_works(spec) -> None:
+    """Eski öğrenci senaryosu ekranı bozulmadı."""
+    assert spec.view_type == "scenario_dashboard"
+    titles = [c.title for c in _section(spec, "metric_grid").components]
+    assert "Öğrenci sayısı" in titles
+    assert "Program FTE açığı" in titles
+    types = [c.type for c in _charts(spec)]
+    assert "dumbbell_chart" in types and "bullet_chart" in types
+    assert "gauge_group" in types and "waterfall_chart" in types

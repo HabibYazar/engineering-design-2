@@ -169,6 +169,11 @@ def _decision_summary(
     etki olumlu mu, kapasite açığı büyüyor mu. Metrikleri olmayan bir
     senaryoda ilgili cümle parçası hiç yazılmaz.
     """
+    # Maaş senaryosunun kendi karar cümlesi. "Kurum için hesaplanan sonuçlar
+    # aşağıdadır" bir karar özeti değil, bir dolgu cümlesidir.
+    if structured.get("type") == "staff_salary_scenario":
+        return _salary_decision_summary(structured, index, scope_name)
+
     clauses: List[str] = []
 
     students = index.get("program_student_count")
@@ -220,31 +225,169 @@ def _decision_summary(
         sentence += "."
 
     badges = [Badge(label=b, tone=t) for b, t in _badges(structured, index, scope_name)]
+    level, reason = _risk_assessment(index)
 
     return Component(
         type="decision_summary",
         id="decision-summary",
         title=sentence,
+        subtitle=reason,   # risk seviyesinin gerekçesi burada görünür
         span=12,
+        level=level,
         badges=badges,
-        aria_label="Karar özeti: " + sentence,
+        aria_label="Karar özeti: " + sentence + " " + reason,
     )
 
 
-def _risk_level(index: Dict[str, Dict[str, Any]]) -> str:
-    """Panelin genel risk seviyesi. Metriklerden türetilir, tahmin edilmez."""
+def _salary_decision_summary(
+    structured: Dict[str, Any], index: Dict[str, Dict[str, Any]], scope_name: str
+) -> Component:
+    """Maaş senaryosunun karar cümlesi — doğrulanmış metriklerden kurulur."""
+    academic = index.get("annual_staff_cost")
+    balance = index.get("university_net_balance")
+    ratio = index.get("academic_personnel_expense_ratio")
+
+    cost_change = _num(academic, "change")
+    balance_change = _num(balance, "change")
+
+    percent_text = ""
+    baseline_cost = _num(academic, "baseline")
+    if cost_change and baseline_cost:
+        percent_text = f"%{round(cost_change / baseline_cost * 100)} akademik maaş artışı "
+
+    parts: List[str] = []
+    if cost_change is not None:
+        parts.append(
+            f"yıllık akademik personel giderini {_fmt_usd(abs(cost_change))} "
+            + ("artırıyor" if cost_change > 0 else "azaltıyor")
+        )
+    if balance_change is not None:
+        same = (
+            cost_change is not None
+            and abs(abs(balance_change) - abs(cost_change)) < 0.51
+        )
+        parts.append(
+            ("ve net bütçeyi aynı tutarda " if same else "ve net bütçeyi ")
+            + ("azaltıyor" if balance_change < 0 else "artırıyor")
+            + ("" if same else f" ({_fmt_usd(abs(balance_change))})")
+        )
+    if ratio is not None and _num(ratio, "scenario") is not None:
+        parts.append(
+            "personel gideri payı "
+            + _fmt_percent(_num(ratio, "baseline")) + " → "
+            + _fmt_percent(_num(ratio, "scenario"))
+        )
+
+    # "artırıyor, ve net bütçeyi" olmasın: ikinci parça zaten "ve" ile
+    # başlıyor, araya virgül girmemeli.
+    sentence = (percent_text + " ".join(parts[:2])).strip()
+    if len(parts) > 2:
+        sentence += "; " + parts[2]
+    if not sentence:
+        sentence = "Maaş senaryosunun hesaplanan sonuçları aşağıdadır"
+    sentence = sentence[0].upper() + sentence[1:] + "."
+
+    badges = [Badge(label=b, tone=t) for b, t in _badges(structured, index, scope_name)]
+    level, reason = _risk_assessment(index)
+    return Component(
+        type="decision_summary",
+        id="decision-summary",
+        title=sentence,
+        subtitle=reason,   # risk seviyesinin gerekçesi burada görünür
+        span=12,
+        level=level,
+        badges=badges,
+        aria_label="Karar özeti: " + sentence + " " + reason,
+    )
+
+
+# Kurumun tanımlı risk eşikleri. Sabit metin yerine SAYISAL EŞİK: seviye
+# değiştiğinde neden değiştiği de gösterilebilsin diye eşikler burada,
+# tek yerde duruyor.
+RISK_THRESHOLDS = {
+    # Talebin karşılanan oranı bu değerin altına inerse
+    "coverage_critical": 50.0,
+    "coverage_warning": 80.0,
+    # Net bütçe bu oranda gerilerse (yüzde)
+    "budget_drop_critical": 20.0,
+    "budget_drop_warning": 10.0,
+    # Personel gideri toplam harcamanın bu payını aşarsa
+    "personnel_ratio_critical": 40.0,
+    "personnel_ratio_warning": 30.0,
+}
+
+
+def _risk_assessment(index: Dict[str, Dict[str, Any]]) -> Tuple[str, str]:
+    """Panelin risk seviyesi ve SEBEBİ.
+
+    Seviye sabit değil, doğrulanmış metriklerden ve `RISK_THRESHOLDS`
+    eşiklerinden türetilir. Sebep metni kullanıcıya gösterilir; "Düşük risk"
+    yazıp gerekçesini saklamak bir karar destek sisteminde işe yaramaz.
+    """
+    reasons: List[Tuple[str, str]] = []  # (seviye, sebep)
+
+    # --- Kapasite karşılama oranı ---
     coverages = [
-        _num(index.get(k), "scenario")
-        for k in index
-        if k.endswith("_coverage") and _num(index.get(k), "scenario") is not None
+        (key, _num(index.get(key), "scenario"))
+        for key in index
+        if key.endswith("_coverage") and _num(index.get(key), "scenario") is not None
     ]
-    if coverages and min(coverages) < 50:
-        return "critical"
+    if coverages:
+        key, worst = min(coverages, key=lambda pair: pair[1])
+        label = index[key].get("label", key)
+        if worst < RISK_THRESHOLDS["coverage_critical"]:
+            reasons.append(("critical", f"{label} " + _fmt_percent(worst) + " — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["coverage_critical"])))
+        elif worst < RISK_THRESHOLDS["coverage_warning"]:
+            reasons.append(("warning", f"{label} " + _fmt_percent(worst) + " — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["coverage_warning"])))
+
+    # --- Kadro açığının büyümesi ---
     if _num(index.get("program_marginal_fte"), "change"):
-        return "critical"
-    if coverages and min(coverages) < 80:
-        return "warning"
-    return "info"
+        reasons.append(
+            ("critical", "senaryo mevcut akademik kadro açığını büyütüyor")
+        )
+
+    # --- Net bütçedeki gerileme ve bütçenin işareti ---
+    balance = index.get("university_net_balance")
+    baseline_balance = _num(balance, "baseline")
+    scenario_balance = _num(balance, "scenario")
+    if scenario_balance is not None and scenario_balance < 0:
+        reasons.append(("critical", "senaryo sonrası bütçe açık veriyor"))
+    elif baseline_balance and scenario_balance is not None:
+        drop = (baseline_balance - scenario_balance) / abs(baseline_balance) * 100
+        if drop >= RISK_THRESHOLDS["budget_drop_critical"]:
+            reasons.append(("critical", "net bütçe " + _fmt_percent(drop) + " geriliyor — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["budget_drop_critical"])))
+        elif drop >= RISK_THRESHOLDS["budget_drop_warning"]:
+            reasons.append(("warning", "net bütçe " + _fmt_percent(drop) + " geriliyor — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["budget_drop_warning"])))
+
+    # --- Personel giderinin toplam harcamadaki payı ---
+    ratio = _num(index.get("total_personnel_expense_ratio"), "scenario")
+    if ratio is None:
+        ratio = _num(index.get("academic_personnel_expense_ratio"), "scenario")
+    if ratio is not None:
+        if ratio >= RISK_THRESHOLDS["personnel_ratio_critical"]:
+            reasons.append(("critical", "personel gideri payı " + _fmt_percent(ratio) + " — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["personnel_ratio_critical"])))
+        elif ratio >= RISK_THRESHOLDS["personnel_ratio_warning"]:
+            reasons.append(("warning", "personel gideri payı " + _fmt_percent(ratio) + " — eşik "
+                            + _fmt_percent(RISK_THRESHOLDS["personnel_ratio_warning"])))
+
+    if not reasons:
+        return "info", "Tanımlı risk eşiklerinin hiçbiri aşılmadı."
+
+    order = {"critical": 0, "warning": 1, "info": 2}
+    reasons.sort(key=lambda pair: order[pair[0]])
+    level = reasons[0][0]
+    matching = [text for lvl, text in reasons if lvl == level]
+    return level, "Sebep: " + "; ".join(matching[:2]) + "."
+
+
+def _risk_level(index: Dict[str, Dict[str, Any]]) -> str:
+    """Geriye dönük uyumluluk için yalnızca seviye."""
+    return _risk_assessment(index)[0]
 
 
 def _badges(
@@ -445,6 +588,164 @@ def _enrollment_kpis(index: Dict[str, Dict[str, Any]]) -> List[Component]:
     return cards[:5]
 
 
+# ---------------------------------------------------------------------------
+# Maaş senaryosu KPI kartları
+# ---------------------------------------------------------------------------
+
+
+def _money_kpi(
+    metric: Optional[Dict[str, Any]], *, title: str, icon: str, caption: str,
+    good_when: str = "up", percent_of: Optional[Dict[str, Any]] = None,
+) -> Optional[Component]:
+    """Parasal bir kalemin mevcut → senaryo kartı."""
+    if metric is None:
+        return None
+    baseline = _num(metric, "baseline")
+    scenario = _num(metric, "scenario")
+    delta = _num(metric, "change")
+    if delta is None and None not in (baseline, scenario):
+        delta = round(scenario - baseline, 2)
+
+    # Değişmeyen kalemde "0 USD" yazmak okuyucuya bir hesap yapılmış gibi
+    # gelir; "Değişmedi" ne olduğunu söyler.
+    delta_text = "Değişmedi" if delta == 0 else _signed(delta, _fmt_usd)
+    # Yüzdesel değişim de yazılır: "+612.000 USD" tek başına büyüklüğü
+    # anlatmıyor, "%10" anlatıyor. İşaret zaten tutarda var; yüzde mutlak
+    # değerle ve yön kelimesiyle yazılır ("%-21,1" okunmuyor).
+    if delta and baseline:
+        ratio = abs(delta / baseline * 100)
+        direction = "artış" if delta > 0 else "azalış"
+        delta_text += f" ({_fmt_percent(ratio)} {direction})"
+
+    sentiment = "neutral"
+    if delta:
+        sentiment = "positive" if (delta > 0) == (good_when == "up") else "negative"
+
+    return Component(
+        type="kpi_card",
+        id="kpi-" + metric["key"],
+        title=title,
+        icon=icon,
+        span=12,
+        unit="USD",
+        value=_fmt_usd(scenario),
+        value_number=scenario,
+        baseline_label=_fmt_usd(baseline),
+        scenario_label=_fmt_usd(scenario),
+        delta_label=delta_text,
+        trend=_trend(delta),
+        sentiment=sentiment,
+        caption=caption,
+        semantic_type=metric.get("semantic_type"),
+        scope_type=metric.get("scope_type"),
+        scope_name=metric.get("scope_name"),
+        data={"baseline": baseline, "scenario": scenario, "delta": delta},
+        data_source_ids={
+            k: v for k, v in {
+                "baseline": _addr(metric, "baseline"),
+                "scenario": _addr(metric, "scenario"),
+                "delta": _addr(metric, "change"),
+            }.items() if v
+        },
+        source_metric_ids=_ids((metric, "baseline"), (metric, "scenario")),
+        source_keys=[metric["key"]],
+        formula=metric.get("formula"),
+        note=metric.get("note"),
+        aria_label=(
+            f"{title}: mevcut {_fmt_usd(baseline)}, senaryo {_fmt_usd(scenario)}"
+        ),
+    )
+
+
+def _salary_kpis(index: Dict[str, Dict[str, Any]]) -> List[Component]:
+    """Sorulan bütün göstergeler: gider, net bütçe, oran, toplam harcama.
+
+    Sıra sorunun sırasıdır. "Toplam personel gideri" ile "akademik personel
+    gideri" AYRI kartlardır: yalnızca akademik gideri "toplam" diye
+    etiketlemek yöneticiyi 2,09 milyon USD yanıltırdı.
+    """
+    cards: List[Component] = []
+
+    cards.append(
+        _money_kpi(
+            index.get("annual_staff_cost"),
+            title="Akademik personel gideri", icon="staff",
+            caption="Zam yalnızca bu kaleme uygulandı", good_when="down",
+        )
+    )
+    cards.append(
+        _money_kpi(
+            index.get("university_net_balance"),
+            title="Net bütçe", icon="money",
+            caption="Toplam gelir − toplam harcama", good_when="up",
+        )
+    )
+
+    ratio = index.get("academic_personnel_expense_ratio")
+    if ratio:
+        baseline = _num(ratio, "baseline")
+        scenario = _num(ratio, "scenario")
+        delta = None if None in (baseline, scenario) else round(scenario - baseline, 2)
+        cards.append(
+            Component(
+                type="kpi_card",
+                id="kpi-" + ratio["key"],
+                title="Personel gideri payı",
+                icon="metric",
+                span=12,
+                unit="%",
+                value=_fmt_percent(scenario),
+                value_number=scenario,
+                baseline_label=_fmt_percent(baseline),
+                scenario_label=_fmt_percent(scenario),
+                delta_label=_fmt_points(delta),
+                trend=_trend(delta),
+                sentiment="negative" if (delta or 0) > 0 else "positive",
+                caption="Akademik gider / toplam harcama",
+                level=(
+                    "critical"
+                    if (scenario or 0) >= RISK_THRESHOLDS["personnel_ratio_critical"]
+                    else "warning"
+                    if (scenario or 0) >= RISK_THRESHOLDS["personnel_ratio_warning"]
+                    else None
+                ),
+                semantic_type=ratio.get("semantic_type"),
+                scope_type=ratio.get("scope_type"),
+                scope_name=ratio.get("scope_name"),
+                data={"baseline": baseline, "scenario": scenario, "delta": delta},
+                data_source_ids={
+                    "baseline": _addr(ratio, "baseline"),
+                    "scenario": _addr(ratio, "scenario"),
+                    "delta": f"{_addr(ratio, 'scenario')}|{_addr(ratio, 'baseline')}",
+                },
+                source_metric_ids=_ids((ratio, "baseline"), (ratio, "scenario")),
+                source_keys=[ratio["key"]],
+                formula=ratio.get("formula"),
+                aria_label=(
+                    f"Personel gideri payı: mevcut yüzde {baseline}, "
+                    f"senaryo yüzde {scenario}"
+                ),
+            )
+        )
+
+    cards.append(
+        _money_kpi(
+            index.get("total_expenditure"),
+            title="Toplam kurum harcaması", icon="university",
+            caption="Bütün gider kalemlerinin toplamı", good_when="down",
+        )
+    )
+    cards.append(
+        _money_kpi(
+            index.get("administrative_staff_cost"),
+            title="İdari personel gideri", icon="staff",
+            caption="Bu senaryoda değişmedi", good_when="down",
+        )
+    )
+
+    return [c for c in cards if c is not None][:5]
+
+
 def _generic_kpis(structured: Dict[str, Any]) -> List[Component]:
     """Senaryo dışındaki sonuç türleri için genel KPI kartları."""
     cards: List[Component] = []
@@ -610,6 +911,159 @@ def _risk_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
 # ---------------------------------------------------------------------------
 
 
+def _salary_risk_cards(index: Dict[str, Dict[str, Any]]) -> List[Component]:
+    """Maaş senaryosunun kompakt risk kartları."""
+    cards: List[Component] = []
+
+    balance = index.get("university_net_balance")
+    baseline_balance = _num(balance, "baseline")
+    scenario_balance = _num(balance, "scenario")
+    change = _num(balance, "change")
+    if balance and scenario_balance is not None:
+        drop = (
+            (baseline_balance - scenario_balance) / abs(baseline_balance) * 100
+            if baseline_balance else 0
+        )
+        level = (
+            "critical" if scenario_balance < 0
+            or drop >= RISK_THRESHOLDS["budget_drop_critical"]
+            else "warning" if drop >= RISK_THRESHOLDS["budget_drop_warning"]
+            else "info"
+        )
+        cards.append(
+            Component(
+                type="risk_summary_card",
+                id="risk-balance",
+                title="Net bütçe",
+                icon="money",
+                level=level,
+                span=4,
+                value=_signed(change, _fmt_usd),
+                subtitle="Senaryonun bütçeye etkisi",
+                caption=f"Senaryo sonrası: {_fmt_usd(scenario_balance)}",
+                data={"change": change, "scenario": scenario_balance},
+                data_source_ids={
+                    k: v for k, v in {
+                        "change": _addr(balance, "change"),
+                        "scenario": _addr(balance, "scenario"),
+                    }.items() if v
+                },
+                source_metric_ids=_ids((balance, "change"), (balance, "scenario")),
+                source_keys=[balance["key"]],
+                aria_label=(
+                    f"Net bütçe riski {LEVEL_LABELS[level].lower()}. Etki "
+                    f"{_signed(change, _fmt_usd)}"
+                ),
+            )
+        )
+
+    ratio = index.get("total_personnel_expense_ratio") or index.get(
+        "academic_personnel_expense_ratio"
+    )
+    if ratio and _num(ratio, "scenario") is not None:
+        value = _num(ratio, "scenario")
+        level = (
+            "critical" if value >= RISK_THRESHOLDS["personnel_ratio_critical"]
+            else "warning" if value >= RISK_THRESHOLDS["personnel_ratio_warning"]
+            else "info"
+        )
+        cards.append(
+            Component(
+                type="risk_summary_card",
+                id="risk-personnel-ratio",
+                # Başlık metriğin KENDİ etiketinden gelir: akademik payı ile
+                # toplam payı aynı başlıkla göstermek yanıltırdı.
+                title=ratio.get("label", "Personel gideri payı"),
+                icon="staff",
+                level=level,
+                span=4,
+                value=_fmt_percent(value),
+                subtitle="Toplam harcama içindeki pay",
+                caption=f"Mevcut: {_fmt_percent(_num(ratio, 'baseline'))}",
+                data={"baseline": _num(ratio, "baseline"), "scenario": value},
+                data_source_ids={
+                    "baseline": _addr(ratio, "baseline"),
+                    "scenario": _addr(ratio, "scenario"),
+                },
+                source_metric_ids=_ids((ratio, "baseline"), (ratio, "scenario")),
+                source_keys=[ratio["key"]],
+                aria_label=(
+                    f"Personel gideri payı riski {LEVEL_LABELS[level].lower()}. "
+                    f"Senaryo yüzde {value}"
+                ),
+            )
+        )
+
+    cost = index.get("annual_staff_cost")
+    if cost and _num(cost, "change"):
+        cards.append(
+            Component(
+                type="risk_summary_card",
+                id="risk-staff-cost",
+                title="Akademik personel gideri",
+                icon="metric",
+                level="warning",
+                span=4,
+                value=_signed(_num(cost, "change"), _fmt_usd),
+                subtitle="Yıllık ek yük",
+                caption=f"Senaryo sonrası: {_fmt_usd(_num(cost, 'scenario'))}",
+                data={"change": _num(cost, "change"), "scenario": _num(cost, "scenario")},
+                data_source_ids={
+                    "change": _addr(cost, "change"),
+                    "scenario": _addr(cost, "scenario"),
+                },
+                source_metric_ids=_ids((cost, "change"), (cost, "scenario")),
+                source_keys=[cost["key"]],
+                aria_label=(
+                    "Akademik personel gideri riski yüksek. Yıllık ek yük "
+                    + _signed(_num(cost, "change"), _fmt_usd)
+                ),
+            )
+        )
+
+    order = {"critical": 0, "warning": 1, "info": 2}
+    cards.sort(key=lambda c: order.get(c.level or "info", 3))
+    return cards[:3]
+
+
+def _salary_decisions(index: Dict[str, Dict[str, Any]]) -> List[str]:
+    """Maaş senaryosunun karar maddeleri."""
+    items: List[str] = []
+
+    cost_change = _num(index.get("annual_staff_cost"), "change")
+    if cost_change:
+        items.append(
+            f"Bütçe: Yıllık {_fmt_usd(abs(cost_change))} ek personel gideri için "
+            "kaynak planlanmalı."
+        )
+
+    balance = index.get("university_net_balance")
+    scenario_balance = _num(balance, "scenario")
+    if scenario_balance is not None:
+        items.append(
+            "Net bütçe: Senaryo sonrası bütçe açık veriyor; gelir artırıcı "
+            "önlem gerekiyor."
+            if scenario_balance < 0
+            else f"Net bütçe: {_fmt_usd(scenario_balance)} ile pozitif kalıyor; "
+                 "zam bütçeyi açığa düşürmüyor."
+        )
+
+    ratio = index.get("academic_personnel_expense_ratio")
+    if ratio and _num(ratio, "scenario") is not None:
+        items.append(
+            "Personel payı: Akademik gider payı "
+            + _fmt_percent(_num(ratio, "baseline")) + " → "
+            + _fmt_percent(_num(ratio, "scenario"))
+            + "; eşik takibi sürdürülmeli."
+        )
+
+    items.append(
+        "Kapsam: Yan haklar, işveren yükleri ve ek ders ödemeleri bu hesaba "
+        "dâhil değildir."
+    )
+    return items[:4]
+
+
 def _decisions(index: Dict[str, Dict[str, Any]]) -> List[str]:
     """En fazla dört, ikişer satırı geçmeyen karar maddesi."""
     items: List[str] = []
@@ -665,6 +1119,67 @@ def _metric_rows(structured: Dict[str, Any], scope_type: str) -> List[str]:
     return rows
 
 
+def _scenario_scope_box(structured: Dict[str, Any]) -> Optional[Component]:
+    """Grafiğin yanındaki görünür kapsam/uyarı kutusu.
+
+    ÖĞRENCİ ARTIŞI: hesaplanmayan personel ve yatırım maliyetleri.
+    MAAŞ SENARYOSU: neyin sabit tutulduğu ve neyin kapsam dışı olduğu.
+    İki senaryoya aynı kutuyu koymak, olmayan bir maliyeti varmış gibi
+    göstermek olurdu.
+    """
+    result_type = structured.get("type")
+
+    if result_type == "staff_salary_scenario":
+        items = list(structured.get("assumptions", []) or [])
+        if not items:
+            return None
+        return Component(
+            type="information_box",
+            id="scenario-assumptions",
+            level="info",
+            icon="assumption",
+            span=6,
+            title="Senaryonun kapsamı",
+            items=items,
+            note=(
+                "Bu değerler yalnızca akademik maaş artışının etkisidir; "
+                "kadro sayısı ve idari maaşlar sabit tutulmuştur."
+            ),
+            aria_label="Senaryonun kapsamı ve varsayımları",
+        )
+
+    if result_type == "enrollment_change_scenario":
+        return Component(
+            type="information_box",
+            id="cost-warning",
+            level="warning",
+            icon="warning",
+            span=6,
+            title="Hesaplanmayan maliyetler",
+            items=UNCALCULATED_COSTS,
+            note=COST_EXCLUSION_WARNING,
+            aria_label="Uyarı: " + COST_EXCLUSION_WARNING,
+        )
+
+    return None
+
+
+def _assumptions_for(structured: Dict[str, Any]) -> List[str]:
+    """Senaryonun KENDİ varsayımları.
+
+    "Ek personel alımı ve fiziksel yatırım maliyetleri hesaplanmadı" uyarısı
+    ÖĞRENCİ ARTIŞI senaryosuna aittir: orada yeni öğrenciler yeni kadro ve
+    yeni derslik gerektirir. Maaş senaryosunda kadro da mekân da sabittir;
+    o uyarıyı göstermek kullanıcıyı olmayan bir maliyete yönlendirirdi.
+    """
+    declared = list(structured.get("assumptions", []) or [])
+    if declared:
+        return declared
+    if structured.get("type") == "enrollment_change_scenario":
+        return UNCALCULATED_COSTS + [COST_EXCLUSION_WARNING]
+    return []
+
+
 def _accordion(
     structured: Dict[str, Any],
     index: Dict[str, Dict[str, Any]],
@@ -711,9 +1226,7 @@ def _accordion(
     )
     block(
         "Varsayımlar ve hariç tutulan maliyetler",
-        items=list(structured.get("notes", []) or [])
-        + UNCALCULATED_COSTS
-        + [COST_EXCLUSION_WARNING],
+        items=list(structured.get("notes", []) or []) + _assumptions_for(structured),
         icon="assumption",
     )
     block("Kullanılan veri kaynakları", items=list(data_sources or []), icon="source")
@@ -763,8 +1276,15 @@ def build_ui_spec(
         kpis = _enrollment_kpis(index)
     elif result_type == "staff_salary_scenario":
         view_type = "financial_dashboard"
-        title = "Akademik Personel Maaş Senaryosu"
-        kpis = _generic_kpis(structured)
+        cost = index.get("annual_staff_cost")
+        change = _num(cost, "change")
+        base = _num(cost, "baseline")
+        percent = f"%{round(change / base * 100)}" if change and base else ""
+        title = (
+            f"Akademik Personel Maaş Senaryosu — {percent} Zam"
+            if percent else "Akademik Personel Maaş Senaryosu"
+        )
+        kpis = _salary_kpis(index)
     else:
         view_type = "summary_dashboard"
         title = scope_name or "Kurumsal Özet"
@@ -796,30 +1316,30 @@ def build_ui_spec(
         )
         components: List[Component] = [legend] + charts
 
-        # Hesaplanmayan maliyetler grafiğe SIFIR olarak konmaz; ayrı uyarı.
+        # Şelalenin yanındaki kutu SENARYOYA GÖRE değişir. Öğrenci artışında
+        # hesaplanmayan yatırım maliyetleri uyarısı, maaş senaryosunda ise
+        # neyin sabit tutulduğunu söyleyen varsayım kutusu gösterilir.
         if any(c.type == "waterfall_chart" for c in charts):
-            components.append(
-                Component(
-                    type="information_box",
-                    id="cost-warning",
-                    level="warning",
-                    icon="warning",
-                    span=6,
-                    title="Hesaplanmayan maliyetler",
-                    items=UNCALCULATED_COSTS,
-                    note=COST_EXCLUSION_WARNING,
-                    aria_label="Uyarı: " + COST_EXCLUSION_WARNING,
-                )
-            )
+            box = _scenario_scope_box(structured)
+            if box is not None:
+                components.append(box)
         sections.append(Section(type="chart_grid", components=components))
 
-    risks = _risk_cards(index)
+    risks = (
+        _salary_risk_cards(index)
+        if result_type == "staff_salary_scenario"
+        else _risk_cards(index)
+    )
     if risks:
         sections.append(
             Section(type="risk_summary", title="En Kritik Riskler", components=risks)
         )
 
-    decisions = _decisions(index)
+    decisions = (
+        _salary_decisions(index)
+        if result_type == "staff_salary_scenario"
+        else _decisions(index)
+    )
     if decisions:
         sections.append(
             Section(

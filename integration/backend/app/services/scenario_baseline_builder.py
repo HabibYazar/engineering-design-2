@@ -32,11 +32,18 @@ HUNDRED = Decimal("100")
 # Mali kalemler milyon USD olarak saklanır; senaryo motoru tam USD ile çalışır.
 MILLION = Decimal("1000000")
 
-# Gider kalemlerinin senaryo motorundaki beş kovaya eşlenmesi.
-# Senaryo motoru beş gider kalemi tanır; mali modülde dokuz kalem vardır.
-# Eşleme burada tek yerde tanımlanır ki iki modül birbirinden kopmasın.
+# Gider kalemlerinin senaryo motorundaki kovalara eşlenmesi.
+# Senaryo motoru sabit sayıda gider kalemi tanır; mali modülde dokuz kalem
+# vardır. Eşleme burada tek yerde tanımlanır ki iki modül birbirinden kopmasın.
+#
+# "personnel" kovası YALNIZCA AKADEMİK personeli taşır: senaryo motoru
+# ortalama akademik maaşı `personnel / akademik kadro sayısı` ile buluyor.
+# İdari maaşlar bu kovaya girseydi ortalama akademik maaş 34.000 yerine
+# 45.600 USD çıkardı ve zam senaryosu yanlış hesaplardı.
 EXPENSE_BUCKETS = {
-    "personnel": ("akademik personel", "idari personel", "burs"),
+    "personnel": ("akademik personel",),
+    "administrative_personnel": ("idari personel", "i̇dari personel"),
+    "scholarship": ("burs",),
     "education": ("eğitim", "laboratuvar"),
     "rd": ("araştırma", "geliştirme", "ar-ge"),
     "building_energy": ("altyapı", "bakım", "enerji", "işletme"),
@@ -51,11 +58,27 @@ REVENUE_BUCKETS = {
 }
 
 
+def _fold(text: str) -> str:
+    """Türkçe'ye duyarlı küçük harfe çevirme.
+
+    NEDEN GEREKLİ: Python'da "İ".lower() sonucu "i" DEĞİL, "i̇" (i + birleşen
+    üstteki nokta) olur. Bu yüzden `"idari personel" in "İdari personel
+    giderleri".lower()` FALSE döner ve kalem sessizce yanlış kovaya düşer.
+    Gerçekte olan buydu: "İdari personel giderleri" (2,09 milyon USD)
+    teknoloji giderine yazılıyor, dolayısıyla projeksiyonda DÖVİZ KURUYLA
+    birlikte artıyordu. İdari maaşların kurla artması anlamsızdır.
+    """
+    return (
+        text.replace("İ", "i").replace("I", "ı").lower()
+        .replace("\u0307", "")  # artakalan birleşen nokta
+    )
+
+
 def _bucket_for(category: str, buckets: dict) -> Optional[str]:
     """Kalem adını kovaya eşler; eşleşme yoksa None döner."""
-    lowered = category.lower()
+    lowered = _fold(category)
     for bucket, keywords in buckets.items():
-        if any(keyword in lowered for keyword in keywords):
+        if any(_fold(keyword) in lowered for keyword in keywords):
             return bucket
     return None
 
@@ -105,8 +128,10 @@ def build_from_financial_period(db: Session, academic_year: str) -> ScenarioBase
         revenue[bucket] += entry.amount * MILLION
 
     # --- Giderler ---
+    # Eşleşmeyen kalemler ("Diğer giderler" gibi) teknoloji kovasına düşer;
+    # bu kova motorda enflasyon + kur ile büyür. İDARİ PERSONEL ARTIK BURAYA
+    # DÜŞMÜYOR: kendi kovası var ve kurdan etkilenmiyor.
     expense = {key: ZERO for key in EXPENSE_BUCKETS}
-    expense["technology"] = ZERO
     for entry in entries:
         if entry.kind != "expenditure":
             continue
@@ -125,13 +150,9 @@ def build_from_financial_period(db: Session, academic_year: str) -> ScenarioBase
 
     scholarship_rate = period.average_scholarship_rate_percent or ZERO
 
-    # Burs gideri personel kovasına düşmesin: senaryo motorunda burs, gelirden
-    # düşülen bir kalemdir. Gider tarafından çıkarılıyor ki iki kez sayılmasın.
-    scholarship_expense = ZERO
-    for entry in entries:
-        if entry.kind == "expenditure" and "burs" in entry.category.lower():
-            scholarship_expense += entry.amount * MILLION
-    expense["personnel"] -= scholarship_expense
+    # Burs gideri motora GİDER olarak girmez: senaryo motorunda burs, brüt
+    # öğrenim ücretinden düşülen bir kalemdir. Kendi kovasında durur ve
+    # toplam gidere eklenmez; iki kez sayılmasın diye.
 
     baseline = ScenarioBaseline(
         name=f"{academic_year} mali dönemi",
@@ -141,6 +162,9 @@ def build_from_financial_period(db: Session, academic_year: str) -> ScenarioBase
         annual_research_revenue=quantize_money(revenue["research"]),
         annual_other_revenue=quantize_money(revenue["other"]),
         annual_personnel_expense=quantize_money(expense["personnel"]),
+        annual_administrative_personnel_expense=quantize_money(
+            expense["administrative_personnel"]
+        ),
         annual_education_expense=quantize_money(expense["education"]),
         annual_rd_expense=quantize_money(expense["rd"]),
         annual_building_energy_expense=quantize_money(expense["building_energy"]),

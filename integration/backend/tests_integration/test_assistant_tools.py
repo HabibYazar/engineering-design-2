@@ -361,7 +361,12 @@ def test_salary_scenario_two_percent_raise(db) -> None:
 def test_salary_scenario_does_not_change_headcount(db) -> None:
     """Zam kadro sayısını değiştirmez; yalnızca ortalama maaşı değiştirir."""
     result = call(db, "run_staff_salary_scenario", academic_year=YEAR, salary_change_percentage=2)
-    assert "kadro sayısı sabit" in result.method_note
+    assert "kadro sayısı ve idari personel gideri sabit kalır" in result.method_note
+    # Kadro sabitliği artık metinde değil, METRİKTE de doğrulanıyor.
+    staff = next(m for m in result.scoped_metrics if m.key == "academic_staff_count")
+    assert staff.baseline == staff.scenario
+    assert staff.change == 0
+    assert "SABİT" in (staff.note or "")
 
 
 # ===========================================================================
@@ -1204,9 +1209,13 @@ def test_salary_scenario_required_metrics_appear_in_the_answer(monkeypatch, db) 
     answer = result["answer"]
     for expected in (
         "%2 değişim",
-        "Yıllık akademik personel gideri: 6.120.000 USD → 6.242.400 USD",
-        "Toplam gider etkisi: +122.400 USD",
-        "Net bütçe etkisi: -122.400 USD",
+        # Etiket artık "Akademik personel gideri": idari personel ayrı bir
+        # kalem ve "toplam personel gideri" ondan farklı bir sayı.
+        "Akademik personel gideri: 6.120.000 USD → 6.242.400 USD",
+        "İdari personel gideri: 2.090.000 USD → 2.090.000 USD",
+        "Toplam personel gideri: 8.210.000 USD → 8.332.400 USD",
+        "Toplam kurum harcaması: 33.060.000 USD → 33.182.400 USD",
+        "Net bütçe: 2.900.000 USD → 2.777.600 USD",
     ):
         assert expected in answer, f"Zorunlu satır eksik: {expected}"
 

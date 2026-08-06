@@ -39,6 +39,53 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _add_missing_columns() -> None:
+    """Var olan SQLite tablolarına modelde sonradan eklenen sütunları ekler.
+
+    NEDEN GEREKLİ
+    -------------
+    `create_all` var olan bir tabloyu DEĞİŞTİRMEZ; yalnızca eksik tabloları
+    oluşturur. Bir modele yeni sütun eklendiğinde, kullanıcının elindeki
+    veritabanı dosyası eski şemada kalır ve ilk sorguda "no such column"
+    hatası verir. Projede migration aracı yok; bu küçük denetim, kullanıcının
+    veritabanını silmek zorunda kalmasını önlüyor.
+
+    Yalnızca EKLEME yapar: sütun siler, tür değiştirir veya veri taşımaz.
+    Bu yüzden idempotenttir ve her açılışta güvenle çağrılabilir.
+    """
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    with engine.begin() as connection:
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue  # create_all zaten oluşturdu
+            present = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in present:
+                    continue
+                if column.server_default is None and not column.nullable:
+                    # Varsayılanı olmayan zorunlu sütun sonradan eklenemez;
+                    # sessizce atlanır ve sorun görünür kalır.
+                    continue
+                default = ""
+                if column.server_default is not None:
+                    default = f" DEFAULT {column.server_default.arg}"
+                nullable = "" if column.nullable else " NOT NULL"
+                connection.execute(
+                    text(
+                        f"ALTER TABLE {table.name} "
+                        f"ADD COLUMN {column.name} "
+                        f"{column.type.compile(engine.dialect)}{default}{nullable}"
+                    )
+                )
+
+
 def init_db() -> None:
     """Tanımlı modellere göre veritabanı tablolarını oluşturur."""
     # Modelleri burada import etmemizin sebebi: create_all sadece Base'e kayıtlı
@@ -48,3 +95,4 @@ def init_db() -> None:
 
     # create_all zaten var olan tabloları tekrar oluşturmaz, bu yüzden her açılışta çağrılabilir.
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()

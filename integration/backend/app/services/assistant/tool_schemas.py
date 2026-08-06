@@ -98,6 +98,23 @@ class ScopedMetric(BaseModel):
             "belirler. Arayüz grafik türünü BU alana göre seçer."
         ),
     )
+    flow: Optional[str] = Field(
+        default=None,
+        description=(
+            "Parasal kalemin bütçedeki YÖNÜ: 'inflow' (gelir), 'outflow' "
+            "(gider) veya 'balance' (net sonuç). Şelale grafiği bu alana "
+            "bakar: bir gider kalemi gelir sütunu olarak çizilemez."
+        ),
+    )
+    is_total: bool = Field(
+        default=False,
+        description=(
+            "Bu metrik başka kalemlerin TOPLAMI mı? Şelale grafiği toplam "
+            "kalemleri katkı olarak kullanmaz; kullansaydı aynı tutar iki "
+            "kez sayılırdı (ör. 'toplam gider' ile 'akademik personel "
+            "gideri' aynı 612.000 USD'yi taşır)."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -435,12 +452,43 @@ class SalaryScenarioOutput(BaseModel):
     #: Kapsamı etiketlenmiş göstergeler.
     scoped_metrics: List[ScopedMetric] = Field(default_factory=list)
     salary_change_percentage: Optional[Decimal] = None
+    # --- Akademik personel (zam yalnızca buraya uygulanır) ---
     previous_annual_staff_cost_usd: Optional[Decimal] = None
     new_annual_staff_cost_usd: Optional[Decimal] = None
     cost_change_usd: Optional[Decimal] = None
+    # --- İdari personel: bu senaryoda DEĞİŞMEZ ---
+    previous_administrative_cost_usd: Optional[Decimal] = None
+    new_administrative_cost_usd: Optional[Decimal] = None
+    # --- Toplam personel = akademik + idari ---
+    previous_total_personnel_cost_usd: Optional[Decimal] = None
+    new_total_personnel_cost_usd: Optional[Decimal] = None
+    # --- Kurum geneli ---
+    previous_total_expenditure_usd: Optional[Decimal] = None
+    new_total_expenditure_usd: Optional[Decimal] = None
     total_expenditure_change_usd: Optional[Decimal] = None
+    previous_total_revenue_usd: Optional[Decimal] = None
+    new_total_revenue_usd: Optional[Decimal] = None
+    revenue_change_usd: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Maaş senaryosunda gelir DEĞİŞMEZ; alan 0 döner. Bu değer "
+            "açıkça taşınıyor ki arayüz maaş artışını gelir sanmasın."
+        ),
+    )
+    previous_net_balance_usd: Optional[Decimal] = None
+    new_net_balance_usd: Optional[Decimal] = None
     net_balance_change_usd: Optional[Decimal] = None
+    # --- Sorulan oran ---
+    previous_personnel_expense_ratio_percent: Optional[Decimal] = Field(
+        default=None,
+        description="Akademik personel gideri / toplam harcama × 100 (taban).",
+    )
+    new_personnel_expense_ratio_percent: Optional[Decimal] = None
+    previous_total_personnel_ratio_percent: Optional[Decimal] = None
+    new_total_personnel_ratio_percent: Optional[Decimal] = None
     cost_per_student_change_usd: Optional[Decimal] = None
+    #: Senaryonun kapsamı: neyin sabit tutulduğu, neyin hariç olduğu.
+    assumptions: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
     method_note: str

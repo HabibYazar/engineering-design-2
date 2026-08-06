@@ -56,6 +56,14 @@ REQUIRED_FIELDS: Dict[str, List[str]] = {
         "salary_change_percentage",
         "previous_annual_staff_cost_usd",
         "new_annual_staff_cost_usd",
+        # Kullanıcının sorduğu oran ve net bütçe ZORUNLU. Biri eksikse cevap
+        # "başarılı" sayılmaz; arayüz eksik veriyle pencere üretmez.
+        "previous_net_balance_usd",
+        "new_net_balance_usd",
+        "previous_personnel_expense_ratio_percent",
+        "new_personnel_expense_ratio_percent",
+        "previous_total_expenditure_usd",
+        "new_total_expenditure_usd",
     ],
     "get_program_summary": ["scope.academic_year", "program_name"],
     "get_financial_summary": ["scope.academic_year"],
@@ -204,6 +212,11 @@ def _metric_from_scoped(metric: Any) -> Dict[str, Any]:
         "scope_name": metric.scope_name,
         "unit": metric.unit,
         "semantic_type": metric_semantics.resolve(metric),
+        # Parasal kalemin bütçedeki yönü ve toplam olup olmadığı. Şelale
+        # grafiği bu iki alana bakar; olmadan bir gider kalemi gelir sütunu
+        # olarak çizilebilir ve aynı tutar iki kez sayılabilirdi.
+        "flow": getattr(metric, "flow", None) or metric_semantics.flow_of(metric),
+        "is_total": bool(getattr(metric, "is_total", False)),
         "baseline": _plain(metric.baseline),
         "scenario": _plain(metric.scenario),
         "change": _plain(metric.change),
@@ -224,6 +237,8 @@ def _metric(key: str, label: str, baseline: Any, scenario: Any,
         "scope_name": scope_name,
         "unit": unit,
         "semantic_type": metric_semantics.classify(key, unit, label),
+        "flow": metric_semantics.classify_flow(key, unit, label),
+        "is_total": metric_semantics.looks_like_total(key),
         "baseline": _plain(baseline),
         "scenario": _plain(scenario),
         "change": _plain(change),
@@ -490,6 +505,7 @@ def _compose_salary(payload: Any) -> ComposedResponse:
         facts_markdown="\n".join(lines),
         structured_result={
             "type": "staff_salary_scenario",
+            "assumptions": list(getattr(payload, "assumptions", []) or []),
             "academic_year": scope.academic_year,
             "scope": {
                 "faculty": scope.faculty,

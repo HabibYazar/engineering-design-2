@@ -197,10 +197,15 @@ function aiVerifiedComponent(component, index) {
 
   (copy.series || []).forEach((series) => {
     (series.values || []).forEach((value, i) => {
-      const resolved = aiResolve(
+      let resolved = aiResolve(
         (series.source_metric_ids || [])[i], index, series.derivation
       );
       if (resolved === undefined) return;
+      // İşaret bildirilmişse uygulanır: bir gider ARTIŞI kaynakta
+      // pozitiftir ama bütçeyi azaltır. İşareti yok saymak şelalede
+      // maaş artışını bütçe artışı gibi gösterirdi.
+      const sign = (series.value_signs || [])[i];
+      if (sign === -1 || sign === 1) resolved = resolved * sign;
       if (value === null || Math.abs(Number(value) - resolved) > 0.005) {
         series.values[i] = resolved;
         corrections++;
@@ -322,10 +327,15 @@ const AI_COMPONENTS = {
           )}</span>`
       )
       .join("");
-    return `<section class="ai-decision" data-ai-type="decision_summary" aria-label="${fmt.esc(
-      c.aria_label || "Karar özeti"
-    )}">
+    const level = AI_LEVEL_TEXT[c.level] ? c.level : "";
+    return `<section class="ai-decision${level ? " ai-decision-" + level : ""}"
+      data-ai-type="decision_summary" aria-label="${fmt.esc(
+        c.aria_label || "Karar özeti"
+      )}">
       <p class="ai-decision-text">${fmt.esc(c.title || "")}</p>
+      ${c.subtitle
+        ? `<p class="ai-decision-reason">${aiIcon("metric")}${fmt.esc(c.subtitle)}</p>`
+        : ""}
       ${badges ? `<div class="ai-badges">${badges}</div>` : ""}
     </section>`;
   },
@@ -701,13 +711,16 @@ const AI_COMPONENTS = {
     const kinds = series.kinds || [];
     const categories = c.categories || [];
 
-    // Kümülatif taban: "total" türü sıfırdan başlar.
+    // Kümülatif taban. "total" türü MUTLAK seviyedir: sıfırdan çizilir ve
+    // kümülatif seviyeyi kendi değerine ayarlar. Böylece ilk sütun mevcut
+    // bütçe olduğunda ara sütunlar sıfırdan değil, O SEVİYEDEN başlar —
+    // gerçek kademeli şelale budur.
     let running = 0;
     const bars = values.map((value, i) => {
       const kind = kinds[i] || (i === values.length - 1 ? "total" : "increase");
       const start = kind === "total" ? 0 : running;
       const end = kind === "total" ? value : running + value;
-      if (kind !== "total") running = end;
+      running = end;
       return { value, kind, start, end, label: categories[i] || "" };
     });
 
@@ -726,25 +739,29 @@ const AI_COMPONENTS = {
         const height = Math.max(3, Math.abs(y(b.end) - y(b.start)));
         const tone =
           b.kind === "total" ? "info" : b.value >= 0 ? "positive" : "critical";
+        // Toplam sütunu bir SEVİYEDİR, bir değişim değil: "+2.900.000" yazmak
+        // bütçenin o kadar arttığını sandırırdı.
+        const text = b.kind === "total" ? aiNum(b.value, 0) : aiSigned(b.value, 0);
         return `<g class="ai-wf-bar">
           <rect class="ai-anim-grow" x="${x}" y="${top}" width="${bw}" height="${height}"
                 rx="6" fill="${aiToneColor(tone)}"><title>${fmt.esc(b.label)}: ${
-                  fmt.esc(aiSigned(b.value, 0))}</title></rect>
+                  fmt.esc(text)}</title></rect>
           <text class="ai-label" x="${x + bw / 2}" y="${top - 8}"
-                text-anchor="middle">${fmt.esc(aiSigned(b.value, 0))}</text>
+                text-anchor="middle">${fmt.esc(text)}</text>
           <text class="ai-axis-label" x="${x + bw / 2}" y="152"
                 text-anchor="middle">${fmt.esc(b.label)}</text>
         </g>`;
       })
       .join("");
 
+    // Bağlantı çizgileri HER sütun arasında çizilir: kademeleri birbirine
+    // bağlayan bu çizgiler olmadan grafik bağımsız üç sütun gibi görünür.
     const connectors = bars
       .slice(0, -1)
-      .map((b, i) =>
-        bars[i + 1].kind === "total"
-          ? ""
-          : `<line class="ai-wf-link" x1="${40 + i * step + bw}" y1="${y(b.end)}"
-               x2="${40 + (i + 1) * step}" y2="${y(b.end)}"/>`
+      .map(
+        (b, i) =>
+          `<line class="ai-wf-link" x1="${40 + i * step + bw}" y1="${y(b.end)}"
+             x2="${40 + (i + 1) * step}" y2="${y(b.end)}"/>`
       )
       .join("");
 
@@ -758,7 +775,9 @@ const AI_COMPONENTS = {
     return aiChartShell(c, svg, aiValueTable(
       bars.map((b) => ({
         label: b.label,
-        value: aiSigned(b.value, 0) + " " + (c.unit || ""),
+        value:
+          (b.kind === "total" ? aiNum(b.value, 0) : aiSigned(b.value, 0)) +
+          " " + (c.unit || ""),
         tone: b.kind === "total" ? "info" : b.value >= 0 ? "positive" : "critical",
       }))
     ));

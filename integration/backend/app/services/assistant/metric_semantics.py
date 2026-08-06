@@ -91,6 +91,70 @@ def classify(key: str, unit: str, label: str = "") -> str:
     return "count_change"
 
 
+# ---------------------------------------------------------------------------
+# Parasal kalemin bütçedeki YÖNÜ
+# ---------------------------------------------------------------------------
+
+#: Bütçe akış yönleri. Şelale grafiği bu alana bakar.
+#: "unit_price" bir bütçe akışı DEĞİLDİR: ortalama maaş veya öğrenci başına
+#: maliyet gibi birim fiyatlar toplanamaz, bütçeye eklenemez. Ayrı bir değer
+#: olması gerekiyor; `None` bırakılsaydı sınıflandırıcı onları yeniden
+#: "gider" sayardı.
+FLOWS = ("inflow", "outflow", "balance", "unit_price")
+
+_INFLOW_HINTS = ("revenue", "income", "gelir", "hibe", "grant", "bağış", "fon")
+_OUTFLOW_HINTS = ("expense", "expenditure", "cost", "gider", "maliyet", "harcama",
+                  "salary", "maaş", "personnel", "personel")
+_BALANCE_HINTS = ("balance", "net", "bakiye", "denge")
+#: Birim fiyatlar: bütçe kalemi değil, bölme sonucu.
+_UNIT_PRICE_HINTS = ("average_", "_per_", "per_student", "ortalama", "başına")
+
+#: "Toplam" olduğunu gösteren ipuçları. Toplam kalemler şelalede KATKI
+#: sayılmaz; sayılsaydı aynı tutar hem alt kalem hem toplam olarak iki kez
+#: hesaba girerdi.
+_TOTAL_HINTS = ("total_", "_total", "toplam", "net_balance", "cost_per_")
+
+
+def classify_flow(key: str, unit: str, label: str = "") -> Optional[str]:
+    """Parasal bir kalemin gelir mi gider mi net sonuç mu olduğunu belirler.
+
+    Yalnızca para birimli metrikler için anlamlıdır; diğerlerinde None döner.
+    Sıralama önemli: "net bütçe" hem "net" hem "bütçe" içerir, önce bakiye
+    kontrol edilir.
+    """
+    if (unit or "").strip() != "USD":
+        return None
+    haystack = f"{key} {label}".lower()
+    if any(hint in haystack for hint in _UNIT_PRICE_HINTS):
+        return "unit_price"
+    if any(hint in haystack for hint in _BALANCE_HINTS):
+        return "balance"
+    if any(hint in haystack for hint in _OUTFLOW_HINTS):
+        return "outflow"
+    if any(hint in haystack for hint in _INFLOW_HINTS):
+        return "inflow"
+    return None
+
+
+def looks_like_total(key: str) -> bool:
+    """Anahtar bir toplam kalemi mi anlatıyor?"""
+    lowered = (key or "").lower()
+    return any(hint in lowered for hint in _TOTAL_HINTS)
+
+
+def flow_of(metric) -> Optional[str]:
+    """Metriğin bildirdiği yönü kullanır, yoksa sınıflandırır."""
+    declared = (
+        metric.get("flow") if isinstance(metric, dict) else getattr(metric, "flow", None)
+    )
+    if declared in FLOWS:
+        return declared
+    if isinstance(metric, dict):
+        return classify_flow(metric.get("key", ""), metric.get("unit", ""),
+                             metric.get("label", ""))
+    return classify_flow(metric.key, metric.unit, metric.label)
+
+
 def resolve(metric) -> str:
     """Metriğin bildirdiği türü kullanır, yoksa sınıflandırır.
 

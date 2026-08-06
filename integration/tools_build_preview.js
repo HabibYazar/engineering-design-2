@@ -23,11 +23,16 @@ const css = read(path.join(ASSETS, "style.css")) + "\n" +
 const api = read(path.join(ASSETS, "api.js"));
 const renderer = read(path.join(ASSETS, "ai-view-renderer.js"));
 
+// Hangi senaryonun önizlemesi üretilecek: varsayılan öğrenci artışı.
+//     node tools_build_preview.js salary
+const WHICH = (process.argv[2] || "enrollment").toLowerCase();
+const SUFFIX = WHICH === "salary" ? "_salary" : "";
+
 const fixtures = path.join(__dirname, "tests_ui", "fixtures");
 let spec, structured;
 try {
-  spec = read(path.join(fixtures, "ui_spec_sample.json"));
-  structured = read(path.join(fixtures, "structured_result_sample.json"));
+  spec = read(path.join(fixtures, `ui_spec${SUFFIX}_sample.json`));
+  structured = read(path.join(fixtures, `structured_result${SUFFIX}_sample.json`));
 } catch {
   console.error(
     "Ornek dosyalar yok. Once backend testlerini calistirin:\n" +
@@ -41,7 +46,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dinamik Analiz Paneli — Önizleme</title>
+<title>${WHICH === "salary" ? "Maaş Senaryosu" : "Dinamik Analiz"} Paneli — Önizleme</title>
 <style>${css}
   body { background: var(--page); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 28px; }
   .preview-head { max-width: 1180px; margin: 0 auto 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -73,7 +78,10 @@ const html = `<!doctype html>
 </body>
 </html>`;
 
-const out = path.join(__dirname, "docs", "preview", "analysis_panel_preview.html");
+const out = path.join(
+  __dirname, "docs", "preview",
+  WHICH === "salary" ? "salary_panel_preview.html" : "analysis_panel_preview.html"
+);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log("Onizleme yazildi:", out, `(${(html.length / 1024).toFixed(0)} KB)`);

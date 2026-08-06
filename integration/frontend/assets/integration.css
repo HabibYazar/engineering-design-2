@@ -1289,3 +1289,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .ai-hbar-row { grid-template-columns: 80px 1fr auto; }
   .ai-bar-chart { gap: 12px; }
 }
+
+/* Risk seviyesinin gerekçesi: rozet tek başına "neden" sorusunu
+   cevaplamıyor; eşik bilgisi burada yazılı duruyor. */
+.ai-decision-reason {
+  margin: 8px 0 0; display: flex; align-items: center; gap: 7px;
+  font-size: .76rem; color: var(--muted); font-weight: 500;
+}
+.ai-decision-reason .ai-icon { width: 14px; height: 14px; }
+.ai-decision-critical { border-left-color: var(--ai-critical); }
+.ai-decision-warning  { border-left-color: var(--ai-warning); }
+.ai-decision-positive { border-left-color: var(--ai-positive); }

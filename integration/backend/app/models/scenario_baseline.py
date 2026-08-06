@@ -33,7 +33,14 @@ class ScenarioBaseline(Base):
     # --- Gider tarafı ---
     # Giderleri tek bir toplam yerine kalemlere ayırıyoruz; çünkü her kalem
     # farklı bir değişkenden etkileniyor (personel sayısı, enflasyon, kur, öğrenci sayısı).
+    # Akademik personel gideri. Senaryo motoru ortalama akademik maaşı bu
+    # değeri kadro sayısına bölerek buluyor; idari maaşlar BURAYA GİRMEZ.
     annual_personnel_expense: Mapped[Decimal] = mapped_column(MoneyType, nullable=False)
+    # İdari personel gideri ayrı tutulur: akademik maaş zammından etkilenmez
+    # ve döviz kuruyla artmaz. Eski kayıtlarda bulunmadığı için varsayılanı 0.
+    annual_administrative_personnel_expense: Mapped[Decimal] = mapped_column(
+        MoneyType, nullable=False, default=Decimal("0"), server_default="0"
+    )
     annual_education_expense: Mapped[Decimal] = mapped_column(MoneyType, nullable=False)
     annual_rd_expense: Mapped[Decimal] = mapped_column(MoneyType, nullable=False)
     annual_building_energy_expense: Mapped[Decimal] = mapped_column(MoneyType, nullable=False)
