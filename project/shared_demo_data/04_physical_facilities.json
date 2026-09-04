@@ -1,0 +1,52 @@
+{
+  "_aciklama": "Modül 5 — Fiziksel mekân envanteri. 42 mekân tek tek listelenir çünkü her mekânın kapasitesi ve doluluğu demoda ayrı ayrı gösterilir.",
+  "_doluluk_notu": "Doluluk değerleri bilinçli olarak dengesiz seçildi: bazı mekânlar %90 üzerinde (aşırı dolu uyarısı), bazıları %50 altında (atıl kapasite uyarısı) çıksın ki Modül 5 raporları demoda anlamlı sonuç üretsin.",
+
+  "facilities": [
+    { "code": "A101", "name": "A Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "CENG", "capacity": 60,  "occupied": 57, "area_square_meters": 96 },
+    { "code": "A102", "name": "A Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "CENG", "capacity": 45,  "occupied": 41, "area_square_meters": 72 },
+    { "code": "A103", "name": "A Blok 103 Dersliği",        "facility_type": "classroom",  "department_code": "SWE",  "capacity": 50,  "occupied": 48, "area_square_meters": 80 },
+    { "code": "A104", "name": "A Blok 104 Dersliği",        "facility_type": "classroom",  "department_code": "SWE",  "capacity": 40,  "occupied": 22, "area_square_meters": 64 },
+    { "code": "A201", "name": "A Blok 201 Dersliği",        "facility_type": "classroom",  "department_code": "EEE",  "capacity": 55,  "occupied": 50, "area_square_meters": 88 },
+    { "code": "A202", "name": "A Blok 202 Dersliği",        "facility_type": "classroom",  "department_code": "EEE",  "capacity": 40,  "occupied": 18, "area_square_meters": 64 },
+    { "code": "B101", "name": "B Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "ME",   "capacity": 50,  "occupied": 46, "area_square_meters": 80 },
+    { "code": "B102", "name": "B Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "ME",   "capacity": 35,  "occupied": 30, "area_square_meters": 56 },
+    { "code": "B201", "name": "B Blok 201 Dersliği",        "facility_type": "classroom",  "department_code": "CE",   "capacity": 45,  "occupied": 26, "area_square_meters": 72 },
+    { "code": "B202", "name": "B Blok 202 Dersliği",        "facility_type": "classroom",  "department_code": "IE",   "capacity": 45,  "occupied": 43, "area_square_meters": 72 },
+    { "code": "C101", "name": "C Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "ARCH", "capacity": 60,  "occupied": 55, "area_square_meters": 110 },
+    { "code": "C102", "name": "C Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "ARCH", "capacity": 40,  "occupied": 17, "area_square_meters": 76 },
+    { "code": "D101", "name": "D Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "BA",   "capacity": 90,  "occupied": 86, "area_square_meters": 140 },
+    { "code": "D102", "name": "D Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "BA",   "capacity": 70,  "occupied": 62, "area_square_meters": 112 },
+    { "code": "D201", "name": "D Blok 201 Dersliği",        "facility_type": "classroom",  "department_code": "ECON", "capacity": 55,  "occupied": 44, "area_square_meters": 88 },
+    { "code": "D202", "name": "D Blok 202 Dersliği",        "facility_type": "classroom",  "department_code": "IR",   "capacity": 45,  "occupied": 21, "area_square_meters": 72 },
+    { "code": "E101", "name": "E Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "PSY",  "capacity": 65,  "occupied": 61, "area_square_meters": 104 },
+    { "code": "E102", "name": "E Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "PSY",  "capacity": 40,  "occupied": 33, "area_square_meters": 64 },
+    { "code": "F101", "name": "F Blok 101 Dersliği",        "facility_type": "classroom",  "department_code": "NUR",  "capacity": 55,  "occupied": 52, "area_square_meters": 88 },
+    { "code": "F102", "name": "F Blok 102 Dersliği",        "facility_type": "classroom",  "department_code": "NUR",  "capacity": 35,  "occupied": 15, "area_square_meters": 56 },
+
+    { "code": "LAB-CE1",  "name": "Bilgisayar Laboratuvarı 1",     "facility_type": "laboratory", "department_code": "CENG", "capacity": 30, "occupied": 29, "area_square_meters": 62 },
+    { "code": "LAB-CE2",  "name": "Bilgisayar Laboratuvarı 2",     "facility_type": "laboratory", "department_code": "CENG", "capacity": 30, "occupied": 24, "area_square_meters": 62 },
+    { "code": "LAB-SWE1", "name": "Yazılım Laboratuvarı",          "facility_type": "laboratory", "department_code": "SWE",  "capacity": 25, "occupied": 24, "area_square_meters": 54 },
+    { "code": "LAB-EEE1", "name": "Devre Laboratuvarı",            "facility_type": "laboratory", "department_code": "EEE",  "capacity": 24, "occupied": 22, "area_square_meters": 58 },
+    { "code": "LAB-EEE2", "name": "Güç Elektroniği Laboratuvarı",  "facility_type": "laboratory", "department_code": "EEE",  "capacity": 20, "occupied": 9,  "area_square_meters": 52 },
+    { "code": "LAB-ME1",  "name": "Malzeme Laboratuvarı",          "facility_type": "laboratory", "department_code": "ME",   "capacity": 22, "occupied": 20, "area_square_meters": 68 },
+    { "code": "LAB-ME2",  "name": "Termodinamik Laboratuvarı",     "facility_type": "laboratory", "department_code": "ME",   "capacity": 20, "occupied": 8,  "area_square_meters": 60 },
+    { "code": "LAB-CE3",  "name": "Yapı Malzemesi Laboratuvarı",   "facility_type": "laboratory", "department_code": "CE",   "capacity": 24, "occupied": 11, "area_square_meters": 74 },
+    { "code": "LAB-IE1",  "name": "Simülasyon Laboratuvarı",       "facility_type": "laboratory", "department_code": "IE",   "capacity": 26, "occupied": 25, "area_square_meters": 56 },
+    { "code": "LAB-PSY1", "name": "Deneysel Psikoloji Laboratuvarı","facility_type": "laboratory","department_code": "PSY",  "capacity": 18, "occupied": 16, "area_square_meters": 44 },
+    { "code": "LAB-NUR1", "name": "Klinik Beceri Laboratuvarı",    "facility_type": "laboratory", "department_code": "NUR",  "capacity": 24, "occupied": 23, "area_square_meters": 78 },
+    { "code": "STD-ARCH1","name": "Mimarlık Stüdyosu 1",           "facility_type": "laboratory", "department_code": "ARCH", "capacity": 35, "occupied": 34, "area_square_meters": 120 },
+    { "code": "STD-ARCH2","name": "Mimarlık Stüdyosu 2",           "facility_type": "laboratory", "department_code": "ARCH", "capacity": 30, "occupied": 13, "area_square_meters": 110 },
+
+    { "code": "OFC-A", "name": "A Blok Öğretim Üyesi Ofisleri", "facility_type": "office", "department_code": "CENG", "capacity": 24, "occupied": 23, "area_square_meters": 240 },
+    { "code": "OFC-B", "name": "B Blok Öğretim Üyesi Ofisleri", "facility_type": "office", "department_code": "ME",   "capacity": 20, "occupied": 17, "area_square_meters": 200 },
+    { "code": "OFC-C", "name": "C Blok Öğretim Üyesi Ofisleri", "facility_type": "office", "department_code": "ARCH", "capacity": 18, "occupied": 15, "area_square_meters": 180 },
+    { "code": "OFC-D", "name": "D Blok Öğretim Üyesi Ofisleri", "facility_type": "office", "department_code": "BA",   "capacity": 26, "occupied": 25, "area_square_meters": 260 },
+    { "code": "OFC-E", "name": "E Blok Öğretim Üyesi Ofisleri", "facility_type": "office", "department_code": "PSY",  "capacity": 16, "occupied": 12, "area_square_meters": 160 },
+
+    { "code": "LIB-MAIN", "name": "Merkez Kütüphane Ana Salon",  "facility_type": "library", "department_code": null, "capacity": 300, "occupied": 214, "area_square_meters": 640 },
+    { "code": "LIB-STUDY","name": "Kütüphane Bireysel Çalışma",  "facility_type": "library", "department_code": null, "capacity": 80,  "occupied": 76,  "area_square_meters": 180 },
+    { "code": "CONF-1",   "name": "Konferans Salonu",            "facility_type": "other",   "department_code": null, "capacity": 400, "occupied": 120, "area_square_meters": 520 },
+    { "code": "CAFE-1",   "name": "Merkez Yemekhane",            "facility_type": "other",   "department_code": null, "capacity": 350, "occupied": 322, "area_square_meters": 480 }
+  ]
+}

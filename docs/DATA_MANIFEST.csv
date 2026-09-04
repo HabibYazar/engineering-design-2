@@ -1,0 +1,50 @@
+﻿filename,relative_path,domain,role,source_type,runtime_used,authoritative,notes
+bolum_eslesme.csv,project/data/bolum_eslesme,department_matching,derived runtime lookup,csv,yes,no,Yetkili XLSX'ten uretildi; ayni/benzer bolum suzgecini bu dosya besler
+floor_semantic_maps.json,project/data/infrastructure/derived,infrastructure,derived runtime map,json,yes,no,Kat plani anlamsal haritasi; build_infrastructure_map.py ciktisi
+semantic_map_overrides.json,project/data/infrastructure/derived,infrastructure,manual correction,json,yes,no,Otomatik haritanin elle duzeltilen noktalari
+room_geometry.json,project/data/infrastructure/derived,infrastructure,derived runtime map,json,yes,no,Derslik vektor geometrisi
+classroom_usage.json,project/data/infrastructure/derived,infrastructure,derived runtime data,json,yes,no,Derslik kullanim yogunlugu
+room_match_report.json,project/data/infrastructure/derived,infrastructure,audit report,json,no,no,Plan-derslik eslestirme denetim raporu
+yokatlas_ankara_2022_plus.csv,project/data/yokatlas_ankara_2022_plus_output,yks,canonical input,csv,yes,yes,YOK Atlas 2022+ veri seti; karsilastirma servisinin kaynagi
+yok_akademik.db,project/data/yok-akademik,academic_staff,collector output,sqlite,no,yes,YOK Akademik toplayici ciktisi; import betigi kullanir
+ankara_bilim_mufredat_data1.xlsx,project/data/ekdata,curriculum,canonical input,xlsx,no,yes,1205 satirlik mufredat; DB'ye aktarilmis
+0. Kat.pdf / 1. Kat.pdf / 2. Kat.pdf,project/data/infrastructure/raw,infrastructure,raw source,pdf,no,yes,Kat planlari; anlamsal harita bunlardan uretildi
+Derslik Plani 2025-26 Bahar (1).xlsx,project/data/infrastructure/raw,infrastructure,raw source,xlsx,no,yes,Donem derslik plani
+ankara_universiteleri_akademik_kadro_2020_2026.xlsx,data_sources/academic_staff,academic_staff,raw authoritative source,xlsx,no,yes,2020-2026 akademik kadro
+ankara_universiteleri_akademik_kadro_2026.xlsx,data_sources/academic_staff,academic_staff,raw authoritative source,xlsx,no,yes,2026 akademik kadro
+ankara_bilim_mufredat_data1.xlsx,data_sources/curriculum,curriculum,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,data_sources/department_matching,department_matching,raw authoritative source,xlsx,no,yes,AYNI/BENZER bolum iliskisinin TEK yetkili kaynagi; bolum_eslesme.csv bundan uretilir
+Ankara_Bilim_Universitesi_Egitim_Ucretleri (1).xlsx,data_sources/finance,finance,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+ankara_ozel_universiteler_10_egitim_ucretleri.xlsx,data_sources/finance,finance,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+ankara_universiteleri_egitim_ucretleri_2026.xlsx,data_sources/finance,finance,raw authoritative source,xlsx,no,yes,2026 egitim ucretleri
+0. Kat.pdf,data_sources/infrastructure,infrastructure,raw authoritative source,pdf,no,yes,ham/referans kaynak
+1. Kat.pdf,data_sources/infrastructure,infrastructure,raw authoritative source,pdf,no,yes,ham/referans kaynak
+2. Kat.pdf,data_sources/infrastructure,infrastructure,raw authoritative source,pdf,no,yes,ham/referans kaynak
+ABU_Tum_Derslikler.xlsx,data_sources/infrastructure,infrastructure,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+Derslik Planı 2025-26 Bahar (1).xlsx,data_sources/infrastructure,infrastructure,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+ambiguous_records.csv,data_sources/merge_reports,merge_reports,audit report,csv,no,no,merge denetim raporu
+inventory.csv,data_sources/merge_reports,merge_reports,audit report,csv,no,no,merge denetim raporu
+merge_summary.csv,data_sources/merge_reports,merge_reports,audit report,csv,no,no,merge denetim raporu
+new_fields_discovered.csv,data_sources/merge_reports,merge_reports,audit report,csv,no,no,merge denetim raporu
+remaining_ambiguous_review.csv,data_sources/merge_reports,merge_reports,audit report,csv,no,no,merge denetim raporu
+ankara_bilim_stratejik_hedefler_kidr2024.xlsx,data_sources/strategic,strategic,raw authoritative source,xlsx,no,yes,KIDR 2024 stratejik hedefler
+Bölümler Hakkında Genel Bilgiler 12-08-2026.xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+FakültelerEnstitülerYOMYO Hakkında Genel Bilgiler 12-08-2026.xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+ankara_bilim_yabanci_ogrenci_2025_2026.xlsx,data_sources/students,students,raw authoritative source,xlsx,no,yes,ham/referans kaynak
+ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,data_sources/students,students,raw authoritative source,xlsx,no,yes,2020-2026 ogrenci sayilari
+Öğrenci Sayıları (1).xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+Öğrenci Sayıları (2).xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+Öğrenci Sayıları (3).xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+Öğrenci Sayıları (4).xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+Öğrenci Sayıları.xls,data_sources/students,students,raw authoritative source,xls,no,yes,ham/referans kaynak
+README_2021-2022.md,data_sources/yks,yks,raw authoritative source,md,no,yes,ham/referans kaynak
+ankara_bilim_yks_2026_yokatlas.xlsx,data_sources/yks,yks,raw authoritative source,xlsx,no,yes,2026 ABU YKS verisi
+ankara_bilim_yks_4year.csv,data_sources/yks,yks,raw authoritative source,csv,no,yes,ham/referans kaynak
+ankara_bilim_yks_program_summary.csv,data_sources/yks,yks,raw authoritative source,csv,no,yes,ham/referans kaynak
+ankara_universiteleri_yks_2026_yokatlas.xlsx,data_sources/yks,yks,raw authoritative source,xlsx,no,yes,2026 Ankara geneli YKS verisi
+ankara_yks_2021.xlsx,data_sources/yks,yks,raw authoritative source,xlsx,no,yes,2021 YKS verisi
+ankara_yks_2022.xlsx,data_sources/yks,yks,raw authoritative source,xlsx,no,yes,2022 YKS verisi
+ankara_yks_2025_kontenjan_doluluk.xlsx,data_sources/yks,yks,raw authoritative source,xlsx,no,yes,2025 kontenjan/yerlesen/doluluk yetkili kaynagi
+yokatlas_ankara_2022_plus.csv,data_sources/yks,yks,raw authoritative source,csv,no,yes,ham/referans kaynak
+yokatlas_ankara_2022_plus_summary.txt,data_sources/yks,yks,raw authoritative source,txt,no,yes,ham/referans kaynak
+yokatlas_ankara_universiteler.csv,data_sources/yks,yks,raw authoritative source,csv,no,yes,ham/referans kaynak

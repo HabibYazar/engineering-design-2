@@ -1,0 +1,43 @@
+﻿dosya,sheet,satir,kolon,kolonlar
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,1406,31,program_adi; universite; universite_turu; fakulte; program_aciklama; ogrenim_suresi; puan_turu; il; onlisans_mi; kosul_kodlari; kaynak_id; is_home_institution; birinci; birincimaxpuan; birincipuan; birinciyerlesme; erkek; kiz; kontenjan; liseli; maxpuan; mezun; puan; sira; tercihbirinci; tercihilkdokuz; tercihilkuc; tercihtoplam; unimezunu; universiteli; yerlesme
+2021-2022/ankara_yks_2021.xlsx,Metadata,13,2,Alan; Değer
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,1530,31,program_adi; universite; universite_turu; fakulte; program_aciklama; ogrenim_suresi; puan_turu; il; onlisans_mi; kosul_kodlari; kaynak_id; is_home_institution; birinci; birincimaxpuan; birincipuan; birinciyerlesme; erkek; kiz; kontenjan; liseli; maxpuan; mezun; puan; sira; tercihbirinci; tercihilkdokuz; tercihilkuc; tercihtoplam; unimezunu; universiteli; yerlesme
+2021-2022/ankara_yks_2022.xlsx,Metadata,13,2,Alan; Değer
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,Kadro_2020_2026,126,11,academic_year; university_name; university_type; is_home_institution; profesor; docent; dr_ogr_uyesi; ogretim_gorevlisi; arastirma_gorevlisi; toplam_ogretim_elemani; profesor_orani_yuzde
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,ABU_Zaman_Serisi,6,8,academic_year; profesor; docent; dr_ogr_uyesi; ogretim_gorevlisi; arastirma_gorevlisi; toplam; onceki_yila_gore_degisim
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,Ogrenci_Basina_Kadro,126,6,academic_year; university_name; is_home_institution; ogrenci; ogretim_elemani; ogrenci_basina_ogretim_elemani
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,Metadata,9,2,Alan; Değer
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Kadro_2026,1794,17,academic_year; university_name; university_type; is_home_institution; faculty; department; program_name; program_code; level; prof; docent; dr_ogr_uyesi; ars_gor; toplam_ogretim_elemani; quota; placed_students; ogrenci_ogretim_elemani_orani
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Universite_Ozet,23,11,university_name; university_type; is_home_institution; kadro_bildirilen_program; toplam_program; prof; docent; dr_ogr_uyesi; ars_gor; toplam_ogretim_elemani; prof_orani_yuzde
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Metadata,11,2,Alan; Değer
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,60,21,academic_year; faculty; department; program_name; program_code; level; score_type; language; scholarship_type; duration_years; quota; placed_students; occupancy_rate; base_score; success_rank; min_rank_requirement; annual_fee_try; prof; docent; dr_ogr_uyesi; ars_gor
+ankara_bilim_yks_2026_yokatlas.xlsx,Gecmis_2023_2025,118,8,academic_year; faculty; program_name; program_code; scholarship_type; quota; base_score; success_rank
+ankara_bilim_yks_2026_yokatlas.xlsx,Dogrulama,316,6,academic_year; program_name; alan; yok_atlas; proje_dosyasi; sonuc
+ankara_bilim_yks_2026_yokatlas.xlsx,Metadata,15,2,Alan; Değer
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,1794,24,academic_year; university_name; university_type; is_home_institution; faculty; department; program_name; program_code; level; score_type; language; scholarship_type; duration_years; quota; placed_students; occupancy_rate; base_score; success_rank; min_rank_requirement; annual_fee_try; prof; docent; dr_ogr_uyesi; ars_gor
+ankara_universiteleri_yks_2026_yokatlas.xlsx,Gecmis_2023_2025,4613,10,academic_year; university_name; is_home_institution; faculty; program_name; program_code; scholarship_type; quota; base_score; success_rank
+ankara_universiteleri_yks_2026_yokatlas.xlsx,Universite_Ozet,23,12,university_name; university_type; is_home_institution; program_count; lisans; onlisans; total_quota; total_placed; occupancy_rate; median_base_score; best_success_rank; median_annual_fee_try
+ankara_universiteleri_yks_2026_yokatlas.xlsx,Metadata,17,2,Alan; Değer
+ankara_yks_2025_kontenjan_doluluk.xlsx,Bolum_Bazinda_2025,322,9,bolum_grubu; universite_sayisi; program_sayisi; kontenjan_2025; yerlesen_kayitli_2025; doluluk_yuzde_2025; abu_var_mi; abu_kontenjan; abu_doluluk_yuzde
+ankara_yks_2025_kontenjan_doluluk.xlsx,ABU_Programlari_2025,40,20,program_kodu; universite; universite_turu; is_home_institution; fakulte; program_adi; bolum_grubu; burs_turu; puan_turu; ogrenim_suresi; kontenjan_2025; ek_yerlestirme_bos_kontenjan; yerlesen_kayitli_2025; doluluk_yuzde_2025; ozel_kontenjan_devri; taban_puan_2025; basari_sirasi_2025; kontenjan_2024; kontenjan_2023; academic_year
+ankara_yks_2025_kontenjan_doluluk.xlsx,Ankara_Tum_Programlar,1614,20,program_kodu; universite; universite_turu; is_home_institution; fakulte; program_adi; bolum_grubu; burs_turu; puan_turu; ogrenim_suresi; kontenjan_2025; ek_yerlestirme_bos_kontenjan; yerlesen_kayitli_2025; doluluk_yuzde_2025; ozel_kontenjan_devri; taban_puan_2025; basari_sirasi_2025; kontenjan_2024; kontenjan_2023; academic_year
+ankara_yks_2025_kontenjan_doluluk.xlsx,Universite_Ozet,22,7,universite; universite_turu; is_home_institution; program_sayisi; kontenjan_2025; yerlesen_kayitli_2025; doluluk_yuzde_2025
+ankara_yks_2025_kontenjan_doluluk.xlsx,Metadata,16,2,Alan; Değer
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Tüm Üniversiteler,22,6,universite; universite_turu; toplam_program; ayni_bolum_sayisi; benzer_bolum_sayisi; eslesen_abu_bolumleri
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Ankara Bilim Bölümleri,26,4,fakulte; bolum; abu_program_sayisi; puan_turu
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Ankara Bilim Programları,60,12,abu_bolumu; abu_fakultesi; program_adi; burs_turu; ogretim_dili; puan_turu; kontenjan; yerlesen; taban_puan; basari_sirasi; academic_year; program_kodu
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Aynı Bölümler,373,14,abu_bolumu; abu_fakultesi; universite; universite_turu; program_adi; burs_turu; ogretim_dili; puan_turu; kontenjan; yerlesen; taban_puan; basari_sirasi; academic_year; program_kodu
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Benzer Bölümler,765,12,abu_bolumu; universite; universite_turu; benzer_program; benzer_bolum_grubu; burs_turu; puan_turu; taban_puan; basari_sirasi; academic_year; eslesme_anahtari; program_kodu
+filtre/Ankara_Bilim_Ayni_Benzer_Bolumler_TAM.xlsx,Metadata,23,2,Alan; Değer
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Ucretler_2026_2027,1794,15,academic_year; university_name; university_type; is_home_institution; faculty; department; program_name; program_code; level; scholarship_type; language; duration_years; annual_fee_try; quota; placed_students
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Universite_Ozet,23,10,university_name; university_type; is_home_institution; program_count; ucreti_bildirilen; min_fee_try; median_fee_try; max_fee_try; lisans_median_try; onlisans_median_try
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Tahmini_Gelir_TURETILMIS,1077,8,university_name; is_home_institution; program_name; scholarship_type; annual_fee_try; indirim_carpani; placed_students; TAHMINI_yillik_gelir_try
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Metadata,11,2,Alan; Değer
+kpi/ankara_bilim_stratejik_hedefler_kidr2024.xlsx,Stratejik_Amac_Hedef,37,11,amac_no; amac; hedef_no; hedef; gosterge; birim; mevcut_deger; hedef_deger; hedef_yili; veri_kaynagi; kaynak_belge
+kpi/ankara_bilim_stratejik_hedefler_kidr2024.xlsx,Rapordan_Olgular,13,6,olgu; deger; birim; akademik_yil; kaynak_belge; not
+kpi/ankara_bilim_stratejik_hedefler_kidr2024.xlsx,Kaynak_Celiskisi,4,8,metrik; akademik_yil; kaynak_1; deger_1; kaynak_2; deger_2; fark; aciklama
+kpi/ankara_bilim_stratejik_hedefler_kidr2024.xlsx,Metadata,11,2,Alan; Değer
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,Ozet_2020_2026,126,9,academic_year; university_name; university_type; is_home_institution; onlisans; lisans; yuksek_lisans; doktora; toplam
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,Yeni_Yillar_Detay,77,20,academic_year; university_name; university_type; city; education_mode; onlisans_E; onlisans_K; onlisans_T; lisans_E; lisans_K; lisans_T; yukseklisans_E; yukseklisans_K; yukseklisans_T; doktora_E; doktora_K; doktora_T; toplam_E; toplam_K; toplam_T
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,ABU_Zaman_Serisi,6,9,academic_year; onlisans; lisans; yuksek_lisans; doktora; toplam_YOK_portali; toplam_projedeki_dosya; fark; durum
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,Metadata,12,2,Alan; Değer

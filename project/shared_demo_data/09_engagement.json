@@ -1,0 +1,77 @@
+{
+  "_aciklama": "Üniversite-sanayi iş birliği ve bölgesel katkı göstergeleri. Bu iki KPI daha önce tek bir soyut puandan ibaretti ve neyi ölçtüğü belli değildi; artık ölçülebilir alt bileşenlere ayrıldı.",
+
+  "_neden_bu_dosya": "Bölgesel Katkı ve Üniversite-Sanayi İş Birliği KPI'ları önceden elle girilmiş tek bir sayıydı ve hangi veriden geldiği belirsizdi. Buradaki alt bileşenler gerçek kayıtlara dönüştürülür ve KPI değerleri bu kayıtlardan FORMÜLLE hesaplanır.",
+
+  "academic_years": ["2021-2022", "2022-2023", "2023-2024", "2024-2025", "2025-2026"],
+
+  "_sanayi_isbirligi_notu": "Fakülte × yıl kırılımında. Sanayi destekli araştırma bütçesi milyon USD cinsindendir ve mali dönemdeki 'Sanayi iş birliği gelirleri' kalemiyle uyumludur.",
+  "industry_collaboration": {
+    "2021-2022": {
+      "FEA":  { "active_partnerships": 11, "joint_projects": 8,  "funded_research_musd": 0.92, "intern_students": 84,  "signed_protocols": 6 },
+      "FEAS": { "active_partnerships": 5,  "joint_projects": 3,  "funded_research_musd": 0.34, "intern_students": 41,  "signed_protocols": 3 },
+      "FAS":  { "active_partnerships": 2,  "joint_projects": 1,  "funded_research_musd": 0.11, "intern_students": 12,  "signed_protocols": 1 },
+      "FHS":  { "active_partnerships": 2,  "joint_projects": 1,  "funded_research_musd": 0.09, "intern_students": 26,  "signed_protocols": 1 }
+    },
+    "2022-2023": {
+      "FEA":  { "active_partnerships": 13, "joint_projects": 10, "funded_research_musd": 1.08, "intern_students": 96,  "signed_protocols": 7 },
+      "FEAS": { "active_partnerships": 6,  "joint_projects": 4,  "funded_research_musd": 0.41, "intern_students": 48,  "signed_protocols": 4 },
+      "FAS":  { "active_partnerships": 2,  "joint_projects": 1,  "funded_research_musd": 0.13, "intern_students": 15,  "signed_protocols": 1 },
+      "FHS":  { "active_partnerships": 3,  "joint_projects": 1,  "funded_research_musd": 0.11, "intern_students": 31,  "signed_protocols": 2 }
+    },
+    "2023-2024": {
+      "FEA":  { "active_partnerships": 15, "joint_projects": 12, "funded_research_musd": 1.24, "intern_students": 108, "signed_protocols": 8 },
+      "FEAS": { "active_partnerships": 7,  "joint_projects": 5,  "funded_research_musd": 0.48, "intern_students": 55,  "signed_protocols": 4 },
+      "FAS":  { "active_partnerships": 3,  "joint_projects": 2,  "funded_research_musd": 0.16, "intern_students": 18,  "signed_protocols": 2 },
+      "FHS":  { "active_partnerships": 3,  "joint_projects": 2,  "funded_research_musd": 0.13, "intern_students": 36,  "signed_protocols": 2 }
+    },
+    "2024-2025": {
+      "FEA":  { "active_partnerships": 17, "joint_projects": 15, "funded_research_musd": 1.43, "intern_students": 121, "signed_protocols": 9 },
+      "FEAS": { "active_partnerships": 8,  "joint_projects": 6,  "funded_research_musd": 0.55, "intern_students": 62,  "signed_protocols": 5 },
+      "FAS":  { "active_partnerships": 3,  "joint_projects": 2,  "funded_research_musd": 0.18, "intern_students": 21,  "signed_protocols": 2 },
+      "FHS":  { "active_partnerships": 4,  "joint_projects": 2,  "funded_research_musd": 0.15, "intern_students": 42,  "signed_protocols": 2 }
+    },
+    "2025-2026": {
+      "FEA":  { "active_partnerships": 19, "joint_projects": 18, "funded_research_musd": 1.62, "intern_students": 134, "signed_protocols": 11 },
+      "FEAS": { "active_partnerships": 9,  "joint_projects": 6,  "funded_research_musd": 0.61, "intern_students": 68,  "signed_protocols": 5 },
+      "FAS":  { "active_partnerships": 4,  "joint_projects": 2,  "funded_research_musd": 0.19, "intern_students": 24,  "signed_protocols": 2 },
+      "FHS":  { "active_partnerships": 4,  "joint_projects": 3,  "funded_research_musd": 0.13, "intern_students": 47,  "signed_protocols": 3 }
+    }
+  },
+
+  "_bolgesel_katki_notu": "Üniversite geneli, yıllık. 'Bölge' = İç Anadolu. Mezun istihdamı Modül 2'deki mezun sayısıyla tutarlı olmalıdır; oran değil SAYI saklanır ki oran hesaplanabilsin ve doğrulanabilsin.",
+  "regional_contribution": {
+    "2021-2022": { "graduates_employed_in_region": 268, "local_public_projects": 6,  "municipality_partnerships": 3, "community_service_hours": 4200,  "regional_sme_collaborations": 9,  "public_events_hosted": 14 },
+    "2022-2023": { "graduates_employed_in_region": 312, "local_public_projects": 8,  "municipality_partnerships": 4, "community_service_hours": 5100,  "regional_sme_collaborations": 12, "public_events_hosted": 18 },
+    "2023-2024": { "graduates_employed_in_region": 358, "local_public_projects": 9,  "municipality_partnerships": 5, "community_service_hours": 6300,  "regional_sme_collaborations": 15, "public_events_hosted": 21 },
+    "2024-2025": { "graduates_employed_in_region": 411, "local_public_projects": 12, "municipality_partnerships": 6, "community_service_hours": 7450,  "regional_sme_collaborations": 18, "public_events_hosted": 26 },
+    "2025-2026": { "graduates_employed_in_region": 452, "local_public_projects": 14, "municipality_partnerships": 7, "community_service_hours": 8600,  "regional_sme_collaborations": 22, "public_events_hosted": 31 }
+  },
+
+  "_hedefler_notu": "KPI hedef değerleri. Formül çıktısı bu hedeflerle karşılaştırılarak başarı oranı bulunur.",
+  "targets": {
+    "industry_collaboration_index": 75.0,
+    "regional_contribution_index": 70.0
+  },
+
+  "_normalizasyon_notu": "Endeks hesabında her alt bileşen kendi referans değerine bölünüp 100 ile çarpılır, sonra ağırlıklı ortalaması alınır. Referans değerler kurumun 2026 stratejik plan hedefleridir. Ağırlıklar toplamı 1.00 olmalıdır.",
+  "industry_collaboration_formula": {
+    "components": {
+      "active_partnerships":  { "weight": 0.20, "reference_value": 45,   "label": "Aktif sanayi iş birliği sayısı", "unit": "adet" },
+      "joint_projects":       { "weight": 0.25, "reference_value": 40,   "label": "Ortak proje sayısı", "unit": "adet" },
+      "funded_research_musd": { "weight": 0.30, "reference_value": 3.50, "label": "Sanayi destekli araştırma bütçesi", "unit": "milyon USD" },
+      "intern_students":      { "weight": 0.15, "reference_value": 350,  "label": "Staj yapan öğrenci sayısı", "unit": "kişi" },
+      "signed_protocols":     { "weight": 0.10, "reference_value": 25,   "label": "İş birliği protokolü sayısı", "unit": "adet" }
+    }
+  },
+  "regional_contribution_formula": {
+    "components": {
+      "graduates_employed_in_region": { "weight": 0.35, "reference_value": 600,   "label": "Bölgede istihdam edilen mezun sayısı", "unit": "kişi" },
+      "local_public_projects":        { "weight": 0.20, "reference_value": 20,    "label": "Yerel kamu projesi sayısı", "unit": "adet" },
+      "municipality_partnerships":    { "weight": 0.10, "reference_value": 10,    "label": "Belediye iş birliği sayısı", "unit": "adet" },
+      "community_service_hours":      { "weight": 0.15, "reference_value": 12000, "label": "Toplum hizmeti saati", "unit": "saat" },
+      "regional_sme_collaborations":  { "weight": 0.15, "reference_value": 30,    "label": "Bölgesel KOBİ iş birliği sayısı", "unit": "adet" },
+      "public_events_hosted":         { "weight": 0.05, "reference_value": 40,    "label": "Halka açık etkinlik sayısı", "unit": "adet" }
+    }
+  }
+}

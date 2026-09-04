@@ -1,0 +1,76 @@
+/* ABÜ KDS — GÖRSEL DEĞİŞKENLER (renk, yarıçap, gölge, taban tipografi)
+   ==========================================================================
+   NEDEN AYRI BİR DOSYA
+   --------------------
+   Yönetim paneli (index.html) yalnızca RENK PALETİNİ paylaşmak için
+   `shell.css`i yüklüyordu. Ama shell.css klasik harita arayüzünün BÜTÜN
+   yerleşim kurallarını da taşır ve içinde ID seçicileri vardır:
+
+       #govde { display: grid; grid-template-columns: 1fr 0fr;
+                height: calc(100vh - 58px); overflow-x: auto; }
+
+   Yeni panelin gövde kabı da `id="govde"` olduğu için bu kural onu ele
+   geçiriyordu. ID seçicisi sınıf seçicisinden güçlüdür; kabuk.css'teki
+   `.govde { flex:1 }` kuralı `display`i geri alamıyordu. Sonuç:
+   panelin çocukları `1fr 0fr` gridine dizildi — biri tam genişlik,
+   diğeri 0fr sütununda 30px'e ezildi — ve `overflow-x:auto` sayfaya
+   yatay kaydırma çubuğu ekledi. Ekranın "bozuk" görünmesinin sebebi
+   buydu; tek bir sınıf değil, İKİ TASARIM SİSTEMİNİN AYNI İSİM ALANINI
+   PAYLAŞMASIYDI.
+
+   Çözüm: paylaşılan tek şey olan değişkenler buraya alındı.
+     index.html  → degiskenler.css + kabuk.css   (shell.css YÜKLENMEZ)
+     klasik.html → degiskenler.css + shell.css
+   Böylece iki arayüzün yerleşim kuralları birbirine hiç değmez ve bu
+   sınıf hata bir daha çıkamaz.
+   ========================================================================== */
+
+:root {
+  --bg: #080b12;
+  --bg-2: #0d1119;
+  --yuzey: #121824;
+  --yuzey-2: #18202f;
+  --cizgi: #1f2937;
+  --kenar: rgba(255, 255, 255, 0.07);
+  --metin: #eef2f8;
+  --metin-2: #9aa8bd;
+  --sonuk: #64748b;
+  --vurgu: #4c8dff;
+  --vurgu-2: #2ec4a6;
+  --iyi: #2ec27e;
+  --uyari: #f2a33c;
+  --kotu: #f2545b;
+  --mor: #9b7ff0;
+  --pembe: #e0679b;
+  --r: 14px;
+  --golge: 0 2px 8px rgba(0, 0, 0, .35), 0 12px 32px rgba(0, 0, 0, .28);
+}
+
+:root[data-tema="acik"] {
+  --bg: #eef1f6; --bg-2: #e6eaf1; --yuzey: #ffffff; --yuzey-2: #f5f7fb;
+  --cizgi: #dfe4ec; --kenar: rgba(10, 20, 40, .09);
+  --metin: #0d1520; --metin-2: #55627a; --sonuk: #8b97ab;
+  --golge: 0 1px 3px rgba(15, 30, 60, .07), 0 10px 28px rgba(15, 30, 60, .07);
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(76, 141, 255, .13), transparent 62%),
+    radial-gradient(820px 520px at 8% 104%, rgba(46, 196, 166, .10), transparent 60%),
+    var(--bg);
+  color: var(--metin);
+  font-size: 14.5px;
+  overflow: hidden;
+}
+
+:root[data-tema="acik"] body {
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(76, 141, 255, .12), transparent 62%),
+    radial-gradient(820px 520px at 8% 104%, rgba(46, 196, 166, .10), transparent 60%),
+    var(--bg);
+}
+

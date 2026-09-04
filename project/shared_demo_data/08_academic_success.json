@@ -1,0 +1,52 @@
+{
+  "_aciklama": "Akademik başarı verisi üretim şartnamesi. Program × akademik yıl kırılımında ders geçme, kalma, bırakma ve mezuniyet oranları üretilir.",
+
+  "_tutarlilik_kurallari": [
+    "Ders geçme oranı + ders kalma oranı = 100 (her satırda birebir sağlanır).",
+    "Tüm oranlar 0-100 aralığındadır.",
+    "Mezun sayısı, o programın mezuniyet aşamasındaki öğrenci sayısını aşamaz.",
+    "Fakülte ve üniversite düzeyindeki oranlar ayrı saklanmaz; program satırlarından öğrenci sayısına göre AĞIRLIKLI ortalama ile hesaplanır. Böylece hangi seviyeden bakılırsa bakılsın toplamlar tutarlıdır.",
+    "Ortalama başarı puanı ile ders geçme oranı aynı yönde hareket eder; biri yükselirken diğerinin düşmesi veri hatası sayılır."
+  ],
+
+  "random_seed": 20260804,
+  "academic_years": ["2021-2022", "2022-2023", "2023-2024", "2024-2025", "2025-2026"],
+
+  "_program_taban_notu": "Her program için taban ders geçme oranı ve yıllık eğilim. Mühendislik programlarında geçme oranı bilinçli olarak düşük, sağlık ve sosyal programlarda yüksek tutuldu; böylece fakülte karşılaştırması anlamlı sonuç üretir.",
+  "programs": {
+    "CENG-BSC": { "base_pass_rate": 78.5, "yearly_trend": 0.9,  "base_score": 68.4, "dropout_base": 8.2,  "graduation_base": 71.5 },
+    "SWE-BSC":  { "base_pass_rate": 82.1, "yearly_trend": 1.2,  "base_score": 71.8, "dropout_base": 6.9,  "graduation_base": 76.2 },
+    "EEE-BSC":  { "base_pass_rate": 74.3, "yearly_trend": 0.6,  "base_score": 65.1, "dropout_base": 10.4, "graduation_base": 67.8 },
+    "ME-BSC":   { "base_pass_rate": 76.0, "yearly_trend": 0.4,  "base_score": 66.7, "dropout_base": 9.6,  "graduation_base": 69.3 },
+    "CE-BSC":   { "base_pass_rate": 71.2, "yearly_trend": -0.5, "base_score": 62.9, "dropout_base": 12.8, "graduation_base": 63.4 },
+    "IE-BSC":   { "base_pass_rate": 84.6, "yearly_trend": 0.8,  "base_score": 73.5, "dropout_base": 5.8,  "graduation_base": 79.1 },
+    "ARCH-BSC": { "base_pass_rate": 79.8, "yearly_trend": 0.3,  "base_score": 69.6, "dropout_base": 8.9,  "graduation_base": 72.6 },
+    "BA-BSC":   { "base_pass_rate": 86.2, "yearly_trend": 0.7,  "base_score": 74.8, "dropout_base": 6.1,  "graduation_base": 80.4 },
+    "ECON-BSC": { "base_pass_rate": 83.4, "yearly_trend": 0.5,  "base_score": 72.3, "dropout_base": 7.4,  "graduation_base": 77.9 },
+    "IR-BSC":   { "base_pass_rate": 85.1, "yearly_trend": 0.2,  "base_score": 73.9, "dropout_base": 7.0,  "graduation_base": 78.8 },
+    "PSY-BSC":  { "base_pass_rate": 87.3, "yearly_trend": 1.0,  "base_score": 76.2, "dropout_base": 5.2,  "graduation_base": 82.1 },
+    "NUR-BSC":  { "base_pass_rate": 89.6, "yearly_trend": 0.6,  "base_score": 78.4, "dropout_base": 4.3,  "graduation_base": 84.7 },
+    "SWE-MSC":  { "base_pass_rate": 91.2, "yearly_trend": 0.4,  "base_score": 81.5, "dropout_base": 9.8,  "graduation_base": 74.2 },
+    "BA-MSC":   { "base_pass_rate": 92.8, "yearly_trend": 0.3,  "base_score": 83.1, "dropout_base": 8.5,  "graduation_base": 77.6 }
+  },
+
+  "_dalgalanma_notu": "Yıllar arası küçük rastgele dalgalanma; sabit tohumla üretildiği için her çalıştırmada aynıdır.",
+  "yearly_noise_range": { "min": -1.8, "max": 1.8 },
+
+  "_sinir_notu": "Üretilen oranlar bu sınırların dışına çıkamaz; çıkarsa sınıra kırpılır.",
+  "bounds": {
+    "pass_rate": { "min": 45.0, "max": 98.0 },
+    "average_score": { "min": 40.0, "max": 95.0 },
+    "dropout_rate": { "min": 1.0, "max": 22.0 },
+    "graduation_rate": { "min": 40.0, "max": 95.0 }
+  },
+
+  "_mezun_notu": "Üniversite geneli mezun sayıları. Mali dönemlerdeki 'total_graduates' alanı buradan doldurulur; iki dosyada ayrı ayrı yazılmaz.",
+  "university_graduates_per_year": {
+    "2021-2022": 512,
+    "2022-2023": 574,
+    "2023-2024": 631,
+    "2024-2025": 698,
+    "2025-2026": 748
+  }
+}

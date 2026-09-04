@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABÜ KDS — Klasik (harita) görünüm</title>
+<!-- shell.css     yeni tasarımın görsel sistemi + değişken köprüsü
+     integration.css  mevcut ekranların bileşen stilleri (değişmedi) -->
+<!-- ÖNEMLİ: `?v=` bir önbellek kırıcıdır. assets/ altındaki HERHANGİ bir
+     dosya değiştiğinde bu sayı ARTIRILMALIDIR. Aksi hâlde tarayıcı bazı
+     dosyaların eski, bazılarının yeni sürümünü karıştırır ve
+     "X is not defined" gibi, testlerde görünmeyen çalışma zamanı
+     hataları çıkar (jsdom her koşuda temiz indirir). -->
+<link rel="stylesheet" href="assets/degiskenler.css?v=47">
+<link rel="stylesheet" href="assets/shell.css?v=47">
+<link rel="stylesheet" href="assets/integration.css?v=47">
+</head>
+<body data-gorunum="klasik">
+<!-- KLASİK GÖRÜNÜM. Yeni yönetim arayüzü index.html'dedir; bu sayfa
+     gezinme haritası (graph.js) tabanlı önceki kabuğu korur ve yeni
+     kabuktaki "Klasik Görünüm" bağlantısından açılır. -->
+<!-- Tek sayfa uygulaması: kabuk ve tüm ekranlar JavaScript ile çizilir.
+     YÜKLEME SIRASI ÖNEMLİDİR:
+       api.js           backend istemcisi, biçimlendirme, durum bileşenleri
+       themes.js        fakülte temaları (palet, doku, şekil, tipografi)
+       graph.js         gezinme haritası (SVG hub grafiği)
+       data-adapter.js  gezinme ağacı — GERÇEK API'den kurulur
+       ui-kit.js        yeni tasarımın bileşen sözlüğü (kutu/kart/çubuk/halka)
+       lenses.js        hub içerikleri — yeni görsel dilde, gerçek API verisiyle
+       hubs.js          8 hub ve içlerindeki alt modüller
+       app.js           kabuk, yönlendirme, asistan kabuğu, grafik yardımcıları
+       ai-view-renderer.js  dinamik AI paneli (ui_spec 2.0) — DEĞİŞMEDİ
+       views-planning / views-system  HENÜZ TAŞINMAMIŞ ekranlar (senaryo,
+                        yapı, veri aktarımı, kullanıcı) — geçici köprü
+       views-assistant  yalnızca SOHBET MOTORU için yüklenir; ekran çizimi
+                        artık `lenses.js` içindeki asistan merceğidir
+     Harici kütüphane veya CDN kullanılmaz, derleme adımı yoktur.
+     (?v= parametresi tarayıcı önbelleğini tazeler) -->
+<script src="assets/api.js?v=47"></script>
+<script src="assets/themes.js?v=47"></script>
+<script src="assets/graph.js?v=47"></script>
+<script src="assets/data-adapter.js?v=47"></script>
+<script src="assets/ui-kit.js?v=47"></script>
+<script src="assets/lenses.js?v=49"></script>
+<script src="assets/hubs.js?v=47"></script>
+<script src="assets/app.js?v=47"></script>
+<script src="assets/ai-view-renderer.js?v=47"></script>
+<script src="assets/views-assistant.js?v=47"></script>
+<script src="assets/views-planning.js?v=47"></script>
+<script src="assets/views-system.js?v=47"></script>
+</body>
+</html>

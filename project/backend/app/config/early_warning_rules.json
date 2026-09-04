@@ -1,0 +1,211 @@
+{
+  "_aciklama": "PDF Bolum 11'de sayilan erken uyari kosullarinin tamami burada tanimlidir. implemented=true olanlar Modul 3 ve Modul 7 verisiyle calisir; implemented=false olanlar baska modullerin verisini bekler ve /pending-rules ucunda raporlanir. Yeni kural eklemek icin bu dosyaya kayit eklemek yeterlidir.",
+  "severity_order": [
+    "kritik",
+    "yuksek",
+    "orta",
+    "dusuk"
+  ],
+  "rules": [
+    {
+      "key": "program_occupancy_low",
+      "name": "Program doluluk oranı kritik seviyenin altında",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot",
+      "thresholds": {
+        "kritik": 50,
+        "yuksek": 65,
+        "orta": 80
+      },
+      "recommended_action": "Kontenjan yeniden değerlendirilmeli; tanıtım ve tercih danışmanlığı güçlendirilmeli.",
+      "risk_category": "Öğrenci talebi riskleri"
+    },
+    {
+      "key": "attrition_rate_increase",
+      "name": "Öğrenci kaybı (terk) oranı artıyor",
+      "pdf_condition": "Student attrition rates increase",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot (yil karsilastirmasi)",
+      "thresholds": {
+        "min_rate": 3.0,
+        "kritik": 60,
+        "yuksek": 40,
+        "orta": 20
+      },
+      "recommended_action": "Akademik danışmanlık ve öğrenci destek mekanizmaları devreye alınmalı; terk nedenleri anketle incelenmeli.",
+      "risk_category": "Öğrenci talebi riskleri"
+    },
+    {
+      "key": "non_renewal_rate_increase",
+      "name": "Kayıt yenilememe oranı artıyor",
+      "pdf_condition": "Student attrition rates increase (kayit yenilememe bileseni)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - ProgramEnrollmentSnapshot (yil karsilastirmasi)",
+      "thresholds": {
+        "min_rate": 2.0,
+        "kritik": 60,
+        "yuksek": 40,
+        "orta": 20
+      },
+      "recommended_action": "Kayıt yenilemeyen öğrencilerle iletişime geçilmeli; burs ve ödeme kolaylığı seçenekleri gözden geçirilmeli.",
+      "risk_category": "Öğrenci talebi riskleri"
+    },
+    {
+      "key": "academic_performance_decline",
+      "name": "Akademik performans göstergeleri düşüyor",
+      "pdf_condition": "Academic performance indicators decline",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - StudentAcademicRecord (GNO trendi)",
+      "thresholds": {
+        "kritik": -0.25,
+        "yuksek": -0.18,
+        "orta": -0.1
+      },
+      "recommended_action": "Ders içerikleri ve ölçme yöntemleri gözden geçirilmeli; destek dersleri planlanmalı.",
+      "risk_category": "Akademik riskler"
+    },
+    {
+      "key": "admission_score_below_national",
+      "name": "Taban puan Türkiye ortalamasının altında",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (oncu gosterge - taban puan ulusal ortalamanin altinda)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - taban puan analizi",
+      "thresholds": {
+        "kritik": -50,
+        "yuksek": -25,
+        "orta": 0
+      },
+      "recommended_action": "Program tanıtımı ve tercih stratejisi güçlendirilmeli; burs politikası gözden geçirilmeli.",
+      "risk_category": "Akademik riskler"
+    },
+    {
+      "key": "demand_sharp_decline",
+      "name": "Öğrenci talebi keskin düşüşte",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (trend bileseni)",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 3 - doluluk trendi",
+      "thresholds": {
+        "kritik": -30,
+        "yuksek": -20,
+        "orta": -10
+      },
+      "recommended_action": "Talep düşüşünün nedeni araştırılmalı; program içeriği ve konumlandırması yenilenmeli.",
+      "risk_category": "Öğrenci talebi riskleri"
+    },
+    {
+      "key": "sustainability_score_low",
+      "name": "Program sürdürülebilirlik puanı düşük",
+      "pdf_condition": "Turetilmis bilesik gosterge - PDF'in tek bir maddesine karsilik gelmez; Modul 7'nin hesaplanan 3 kriterini (talep, doluluk, mezuniyet orani) tek puanda birlestirir",
+      "scope": "program",
+      "implemented": true,
+      "data_source": "Modul 7 - surdurulebilirlik puani",
+      "thresholds": {
+        "kritik": 40,
+        "yuksek": 50,
+        "orta": 60
+      },
+      "recommended_action": "Program için iyileştirme planı hazırlanmalı; kapatma veya birleştirme seçenekleri değerlendirilmeli.",
+      "risk_category": "Stratejik riskler"
+    },
+    {
+      "key": "university_occupancy_low",
+      "name": "Üniversite geneli doluluk oranı düşük",
+      "pdf_condition": "Program enrollment rates fall below a critical threshold (kurum duzeyi)",
+      "scope": "university",
+      "implemented": true,
+      "data_source": "Modul 3 - konsolide doluluk",
+      "thresholds": {
+        "kritik": 60,
+        "yuksek": 70,
+        "orta": 80
+      },
+      "recommended_action": "Kurumsal tanıtım ve kontenjan planlaması bütüncül olarak gözden geçirilmeli.",
+      "risk_category": "Öğrenci talebi riskleri"
+    },
+    {
+      "key": "budget_deficit",
+      "name": "Bütçe açığı oluştu",
+      "pdf_condition": "A budget deficit emerges",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Gelir kalemleri ve harcama planı yeniden değerlendirilmeli.",
+      "risk_category": "Mali riskler"
+    },
+    {
+      "key": "unit_budget_overrun",
+      "name": "Birim harcamaları tahsis edilen bütçeyi aştı",
+      "pdf_condition": "Expenditures of an organizational unit exceed its allocated budget",
+      "scope": "unit",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Birim bütçesi revize edilmeli; harcama onay süreci sıkılaştırılmalı.",
+      "risk_category": "Mali riskler"
+    },
+    {
+      "key": "additional_staff_need",
+      "name": "Ek akademik personel ihtiyacı arttı",
+      "pdf_condition": "The need for additional academic staff increases",
+      "scope": "program",
+      "implemented": false,
+      "data_source": "Modul 4 - Akademik Kadro Analitigi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Kadro planlaması güncellenmeli; ders yükü dağılımı dengelenmeli.",
+      "risk_category": "Akademik riskler"
+    },
+    {
+      "key": "capacity_insufficient",
+      "name": "Derslik veya laboratuvar kapasitesi yetersiz",
+      "pdf_condition": "Classroom or laboratory capacity becomes insufficient",
+      "scope": "unit",
+      "implemented": false,
+      "data_source": "Modul 5 - Fiziksel Kaynak ve Kapasite Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Mekân planlaması gözden geçirilmeli; ders programı eş zamanlı kullanımı azaltacak şekilde düzenlenmeli.",
+      "risk_category": "Kapasite riskleri"
+    },
+    {
+      "key": "strategic_objective_delay",
+      "name": "Stratejik hedefler gecikmede",
+      "pdf_condition": "Strategic objectives are delayed",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 8 - Stratejik Plan ve Hedef Izleme (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Hedef sahipleriyle gözden geçirme toplantısı yapılmalı; gecikme nedenleri raporlanmalı.",
+      "risk_category": "Stratejik riskler"
+    },
+    {
+      "key": "accreditation_expiry",
+      "name": "Akreditasyon yenileme tarihi yaklaşıyor",
+      "pdf_condition": "Accreditation renewal or expiration dates are approaching",
+      "scope": "program",
+      "implemented": false,
+      "data_source": "Kalite guvence / akreditasyon takibi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Akreditasyon başvuru dosyası hazırlanmalı; öz değerlendirme raporu güncellenmeli.",
+      "risk_category": "Stratejik riskler"
+    },
+    {
+      "key": "revenue_decline",
+      "name": "Araştırma veya öğrenci gelirleri azalıyor",
+      "pdf_condition": "Research revenues or student-related revenues decrease",
+      "scope": "university",
+      "implemented": false,
+      "data_source": "Modul 5 - Finansal Surdurulebilirlik Analizi (baglanmadi)",
+      "thresholds": {},
+      "recommended_action": "Gelir çeşitlendirme seçenekleri ve proje başvuru hedefleri gözden geçirilmeli.",
+      "risk_category": "Mali riskler"
+    }
+  ],
+  "_kategori_aciklamasi": "risk_category alani panoda risklerin gruplanmasi icin kullanilir. Kural mantigini ve esikleri etkilemez; yalnizca gosterim amaclidir."
+}

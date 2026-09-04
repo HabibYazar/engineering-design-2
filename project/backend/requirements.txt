@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic-settings
+pandas
+openpyxl
+# YÖK'ün istatistik portalı ESKİ BIFF .xls üretiyor (JasperReports).
+# openpyxl bu biçimi okuyamaz; yalnızca import_yok_registry.py kullanır.
+xlrd
+python-multipart
+
+# Yerel Ollama sunucusuyla konusmak icin (bulut API'si degil).
+httpx
+
+# Test bağımlılıkları
+pytest==9.1.1
+httpx2

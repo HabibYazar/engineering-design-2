@@ -1,0 +1,376 @@
+/* ==========================================================================
+   MİKRO ANİMASYONLAR
+   ==========================================================================
+   Bu dosya YALNIZCA görsel cilâdır. Tamamı silinse uygulama bugünkü
+   davranışını birebir sürdürür: hiçbir yerleşim, ölçü, renk, sayı veya
+   etkileşim buradan gelmiyor.
+
+   ÜÇ KURAL
+   --------
+   1. Yalnızca `opacity`, `transform` ve `clip-path` animate edilir.
+      `width`, `height`, `top`, `left` animasyonu her karede yerleşim
+      hesabını yeniden tetikler; büyük panolarda bu takılma olur.
+
+   2. `animation-fill-mode: backwards` kullanılır, `forwards` DEĞİL.
+      Fark önemli: `backwards` yalnızca BAŞLANGIÇ karesini animasyondan
+      önce uygular; animasyon bitince öğe kendi normal stiline döner ve
+      geride hiçbir `transform` ya da `clip-path` kalmaz. `forwards`
+      son kareyi kilitler ve örneğin grafiğin üzerinde kalıcı bir kırpma
+      bırakırdı — ipucu kutusu ya da taşan bir etiket kesilebilirdi.
+
+   3. SAYILARA DOKUNULMAZ. Hiçbir kural bir değerin metnini
+      değiştirmez; KPI değeri ilk kareden itibaren gerçek değeridir.
+      (Sayaç/count-up denenmiş ve geri alınmıştı — gerekçe aşağıda.)
+
+   Sınıf adları bilerek azdır: efektler mevcut `.kpi` / `.panel` /
+   `.gmodal` / `.ai-mesaj` yapısına bağlanır, yeni sınıf üretilmez.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1) EKRAN GEÇİŞİ
+   --------------------------------------------------------------------------
+   `kabuk.js` içindeki `ciz()`, sol menüden bir ekran seçildiğinde
+   `#kds` ağacının TAMAMINI `innerHTML` ile yeniden kurar. Yani
+   `.icerik-sar`, `.ust` ve `.govde` her geçişte YENİ ELEMANLARDIR ve
+   CSS animasyonu kendiliğinden yeniden başlar — sınıf ekleyip kaldıran
+   bir JS yardımcısına gerek yoktur.
+
+   Panel içi tazeleme (`doldur()`) yalnızca panelin GÖVDESİNİ değiştirir;
+   `.govde` aynı eleman olarak kaldığı için animasyon tekrar oynamaz.
+   İstenen ayrım tam olarak budur: ekran değişince görünür bir geçiş,
+   veri tazelenince sükûnet.
+   -------------------------------------------------------------------------- */
+@keyframes abu-ekran-giris {
+  from { opacity: 0; transform: translateY(14px) scale(.995); }
+  to   { opacity: 1; transform: none; }
+}
+
+.icerik-sar > .govde {
+  animation: abu-ekran-giris .36s cubic-bezier(.22, .61, .36, 1) backwards;
+}
+
+/* --------------------------------------------------------------------------
+   2) SAYFA BAŞLIĞI
+   --------------------------------------------------------------------------
+   Başlık kartlardan önce yerine oturur; göz önce "neredeyim" sorusunun
+   cevabını alır, sonra veriye iner.
+   -------------------------------------------------------------------------- */
+@keyframes abu-baslik-giris {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ust > h1 { animation: abu-baslik-giris .3s ease-out backwards; }
+
+/* --------------------------------------------------------------------------
+   3) KART GİRİŞİ
+   --------------------------------------------------------------------------
+   Kademe (stagger) İLK 6 KARTLA SINIRLIDIR. Sınırsız kademe, alttaki
+   kartı yarım saniyeden fazla bekletir ve "yavaş açılıyor" hissi verir.
+   Altıncıdan sonrası aynı anda gelir; kullanıcı zaten ekranın üstüne
+   bakıyordur.
+   -------------------------------------------------------------------------- */
+@keyframes abu-kart-giris {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.govde .kpi,
+.govde .panel {
+  animation: abu-kart-giris .42s cubic-bezier(.22, .61, .36, 1) backwards;
+}
+
+.govde .kpi:nth-child(1),   .govde .panel:nth-child(1)   { animation-delay: 0ms; }
+.govde .kpi:nth-child(2),   .govde .panel:nth-child(2)   { animation-delay: 60ms; }
+.govde .kpi:nth-child(3),   .govde .panel:nth-child(3)   { animation-delay: 120ms; }
+.govde .kpi:nth-child(4),   .govde .panel:nth-child(4)   { animation-delay: 180ms; }
+.govde .kpi:nth-child(5),   .govde .panel:nth-child(5)   { animation-delay: 240ms; }
+.govde .kpi:nth-child(n+6), .govde .panel:nth-child(n+6) { animation-delay: 300ms; }
+
+/* Panel İÇİNDEKİ kartlar kademe almaz: dış panel zaten gecikmeli
+   geliyor, iç kartlara ikinci gecikme binerse bekleme toplanır. */
+.govde .panel .kpi { animation-delay: 0ms !important; }
+
+/* --------------------------------------------------------------------------
+   4) KPI DEĞERİ
+   --------------------------------------------------------------------------
+   SAYAÇ (COUNT-UP) BİLEREK YOK.
+   Denendi ve geri alındı: sayaç değeri `textContent` üzerinden animate
+   ediyordu, arayüz testleri de ekrandaki sayıyı aynı yerden okuyor.
+   Ölçüldü — `test_yonetim_paneli.js` 9 hatadan 16 hataya çıkmıştı;
+   "3.626 görünüyor" gibi kontroller sayaç ara karedeyken düşüyordu.
+   Testin yakaladığı şey gerçekti: sayaç sürerken ekranda bir süre
+   YANLIŞ sayı duruyor. Bir yönetim panosunda bu, görsel kazançtan ağır
+   basar.
+
+   Buradaki efekt yalnızca GÖRSELDİR: metin ilk kareden itibaren gerçek
+   değerdir, sadece belirme biçimi yumuşatılır.
+   -------------------------------------------------------------------------- */
+@keyframes abu-deger-giris {
+  from { opacity: 0; transform: scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+.govde .kpi .dg {
+  animation: abu-deger-giris .34s cubic-bezier(.22, .61, .36, 1) .1s backwards;
+  transform-origin: left center;
+}
+
+/* --------------------------------------------------------------------------
+   5) GRAFİK AÇILIŞI
+   --------------------------------------------------------------------------
+   Grafik soldan sağa açılır. SVG'nin İÇİNDEKİ öğelere (çubuk, çizgi,
+   dilim) DOKUNULMAZ: bir çubuğu tek tek "yerden yükseltmek"
+   `transform-origin` gerektirir ve bu her grafiğin kendi `viewBox`
+   düzenine bağlıdır — yanlış origin çubuğu kaydırır ve kullanıcı yanlış
+   bir grafiğe bakar. Burada yalnızca kabın görünür bölgesi açılır;
+   geometri, koordinat ve sayılar hiç değişmez.
+
+   `backwards` sayesinde animasyon bitince kırpma tümüyle kalkar.
+   -------------------------------------------------------------------------- */
+@keyframes abu-grafik-acilis {
+  from { opacity: .4; clip-path: inset(0 100% 0 0); }
+  to   { opacity: 1;  clip-path: inset(0 0 0 0); }
+}
+
+.govde .panel svg,
+.govde .mp-svg {
+  animation: abu-grafik-acilis .8s cubic-bezier(.33, 1, .68, 1) .12s backwards;
+}
+
+/* --------------------------------------------------------------------------
+   6) HALKA (DONUT) GRAFİKLERİ — DÖNEREK DOLMA
+   --------------------------------------------------------------------------
+   İki ayrı halka türü vardır ve ikisi de farklı çizilir:
+
+     `dagilimHalkasi()`  grafikler.js — çok dilimli dağılım halkası
+                         ("Akademik Ünvan Dağılımı"). Dilimler DOLDURULMUŞ
+                         `<path>` kamalarıdır, `stroke` değil; bu yüzden
+                         dilimlere doğrudan `stroke-dasharray` uygulanamaz.
+                         Çözüm: halka bandını kaplayan tek bir maske
+                         çemberi saat yönünde açılır, dilimler onun
+                         altından sırayla görünür.
+
+     `halka()`           ui-kit.js — tek değerli ilerleme halkası. Zaten
+                         `stroke-dasharray` ile çizildiği için yalnızca
+                         `stroke-dashoffset` animasyonu yeter.
+
+   Her iki durumda da GEOMETRİ, AÇI, RENK VE SAYILAR DEĞİŞMEZ. Animasyon
+   neyin GÖRÜNDÜĞÜNÜ belirler, neyin ÇİZİLDİĞİNİ değil: kapatıldığında
+   halka ilk kareden itibaren tam ve doğru görünür.
+
+   Kap için ölçek/döndürme efekti BİLEREK KALDIRILDI — süpürme sürerken
+   kabın da dönmesi iki hareketi üst üste bindiriyor ve halkanın nereden
+   dolduğu okunmuyordu. Kap yalnızca yumuşakça belirir.
+   -------------------------------------------------------------------------- */
+@keyframes abu-halka-sweep {
+  from { stroke-dashoffset: var(--abu-halka-cevre, 500); }
+  to   { stroke-dashoffset: 0; }
+}
+
+.govde .halka-kap .abu-halka-sweep,
+.gmodal .halka-kap .abu-halka-sweep {
+  animation: abu-halka-sweep 1.05s cubic-bezier(.33, 1, .68, 1) .1s backwards;
+}
+
+/* Kap yalnızca belirir; süpürme asıl hareketi taşır. */
+.govde .halka-kap { animation: abu-belir .4s ease-out backwards; }
+
+/* Merkezdeki toplam maskenin dışındadır (bkz. grafikler.js) — süpürme
+   onu kesmez; yalnızca çok hafif gecikmeli belirir. */
+@keyframes abu-halka-merkez {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.govde .halka-kap svg > text {
+  animation: abu-halka-merkez .5s ease-out .5s backwards;
+}
+
+/* --- ui-kit.js: tek değerli ilerleme halkası --- */
+@keyframes abu-halka-ilerleme {
+  from { stroke-dashoffset: 214; }   /* 2·π·34 ≈ 213.6 — tam çevre */
+  to   { stroke-dashoffset: 0; }
+}
+.govde .halka-kutu svg circle[stroke-linecap="round"] {
+  animation: abu-halka-ilerleme 1s cubic-bezier(.33, 1, .68, 1) .1s backwards;
+}
+
+/* Dağılım halkasının SVG'si yatay perde (grafik açılışı) ALMAZ: iki
+   reveal üst üste binerse halka soldan kesilmiş görünür. */
+.govde .halka-kap svg,
+.govde .halka-kutu svg { animation: none; }
+
+/* --------------------------------------------------------------------------
+   7) KART ÜZERİNE GELME
+   --------------------------------------------------------------------------
+   Yalnızca VERİ kartlarında. Ölçek kullanılmaz ya da fark edilmeyecek
+   kadar küçük tutulur: büyüyen kart komşusunun üstüne taşar ve ucuz
+   görünür. Gölge mevcut sistemden geliyor; burada yalnızca bir tık
+   derinleştirilir, renk sistemi değiştirilmez.
+   -------------------------------------------------------------------------- */
+.govde .kpi,
+.govde .panel {
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.govde .kpi:hover,
+.govde .panel:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+
+/* Büyütme kaplamasının içindeki panel yükselmez: zaten öndedir. */
+.gmodal .panel:hover { transform: none; box-shadow: none; }
+
+/* --------------------------------------------------------------------------
+   8) DÜĞMELER VE SEÇİCİLER
+   --------------------------------------------------------------------------
+   Kurum süzgeci (Tümü / Devlet / Vakıf / Benzer Ölçek) ve bölüm
+   eşleştirmesi (Hepsi / Aynı Bölümler / Benzer Bölümler) bu arayüzde
+   <select> öğeleridir, düğme değil. Bu yüzden onlara odak/geçiş cilâsı
+   uygulanır; SEÇİM DAVRANIŞI HİÇ DEĞİŞMEZ.
+   -------------------------------------------------------------------------- */
+button, select, .dugme, .dugme-kucuk, .not-dugme, .buyut-dugme {
+  transition: background-color .18s ease, border-color .18s ease,
+              color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+button:hover:not(:disabled),
+.dugme:hover,
+.dugme-kucuk:hover,
+.buyut-dugme:hover { transform: translateY(-1px); }
+
+button:active:not(:disabled),
+.dugme:active,
+.dugme-kucuk:active,
+.buyut-dugme:active { transform: scale(.97); }
+
+.evren-sec select:focus,
+.secici select:focus { transform: translateY(-1px); }
+
+/* Devre dışı düğme hareket etmez: hareket "tıklanabilir" demektir. */
+button:disabled { transform: none !important; }
+
+/* --------------------------------------------------------------------------
+   9) SOL MENÜ
+   --------------------------------------------------------------------------
+   Hareket `translateX(3px)` ile sınırlıdır — maddenin yerini
+   değiştirmeyecek, yalnızca canlı hissettirecek kadar. Grubu açıp
+   kapayan chevron davranışına dokunulmaz.
+   -------------------------------------------------------------------------- */
+.yan-liste .mad {
+  transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+.yan-liste .mad:hover { transform: translateX(3px); }
+
+/* --------------------------------------------------------------------------
+   10) BÜYÜTME KAPLAMASI
+   --------------------------------------------------------------------------
+   Yalnızca AÇILIŞ animasyonu var. Kapanış için öğenin DOM'dan
+   kaldırılmadan önce beklemesi gerekir; bu, çalışan kapatma akışına
+   (ESC / tıklama / `grafikModalKapat`) zamanlayıcı sokmak demektir.
+   Çalışan bir kapatma yolunu cilâ uğruna karmaşıklaştırmayız.
+   -------------------------------------------------------------------------- */
+@keyframes abu-belir { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes abu-modal-giris {
+  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.gmodal { animation: abu-belir .2s ease-out backwards; }
+.gmodal-kutu {
+  animation: abu-modal-giris .26s cubic-bezier(.22, .61, .36, 1) backwards;
+}
+
+/* --------------------------------------------------------------------------
+   11) ASİSTAN MESAJLARI
+   --------------------------------------------------------------------------
+   Kullanıcı balonu sağdan, asistan balonu aşağıdan gelir; sohbetin yönü
+   böylece hareketten okunur. Yalnızca balonun belirme biçimi
+   değişir — mesaj metni, sıralaması ve gönderme akışı aynıdır.
+   -------------------------------------------------------------------------- */
+@keyframes abu-mesaj-kullanici {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes abu-mesaj-asistan {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ai-mesaj.kullanici { animation: abu-mesaj-kullanici .3s ease-out backwards; }
+.ai-mesaj.asistan   { animation: abu-mesaj-asistan  .3s ease-out backwards; }
+
+/* --------------------------------------------------------------------------
+   12) BEKLEME DURUMU
+   --------------------------------------------------------------------------
+   Mevcut "veri bekleniyor" ve asistan bekleme balonu, ani metin
+   değişimi yerine yumuşak bir nabızla belirir. Yeni bir iskelet
+   (skeleton) sistemi KURULMAZ.
+   -------------------------------------------------------------------------- */
+@keyframes abu-nabiz { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+.bekleniyor,
+.ai-yukleniyor { animation: abu-nabiz 1.6s ease-in-out infinite; }
+
+/* Bekleme balonu kendi nabzını korur; mesaj giriş animasyonu onu ezmesin. */
+.ai-mesaj .ai-yukleniyor { animation: abu-nabiz 1.6s ease-in-out infinite; }
+
+/* --------------------------------------------------------------------------
+   13) HARİTA ANİMASYON DIŞIDIR
+   --------------------------------------------------------------------------
+   Derslik haritası ve kat planı bu turda tümüyle dokunulmaz bırakıldı:
+   `.dh-*` (derslik-haritasi.js) ve `.dhp-*` (derslik-harita-plan.js).
+
+   `.mp-*` BURAYA DAHİL DEĞİLDİR — ölçüldü: bu sınıflar haritada değil,
+   `grafikler.js` içindeki mini profil grafiklerinde geçiyor. Önceki
+   sürümde yanlışlıkla harita sanılıp animasyon dışı bırakılmışlardı.
+   -------------------------------------------------------------------------- */
+[class^="dh-"], [class*=" dh-"],
+[class^="dhp-"], [class*=" dhp-"] {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   14) AZALTILMIŞ HAREKET
+   --------------------------------------------------------------------------
+   İşletim sisteminde "hareketi azalt" açıksa animasyon KALMAZ.
+   Süreleri kısaltmak yerine tamamen kapatıyoruz: baş dönmesi veya
+   vestibüler duyarlılığı olan bir kullanıcı için 40 ms'lik hareket de
+   hareketdir. Bitiş durumu zaten doğru olduğu için görünüm bozulmaz.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .icerik-sar > .govde,
+  .ust > h1,
+  .govde .kpi,
+  .govde .panel,
+  .govde .kpi .dg,
+  .govde .panel svg,
+  .govde .mp-svg,
+  .govde .halka-kap,
+  .govde .halka-kap .abu-halka-sweep,
+  .govde .halka-kap svg > text,
+  .govde .halka-kutu svg circle[stroke-linecap="round"],
+  .gmodal .halka-kap .abu-halka-sweep,
+  .gmodal,
+  .gmodal-kutu,
+  .ai-mesaj.kullanici,
+  .ai-mesaj.asistan,
+  .bekleniyor,
+  .ai-yukleniyor {
+    animation: none !important;
+  }
+  .govde .kpi, .govde .panel,
+  .yan-liste .mad,
+  button, select, .dugme, .dugme-kucuk, .not-dugme, .buyut-dugme {
+    transition: none !important;
+  }
+  .govde .kpi:hover, .govde .panel:hover,
+  .yan-liste .mad:hover,
+  button:hover, .dugme:hover, .dugme-kucuk:hover, .buyut-dugme:hover,
+  .evren-sec select:focus, .secici select:focus {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,58 @@
+﻿YÖK ATLAS ANKARA 2022+ VERİ KÜÇÜLTME ÖZETİ
+
+Kaynak ZIP adı: yokatlas-dataset-2025-main.zip
+Kaynak ZIP yolu: C:\Users\habib\Downloads\yokatlas-dataset-2025-main.zip
+Kullanılan kaynak dosyalar: yokatlas-dataset-2025-main/tum_bolumler.csv; yokatlas-dataset-2025-main/universiteler.csv
+
+Kaynak toplam program satırı (başlık hariç): 21337
+Ankara filtresinden sonra program satırı (başlık hariç): 1768
+Farklı Ankara üniversitesi (program verisi): 21
+Kalan yıllar: 2022, 2023, 2024
+Silinen yıllar: 2015, 2016, 2017, 2018, 2019, 2020, 2021
+Program kolon sayısı önce / sonra: 160 / 72
+Üniversite metadata satırı kaynak / Ankara (başlık hariç): 208 / 22
+Üniversite metadata kolon sayısı önce / sonra: 32 / 32
+
+Ankara üniversiteleri (program verisi):
+- ANKARA BİLİM ÜNİVERSİTESİ
+- ANKARA HACI BAYRAM VELİ ÜNİVERSİTESİ
+- ANKARA MEDİPOL ÜNİVERSİTESİ
+- ANKARA MÜZİK VE GÜZEL SANATLAR ÜNİVERSİTESİ
+- ANKARA SOSYAL BİLİMLER ÜNİVERSİTESİ
+- ANKARA ÜNİVERSİTESİ
+- ANKARA YILDIRIM BEYAZIT ÜNİVERSİTESİ
+- ATILIM ÜNİVERSİTESİ
+- BAŞKENT ÜNİVERSİTESİ
+- ÇANKAYA ÜNİVERSİTESİ
+- GAZİ ÜNİVERSİTESİ
+- HACETTEPE ÜNİVERSİTESİ
+- İHSAN DOĞRAMACI BİLKENT ÜNİVERSİTESİ
+- LOKMAN HEKİM ÜNİVERSİTESİ
+- ORTA DOĞU TEKNİK ÜNİVERSİTESİ
+- OSTİM TEKNİK ÜNİVERSİTESİ
+- TED ÜNİVERSİTESİ
+- TOBB EKONOMİ VE TEKNOLOJİ ÜNİVERSİTESİ
+- TÜRK HAVA KURUMU ÜNİVERSİTESİ
+- UFUK ÜNİVERSİTESİ
+- YÜKSEK İHTİSAS ÜNİVERSİTESİ
+
+Yıllara göre bulunan metrik kolonları:
+- 2022: kontenjan, birinci, birincimaxpuan, birincipuan, birinciyerlesme, maxpuan, puan, sira, yerlesme, kiz, erkek, liseli, mezun, universiteli, unimezunu, tercihtoplam, tercihbirinci, tercihilkuc, tercihilkdokuz
+- 2023: kiz, erkek, liseli, mezun, universiteli, unimezunu, tercihtoplam, tercihbirinci, tercihilkuc, tercihilkdokuz, kontenjan, depremzedekontenjan, kadinkontenjan, sehitkontenjan, birinci, yerlesen, maxpuan, birinciyerlesen, birincipuan, depremzedeyerlesen, depremzedepuan, kadinyerlesen, kadinpuan, sehityerlesen, sehitpuan, ekkontenjan, eksehitkontenjan, ekkadinkontenjan, ekdepremzedekontenjan, sira, puan
+- 2024: kontenjan, birinci, sehitkontenjan, kadinkontenjan, depremzedekontenjan, puan, sira, maxpuan, yerlesen, birinciyerlesen
+- 2025: YOK
+
+Beklenmeyen / dikkat gerektiren alanlar:
+- Kaynak program dosyasında 2025 yılına ait metrik kolonu yoktur; bu nedenle çıktı 2022, 2023 ve 2024 yıllarını içerir.
+- 2022 için yerleşen metriğinin kaynak adı "yerlesme2022"; 2023 ve 2024 için kaynak adı "yerlesenYYYY" biçimindedir. Adlar değiştirilmedi.
+- Metadata dosyasında olup program dosyasında Ankara programı bulunmayan üniversite: ANKA TEKNOLOJİ ÜNİVERSİTESİ. Kaynaklar reconcile edilmedi.
+- Bozuk satır genişliği veya yinelenen kolon başlığı bulunmadı.
+
+Validation sonucu: BAŞARILI
+- Resmî il alanı tam eşleşmesiyle Ankara dışı program kalmadı.
+- 2021 ve daha eski yıla ait metrik kolonu kalmadı.
+- Kaynaktaki 19 adet 2022 kolonu korunmuştur.
+- Üniversite, fakülte, program ve diğer tutulan hücre değerleri kaynakla birebir aynıdır.
+- Hiçbir satır birleştirilmedi, duplicate silinmedi, null/eksik değer dönüştürülmedi.
+- Her iki çıktı CSV kendi ayrıştırıcısı ve artifact-tool ile yeniden okunabildi.
+- Çıktılar UTF-8-SIG (BOM) olarak yazıldı.

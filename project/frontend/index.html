@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABÜ — Üst Düzey Bilgi ve Karar Destek Sistemi</title>
+<!-- shell.css   renk/tipografi değişkenlerinin TEK kaynağı (--vurgu, --yuzey…)
+     kabuk.css   yönetim panelinin yerleşimi (sol menü, KPI şeridi, paneller)
+
+     ÖNEMLİ: `?v=` bir önbellek kırıcıdır. assets/ altındaki HERHANGİ bir
+     dosya değiştiğinde bu sayı ARTIRILMALIDIR. Aksi hâlde tarayıcı bazı
+     dosyaların eski, bazılarının yeni sürümünü karıştırır ve
+     "X is not defined" gibi, testlerde görünmeyen çalışma zamanı
+     hataları çıkar (jsdom her koşuda temiz indirir). -->
+<link rel="stylesheet" href="assets/degiskenler.css?v=131">
+<link rel="stylesheet" href="assets/kabuk.css?v=131">
+<!-- animasyon.css SON sırada: yalnızca geçiş/animasyon ekler, hiçbir
+     yerleşim veya renk kuralını geçersiz kılmaz. Silinirse arayüz
+     bugünkü hâliyle çalışmaya devam eder. -->
+<link rel="stylesheet" href="assets/animasyon.css?v=131">
+</head>
+<body data-gorunum="yonetim">
+
+<!-- Tek sayfa uygulaması: kabuk ve altı ekran JavaScript ile çizilir.
+     YÜKLEME SIRASI ÖNEMLİDİR:
+       api.js           backend istemcisi + biçimlendirme (`api`, `fmt`, `ref`)
+       themes.js        fakülte paletleri (kabukta renk anahtarı olarak kullanılır)
+       data-adapter.js  gezinme ağacı ve KAPSAM SÖZLÜĞÜ — gerçek API'den kurulur
+       ui-kit.js        ortak çizim yardımcıları (`dagilimGrafik` buradan gelir)
+     grafikler.js: sütun grafiği sözlüğü (gruplandırılmış / yığın /
+     yatay çubuk + "Detayı göster"). ekranlar.js bunu KULLANIR, o yüzden
+     ondan ÖNCE yüklenir.
+       data-sources.js  veri kaynakları listesi
+       ekranlar.js      ekran tanımları — `EKRANLAR` sözlüğünü doldurur
+       ai-screen-assistant.js analitik ekranlar için kompakt asistan ve otomatik yorum kartı
+       kabuk.js         menü, seçiciler, yönlendirme; açılışta `EKRANLAR` okur
+     kabuk.js EN SONA konur: `baslat()` çalıştığında `EKRANLAR` dolu olmalıdır.
+     Harici kütüphane veya CDN kullanılmaz, derleme adımı yoktur. -->
+<div id="kds" class="kds"></div>
+
+<script src="assets/api.js?v=131"></script>
+<script src="assets/themes.js?v=131"></script>
+<script src="assets/data-adapter.js?v=131"></script>
+<script src="assets/ui-kit.js?v=131"></script>
+<script src="assets/grafikler.js?v=131"></script>
+<script src="assets/data-sources.js?v=131"></script>
+<script src="assets/derslik-harita-plan.js?v=131"></script>
+<script src="assets/derslik-haritasi.js?v=131"></script>
+<script src="assets/ekranlar.js?v=131"></script>
+<script src="assets/ai-screen-assistant.js?v=131"></script>
+<script src="assets/kabuk.js?v=131"></script>
+
+</body>
+</html>
+

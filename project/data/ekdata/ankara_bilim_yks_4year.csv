@@ -1,0 +1,213 @@
+academic_year,faculty,department,program_name,program_code,score_type,scholarship_type,quota,placed_students,vacant_quota,occupancy_rate,base_score,highest_score,success_rank
+2025,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,439.51791,,55895
+2024,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,430.30696,,54018
+2023,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,12,,1.2,478.97169,,33416
+2022,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,9,9,,1,467.00519,,42177
+2025,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,431.91149,,63468
+2024,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (Burslu) (4 Yıllık),,SAY,Burslu,5,6,,1.2,424.58894,,59030
+2023,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (Burslu) (4 Yıllık),,SAY,Burslu,6,8,,1.333333,472.03412,,38898
+2022,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (Burslu) (4 Yıllık),,SAY,Burslu,,,,,,,
+2025,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,7,8,,1.142857,431.79005,,63592
+2024,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,417.06405,,65660
+2023,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,471.53142,,39304
+2022,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,9,9,,1,462.22244,,46056
+2025,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,7,8,,1.142857,431.15067,,64242
+2024,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,8,9,,1.125,417.2539,,65516
+2023,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,8,9,,1.125,447.87237,,60155
+2022,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,6,6,,1,443.70929,,62162
+2025,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,7,8,,1.142857,429.18705,,66266
+2024,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,6,7,,1.166667,410.87282,,71627
+2023,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,5,6,,1.2,447.34584,,60652
+2022,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,5,5,,1,435.00135,,70120
+2025,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,5,6,,1.2,408.54267,,88768
+2024,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,11,12,,1.090909,397.28056,,85473
+2023,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,10,11,,1.1,446.1183,,61744
+2022,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (Burslu) (4 Yıllık),,SAY,Burslu,9,9,,1,412.4117,,92626
+2025,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,68,4,,0.058824,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,31,21,,0.677419,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,20,20,,1,350.73487,,187267
+2022,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,,,,,,,
+2025,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,66,23,,0.348485,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,56,56,,1,297.21887,,274491
+2023,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,44,44,,1,375.56726,,144167
+2022,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,43,43,,1,354.60156,,168041
+2025,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,34,2,,0.058824,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,68,8,,0.117647,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,54,50,,0.925926,,,
+2022,Mühendislik ve Mimarlık Fakültesi,Bilişim Sistemleri Mühendisliği,Bilişim Sistemleri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,43,21,,0.488372,,,
+2025,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,42,10,,0.238095,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,47,14,,0.297872,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,41,41,,1,316.76459,,270729
+2022,Mühendislik ve Mimarlık Fakültesi,Elektrik-Elektronik Mühendisliği,Elektrik-Elektronik Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,27,27,,1,302.45157,,286029
+2025,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,42,9,,0.214286,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,38,13,,0.342105,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,34,34,,1,309.36833,,294170
+2022,Mühendislik ve Mimarlık Fakültesi,Endüstri Mühendisliği,Endüstri Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,22,20,,0.909091,,,
+2025,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,42,3,,0.071429,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,56,19,,0.339286,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,44,44,,1,362.06992,,166174
+2022,Mühendislik ve Mimarlık Fakültesi,Yazılım Mühendisliği,Yazılım Mühendisliği (İngilizce) (%50 İndirimli) (4 Yıllık),,SAY,%50 İndirimli,43,43,,1,347.09103,,181172
+2025,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Ücretli) (4 Yıllık),,SAY,Ücretli,2,,,,,,
+2024,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Ücretli) (4 Yıllık),,SAY,Ücretli,12,3,,0.25,,,
+2023,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Ücretli) (4 Yıllık),,SAY,Ücretli,20,20,,1,327.11367,,241498
+2022,Mühendislik ve Mimarlık Fakültesi,Bilgisayar Mühendisliği,Bilgisayar Mühendisliği (İngilizce) (Ücretli) (4 Yıllık),,SAY,Ücretli,8,8,,1,340.37114,,193775
+2025,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,6,7,,1.166667,357.82251,,44228
+2024,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,6,8,,1.333333,368.74448,,86557
+2023,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,4,5,,1.25,411.98737,,12824
+2022,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,4,4,,1,384.17208,,40077
+2025,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,4,4,,1,350.67819,,56565
+2024,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,4,5,,1.25,394.02344,,39505
+2023,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,4,4,,1,389.33762,,31920
+2022,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (Burslu) (4 Yıllık),,SÖZ,Burslu,3,3,,1,373.33586,,56905
+2025,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,25,4,,0.16,,,
+2024,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,23,19,,0.826087,,,
+2023,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,25,25,,1,169.46014,,1532228
+2022,Güzel Sanatlar ve Tasarım Fakültesi,Film Tasarımı ve Yönetimi,Film Tasarımı ve Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,15,15,,1,230.89995,,1036615
+2025,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,38,6,,0.157895,,,
+2024,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,35,22,,0.628571,,,
+2023,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,29,29,,1,239.35165,,932690
+2022,Güzel Sanatlar ve Tasarım Fakültesi,Yeni Medya ve İletişim,Yeni Medya ve İletişim (İngilizce) (%50 İndirimli) (4 Yıllık),,SÖZ,%50 İndirimli,18,18,,1,255.384,,758711
+2025,Hukuk Fakültesi,Hukuk,Hukuk (Burslu) (4 Yıllık),,EA,Burslu,10,11,,1.1,419.0631,,13802
+2024,Hukuk Fakültesi,Hukuk,Hukuk (Burslu) (4 Yıllık),,EA,Burslu,10,11,,1.1,410.73496,,23890
+2023,Hukuk Fakültesi,Hukuk,Hukuk (Burslu) (4 Yıllık),,EA,Burslu,10,11,,1.1,423.78579,,17246
+2022,Hukuk Fakültesi,Hukuk,Hukuk (Burslu) (4 Yıllık),,EA,Burslu,55,55,,1,413.8573,,35445
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,9,10,,1.111111,382.22035,,54206
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,7,8,,1.142857,375.34455,,69689
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,6,,1.2,385.45486,,70644
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,5,,1,372.80285,,113935
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,10,12,,1.2,380.40624,,57201
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,10,12,,1.2,377.09971,,66513
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,10,11,,1.1,393.55048,,55707
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,9,9,,1,394.2506,,67999
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Burslu) (4 Yıllık),,EA,Burslu,10,12,,1.2,378.39668,,60799
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Burslu) (4 Yıllık),,EA,Burslu,10,12,,1.2,376.75483,,67070
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Burslu) (4 Yıllık),,EA,Burslu,10,12,,1.2,390.89761,,60433
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Burslu) (4 Yıllık),,EA,Burslu,9,9,,1,389.65514,,77022
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Burslu) (4 Yıllık),,EA,Burslu,9,10,,1.111111,373.69229,,69543
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Burslu) (4 Yıllık),,EA,Burslu,7,8,,1.142857,373.60088,,72776
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Burslu) (4 Yıllık),,EA,Burslu,6,8,,1.333333,376.98201,,88572
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Burslu) (4 Yıllık),,EA,Burslu,,,,,,,
+2025,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,4,5,,1.25,366.44523,,84447
+2024,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,7,,1.4,363.70451,,92419
+2023,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,6,,1.2,372.12615,,99614
+2022,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,5,,1,362.43169,,140282
+2025,Hukuk Fakültesi,Hukuk,Hukuk (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,64,64,,1,353.17363,,116522
+2024,Hukuk Fakültesi,Hukuk,Hukuk (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,60,60,,1,358.20653,,105166
+2023,Hukuk Fakültesi,Hukuk,Hukuk (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,48,48,,1,366.84644,,112481
+2022,Hukuk Fakültesi,Hukuk,Hukuk (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,,,,,,,
+2025,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,7,8,,1.142857,349.19402,,127658
+2024,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,6,,1.2,340.64113,,153907
+2023,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,4,5,,1.25,345.89501,,175334
+2022,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,3,3,,1,334.34674,,231786
+2025,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,7,9,,1.285714,341.98381,,149610
+2024,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,5,7,,1.4,336.47573,,167777
+2023,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,4,6,,1.5,350.09369,,161002
+2022,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (Burslu) (4 Yıllık),,EA,Burslu,3,3,,1,332.31621,,240075
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,264.46778,,648613
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Ücretli) (4 Yıllık),,EA,Ücretli,23,23,,1,260.19886,,708074
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Ücretli) (4 Yıllık),,EA,Ücretli,42,42,,1,240.79444,,1000556
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (Ücretli) (4 Yıllık),,EA,Ücretli,11,11,,1,305.63709,,374095
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,55,55,,1,258.66436,,709929
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,36,36,,1,316.03036,,254833
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,17,17,,1,332.83528,,227093
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,40,40,,1,333.7561,,234050
+2025,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,27,27,,1,247.30976,,838030
+2024,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,30,30,,1,277.55491,,528334
+2023,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,30,30,,1,272.83362,,638760
+2022,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,21,21,,1,288.37536,,493383
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,241.3831,,907586
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,23,23,,1,235.07503,,1032227
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,42,42,,1,219.32061,,1295620
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,39,39,,1,279.36689,,567803
+2025,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,2,2,,1,236.30431,,967784
+2024,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,260.78761,,701326
+2023,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,255.46321,,821979
+2022,Güzel Sanatlar ve Tasarım Fakültesi,İç Mimarlık ve Çevre Tasarımı,İç Mimarlık ve Çevre Tasarımı (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,274.49271,,612044
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Ücretli) (4 Yıllık),,EA,Ücretli,2,2,,1,223.6973,,1115242
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Ücretli) (4 Yıllık),,EA,Ücretli,4,3,,0.75,,,
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Ücretli) (4 Yıllık),,EA,Ücretli,2,2,,1,266.58157,,701073
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (Ücretli) (4 Yıllık),,EA,Ücretli,,,,,,,
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,2,2,,1,218.41367,,1174399
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,4,4,,1,237.88389,,993020
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,5,5,,1,256.70307,,807913
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (Ücretli) (4 Yıllık),,EA,Ücretli,6,6,,1,274.78398,,609371
+2025,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,42,30,,0.714286,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,34,34,,1,200.28815,,1507528
+2023,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,25,25,,1,243.54757,,965259
+2022,İnsan ve Toplum Bilimleri Fakültesi,İşletme,İşletme (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,13,13,,1,252.7194,,844478
+2025,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,55,34,,0.618182,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,36,36,,1,308.85608,,294551
+2023,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,17,17,,1,324.3884,,266932
+2022,İnsan ve Toplum Bilimleri Fakültesi,Psikoloji,Psikoloji (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,,,,,,,
+2025,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,42,11,,0.261905,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,34,25,,0.735294,,,
+2023,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,25,25,,1,232.69205,,1107859
+2022,İnsan ve Toplum Bilimleri Fakültesi,Siyaset Bilimi ve Kamu Yönetimi,Siyaset Bilimi ve Kamu Yönetimi (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,13,13,,1,255.85541,,807369
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,53,41,,0.773585,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,39,39,,1,261.32726,,695071
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,32,32,,1,276.30139,,605844
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,,,,,,,
+2025,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,53,25,,0.471698,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,38,38,,1,257.45686,,739840
+2023,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,29,29,,1,290.40797,,484173
+2022,İnsan ve Toplum Bilimleri Fakültesi,Yönetim Bilişim Sistemleri,Yönetim Bilişim Sistemleri (İngilizce) (%50 İndirimli) (4 Yıllık),,EA,%50 İndirimli,19,19,,1,279.38817,,567613
+2025,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Burslu) (4 Yıllık),,DİL,Burslu,7,9,,1.285714,428.96149,,11553
+2024,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Burslu) (4 Yıllık),,DİL,Burslu,6,7,,1.166667,436.96631,,11900
+2023,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Burslu) (4 Yıllık),,DİL,Burslu,6,7,,1.166667,439.44784,,13801
+2022,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Burslu) (4 Yıllık),,DİL,Burslu,5,5,,1,429.7497,,14432
+2025,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (%50 İndirimli) (4 Yıllık),,DİL,%50 İndirimli,45,45,,1,234.48549,,104416
+2024,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (%50 İndirimli) (4 Yıllık),,DİL,%50 İndirimli,34,34,,1,286.50546,,80757
+2023,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (%50 İndirimli) (4 Yıllık),,DİL,%50 İndirimli,30,30,,1,302.74206,,72907
+2022,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (%50 İndirimli) (4 Yıllık),,DİL,%50 İndirimli,22,22,,1,311.61858,,57770
+2025,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Ücretli) (4 Yıllık),,DİL,Ücretli,2,,,,,,
+2024,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Ücretli) (4 Yıllık),,DİL,Ücretli,7,7,,1,214.07769,,130027
+2023,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Ücretli) (4 Yıllık),,DİL,Ücretli,11,10,,0.909091,,,
+2022,İnsan ve Toplum Bilimleri Fakültesi,İngilizce Mütercim ve Tercümanlık,İngilizce Mütercim ve Tercümanlık (Ücretli) (4 Yıllık),,DİL,Ücretli,6,6,,1,298.66595,,63102
+2025,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,382.33202,,230794
+2024,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,386.59064,,235485
+2023,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,362.60825,,349320
+2022,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,364.97837,,311416
+2024,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,363.81931,,333864
+2023,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,360.70315,,359840
+2022,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,364.85377,,312043
+2024,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,377.45452,,271245
+2023,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,372.75183,,298162
+2022,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,345.9987,,424335
+2024,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,351.20336,,404547
+2023,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,350.56439,,420909
+2022,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,343.4739,,441458
+2024,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (Burslu) (2 Yıllık),,TYT,Burslu,4,4,,1,346.8607,,432445
+2023,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2022,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (Burslu) (2 Yıllık),,TYT,Burslu,8,8,,1,329.4686,,549788
+2024,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (Burslu) (2 Yıllık),,TYT,Burslu,7,7,,1,341.10831,,472518
+2023,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (Burslu) (2 Yıllık),,TYT,Burslu,6,6,,1,335.15477,,532581
+2022,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (Burslu) (2 Yıllık),,TYT,Burslu,,,,,,,
+2025,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,51,,1,274.30809,,1189454
+2024,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,39,39,,1,282.15341,,1130776
+2023,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,34,34,,1,280.85574,,1132327
+2022,Meslek Yüksekokulu,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü,İnsansız Hava Aracı Teknolojisi ve Operatörlüğü (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2025,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,51,,1,262.10938,,1365235
+2024,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,51,,1,271.51447,,1294348
+2023,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,34,34,,1,286.40062,,1055970
+2022,Meslek Yüksekokulu,Bilgisayar Programcılığı,Bilgisayar Programcılığı (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2025,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,38,,0.745098,,,
+2024,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,39,39,,1,239.4264,,1839719
+2023,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,34,34,,1,240.99385,,1773049
+2022,Meslek Yüksekokulu,Bilgisayar Destekli Tasarım ve Animasyon,Bilgisayar Destekli Tasarım ve Animasyon (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2025,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,39,,0.764706,,,
+2024,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,39,39,,1,260.22744,,1477944
+2023,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,34,34,,1,268.26353,,1317249
+2022,Meslek Yüksekokulu,Bilişim Güvenliği Teknolojisi,Bilişim Güvenliği Teknolojisi (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2025,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,13,,0.254902,,,
+2024,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,43,43,,1,218.90587,,2216733
+2023,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,34,34,,1,228.85225,,2000257
+2022,Meslek Yüksekokulu,E-Ticaret ve Pazarlama,E-Ticaret ve Pazarlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2025,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,51,30,,0.588235,,,
+2024,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,25,25,,1,243.0119,,1775752
+2023,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,
+2022,Meslek Yüksekokulu,Web Tasarımı ve Kodlama,Web Tasarımı ve Kodlama (%50 İndirimli) (2 Yıllık),,TYT,%50 İndirimli,,,,,,,

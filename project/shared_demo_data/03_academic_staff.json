@@ -1,0 +1,31 @@
+{
+  "_aciklama": "Modül 4 — Akademik personel üretim şartnamesi. 180 personel deterministik olarak üretilir.",
+
+  "random_seed": 20260804,
+  "total_staff": 180,
+  "academic_years": ["2024-2025", "2025-2026"],
+
+  "_unvan_notu": "Unvan dağılımı tipik bir vakıf üniversitesi piramidine göre belirlendi: tabanda araştırma görevlisi ve Dr. Öğr. Üyesi, tepede profesör.",
+  "title_distribution": [
+    { "title": "Prof. Dr.",        "weight": 12, "publication_range": [14, 32], "citation_range": [60, 210], "teaching_load_range": [6, 12] },
+    { "title": "Doç. Dr.",         "weight": 18, "publication_range": [8, 22],  "citation_range": [30, 130], "teaching_load_range": [8, 14] },
+    { "title": "Dr. Öğr. Üyesi",   "weight": 34, "publication_range": [3, 14],  "citation_range": [8, 70],   "teaching_load_range": [10, 18] },
+    { "title": "Öğr. Gör.",        "weight": 22, "publication_range": [0, 6],   "citation_range": [0, 22],   "teaching_load_range": [14, 22] },
+    { "title": "Araş. Gör.",       "weight": 14, "publication_range": [0, 5],   "citation_range": [0, 18],   "teaching_load_range": [4, 10] }
+  ],
+
+  "_bolum_dagilimi_notu": "Personel, bölümlerin öğrenci ağırlığına yakın oranda dağıtılır; böylece öğrenci/öğretim üyesi oranı bölümler arasında aşırı sapma göstermez.",
+  "department_weights": {
+    "SWE": 16, "CENG": 20, "EEE": 17, "ME": 15, "CE": 13, "IE": 14, "ARCH": 15,
+    "BA": 20, "ECON": 13, "IR": 11, "PSY": 15, "NUR": 11
+  },
+
+  "advising_count_range": [0, 9],
+  "project_count_range": [0, 6],
+  "patent_count_range": [0, 3],
+  "community_engagement_range": [0, 10],
+  "administrative_duty_percent": 22,
+  "industry_collaboration_percent": 31,
+
+  "_agirlik_notu": "Puan ağırlıkları burada değil, backend/app/config/academic_staff_weights.json dosyasındadır; puanlama politikası veriden bağımsız yönetilir."
+}

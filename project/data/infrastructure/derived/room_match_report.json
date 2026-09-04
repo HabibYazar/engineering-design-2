@@ -1,0 +1,262 @@
+{
+ "total_rooms_in_inventory": 80,
+ "total_schedule_sheets": 72,
+ "matched_count": 71,
+ "unmatched_rooms_without_schedule": [
+  {
+   "room_code": "L 002",
+   "floor": 0,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "C 122",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "C 123",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "C 130",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "C 131",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "C 132",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "L 115",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "L 121",
+   "floor": 1,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  },
+  {
+   "room_code": "AMFİ 5",
+   "floor": 2,
+   "reason": "xlsx_icinde_program_sayfasi_yok"
+  }
+ ],
+ "schedule_sheets_without_inventory": [
+  {
+   "sheet": "C 121",
+   "room_key": "C121",
+   "reason": "KAT_PLANI_envanterinde_yok"
+  }
+ ],
+ "normalization_collisions": [],
+ "rejected_non_room_values": [
+  {
+   "value": "Ders Planlama Esasları",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "1. Sabah 09.00 – Akşam 18.00 arası 9 saat olacak şekilde planlama yapı",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "2. Dersler 09.00-11.40, 12.20-15.00, 15.20-18.00 olacak şekilde 3’er s",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "3. İnkılap Tarihi ve ATA dersleri cumartesi sabah olacak şekilde planl",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "4. Cuma saat 12.00-14.00 arasına ders planlanmayacaktır",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "5. Her ders 50 dakikadır",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "6. Hazırlık okulu günde 10 saat olacak şekilde planlama yapacaktır",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "7. Dönem içinde yapılacak değişiklikler Rektör yardımcısı ile koordine",
+   "column_floor": 0,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "TOPLAM",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "İTBF",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "HF",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "MMF",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "MMF-Lab",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "GSTF",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "MYO",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "Hazırlık Okulu",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  },
+  {
+   "value": "Toplam:",
+   "column_floor": 2,
+   "reason": "oda_kodu_bicimine_uymuyor"
+  }
+ ],
+ "slot_label_variants": [
+  {
+   "index": 0,
+   "label": "09:10-10:00",
+   "variants": [
+    "09.00 - 09.50",
+    "09:10-10:00"
+   ]
+  },
+  {
+   "index": 1,
+   "label": "10:10-11:00",
+   "variants": [
+    "09.55 - 10.45",
+    "10:10-11:00"
+   ]
+  },
+  {
+   "index": 2,
+   "label": "11:10-12:00",
+   "variants": [
+    "10.50 - 11.40",
+    "11:10-12:00"
+   ]
+  },
+  {
+   "index": 3,
+   "label": "12:10-13:00",
+   "variants": [
+    "12.20 - 13.10",
+    "12:10-13:00"
+   ]
+  },
+  {
+   "index": 4,
+   "label": "13:10-14:00",
+   "variants": [
+    "13.15 - 14.05",
+    "13:10-14:00"
+   ]
+  },
+  {
+   "index": 5,
+   "label": "14:10-15:00",
+   "variants": [
+    "14.10 - 15.00",
+    "14:10-15:00"
+   ]
+  },
+  {
+   "index": 6,
+   "label": "15:10-16:00",
+   "variants": [
+    "15.20 - 16.10",
+    "15:10-16:00"
+   ]
+  },
+  {
+   "index": 7,
+   "label": "16:10-17:00",
+   "variants": [
+    "16.15 - 17.05",
+    "16:10-17:00"
+   ]
+  },
+  {
+   "index": 8,
+   "label": "17:10-18:00",
+   "variants": [
+    "17.10 - 18.00",
+    "17:10-18:00"
+   ]
+  },
+  {
+   "index": 9,
+   "label": "18:10 -19:00",
+   "variants": [
+    "18:10 - 19:00",
+    "18:10 -19:00"
+   ]
+  }
+ ],
+ "floor_mapping_evidence": {
+  "method": "PDF kot (yükseklik) sırası + AMFİ etiketlerinin kat teyidi",
+  "detail": [
+   {
+    "pdf": "0. Kat.pdf",
+    "internal_title": "0. BODRUM KAT (D) PLANI (-13.20 KOTU)",
+    "elevation_m": -13.2,
+    "mapped_floor": 0
+   },
+   {
+    "pdf": "1. Kat.pdf",
+    "internal_title": "2. BODRUM KAT PLANI (-9.20 KOTU)",
+    "elevation_m": -9.2,
+    "mapped_floor": 1
+   },
+   {
+    "pdf": "2. Kat.pdf",
+    "internal_title": "1. BODRUM KAT PLANI (-5.20 KOTU)",
+    "elevation_m": -5.2,
+    "mapped_floor": 2
+   }
+  ]
+ },
+ "plan_placement": {
+  "placed_count": 3,
+  "unplaced_count": 77,
+  "placed": [
+   "AMFI3",
+   "AMFI4",
+   "AMFI5"
+  ],
+  "reason_unplaced": "Plan PDF'lerinde oda içi etiketler mimari sıra numarası + alan ('13-86.7') biçimindedir; Excel oda koduna eşlemek tahmin olurdu."
+ }
+}

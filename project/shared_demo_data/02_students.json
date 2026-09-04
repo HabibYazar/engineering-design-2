@@ -1,0 +1,101 @@
+{
+  "_aciklama": "Modül 2 ve 3 — Öğrenci verisi üretim şartnamesi. 4000 öğrenci tek tek listelenmez; deterministik üretim parametreleri burada tanımlıdır. Aynı tohumla her çalıştırmada aynı 4000 kayıt oluşur.",
+  "_neden_uretim": "4000 satırlık JSON hem okunamaz hem de bir sayı değiştiğinde elle güncellenemez. Parametre tabanlı üretim sayesinde 'uluslararası öğrenci oranını %12'ye çıkar' gibi bir değişiklik tek satırda yapılabilir.",
+  "random_seed": 20260804,
+  "total_students": 4000,
+  "enrollment_years": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "_program_dagilimi_notu": "Öğrenciler kontenjan ağırlığına göre programlara dağıtılır. Yüksek lisans programlarına lisansın yaklaşık üçte biri kadar öğrenci düşer.",
+  "program_weights": {
+    "SWE-BSC": 80,
+    "CENG-BSC": 100,
+    "EEE-BSC": 90,
+    "ME-BSC": 80,
+    "CE-BSC": 70,
+    "IE-BSC": 75,
+    "ARCH-BSC": 80,
+    "BA-BSC": 120,
+    "ECON-BSC": 70,
+    "IR-BSC": 60,
+    "PSY-BSC": 90,
+    "NUR-BSC": 85,
+    "SWE-MSC": 30,
+    "BA-MSC": 40
+  },
+  "_durum_notu": "graduated / dropped-out / non-renewed yalnızca eski kayıt yıllarına atanır; 2025 girişli bir öğrenci mezun gösterilemez.",
+  "status_weights": {
+    "active": 52,
+    "newly-enrolled": 14,
+    "graduated": 18,
+    "dropped-out": 8,
+    "non-renewed": 5,
+    "suspended": 3
+  },
+  "international_student_percent": 11,
+  "preparatory_school_percent": 22,
+  "_burs_notu": "Vakıf üniversitesi burs yapısı: tam burslu, %50 burslu, %25 burslu ve ücretli kontenjanlar.",
+  "scholarship_rate_distribution": [
+    {
+      "rate_percent": 100,
+      "weight": 14
+    },
+    {
+      "rate_percent": 50,
+      "weight": 26
+    },
+    {
+      "rate_percent": 25,
+      "weight": 22
+    },
+    {
+      "rate_percent": 0,
+      "weight": 38
+    }
+  ],
+  "gpa_range": {
+    "min": 1.2,
+    "max": 3.95
+  },
+  "_istihdam_notu": "Mezunların yalnızca bir kısmının istihdam bilgisi kuruma ulaşır. Bilgisi olmayan mezun için alan boş bırakılır; istihdam oranı sadece bilgisi olanlar üzerinden hesaplanır.",
+  "graduate_employment": {
+    "known_information_percent": 70,
+    "employed_percent_among_known": 74
+  },
+  "_kayit_gorunumu_notu": "Program bazlı yıllık kontenjan/yerleşme anlık görüntüleri. Taban puanlar ÖSYM ölçeğindedir (0-500).",
+  "enrollment_snapshots": {
+    "academic_years": [
+      "2021-2022",
+      "2022-2023",
+      "2023-2024",
+      "2024-2025",
+      "2025-2026",
+      "2026-2027"
+    ],
+    "fill_rate_percent_range": {
+      "min": 74,
+      "max": 100
+    },
+    "minimum_admission_score_range": {
+      "min": 268.0,
+      "max": 462.0
+    },
+    "full_scholarship_score_premium_range": {
+      "min": 24.0,
+      "max": 58.0
+    },
+    "national_average_offset_range": {
+      "min": -22.0,
+      "max": 16.0
+    },
+    "ankara_average_offset_range": {
+      "min": -14.0,
+      "max": 24.0
+    }
+  },
+  "_yil_notu": "Kayıt görüntüsü yılları mali dönemlerle aynıdır; böylece başarı, mali ve öğrenci ekranları aynı yıl kümesini gösterir."
+}

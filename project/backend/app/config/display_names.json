@@ -1,0 +1,40 @@
+{
+  "_aciklama": "Organizasyon birimlerinin arayuzde gosterilecek Turkce adlari. Veritabanindaki 'name' alanlari, mevcut testleri ve modul kodlarini bozmamak icin degistirilmedi; arayuz bu sozlukten okur. Yeni bir birim eklendiginde buraya karsiligi yazilmazsa arayuz veritabanindaki adi kullanir (sessizce bos birakmaz).",
+  "_kullanim": "GET /api/reference/display-names -> { faculties: {kod: ad}, departments: {...}, programs: {...} }",
+  "faculties": {
+    "FEA": "Mühendislik ve Mimarlık Fakültesi",
+    "FEAS": "İktisadi ve İdari Bilimler Fakültesi",
+    "FAS": "Fen-Edebiyat Fakültesi",
+    "FHS": "Sağlık Bilimleri Fakültesi"
+  },
+  "departments": {
+    "SWE": "Yazılım Mühendisliği",
+    "CENG": "Bilgisayar Mühendisliği",
+    "EEE": "Elektrik-Elektronik Mühendisliği",
+    "ME": "Makine Mühendisliği",
+    "CE": "İnşaat Mühendisliği",
+    "IE": "Endüstri Mühendisliği",
+    "ARCH": "Mimarlık",
+    "BA": "İşletme",
+    "ECON": "İktisat",
+    "IR": "Uluslararası İlişkiler",
+    "PSY": "Psikoloji",
+    "NUR": "Hemşirelik"
+  },
+  "programs": {
+    "SWE-BSC": "Yazılım Mühendisliği Lisans Programı",
+    "CENG-BSC": "Bilgisayar Mühendisliği Lisans Programı",
+    "EEE-BSC": "Elektrik-Elektronik Mühendisliği Lisans Programı",
+    "ME-BSC": "Makine Mühendisliği Lisans Programı",
+    "CE-BSC": "İnşaat Mühendisliği Lisans Programı",
+    "IE-BSC": "Endüstri Mühendisliği Lisans Programı",
+    "ARCH-BSC": "Mimarlık Lisans Programı",
+    "BA-BSC": "İşletme Lisans Programı",
+    "ECON-BSC": "İktisat Lisans Programı",
+    "IR-BSC": "Uluslararası İlişkiler Lisans Programı",
+    "PSY-BSC": "Psikoloji Lisans Programı",
+    "NUR-BSC": "Hemşirelik Lisans Programı",
+    "SWE-MSC": "Yazılım Mühendisliği Yüksek Lisans Programı",
+    "BA-MSC": "İşletme Yüksek Lisans Programı"
+  }
+}

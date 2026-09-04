@@ -1,0 +1,27 @@
+{
+ "coordinate_system": "Arka plan görselinin sol-üst köşesine göre 0–1 normalize; responsive ölçekte kayma olmaz.",
+ "how_to_extend": "Bir odayı plana yerleştirmek için buraya \"<ROOM_KEY>\": {\"floor\":n,\"x\":0-1,\"y\":0-1,\"source\":\"kim/nasıl belirledi\",\"confidence\":\"manual\"} ekleyin. TAHMİNLE koordinat girmeyin; yanlış oda boyanır.",
+ "rooms": {
+  "AMFI3": {
+   "floor": 2,
+   "x": 0.8257,
+   "y": 0.39,
+   "source": "2. Kat.pdf · plan etiketi \"AMFİ-3\"",
+   "confidence": "label_exact"
+  },
+  "AMFI4": {
+   "floor": 2,
+   "x": 0.8239,
+   "y": 0.4563,
+   "source": "2. Kat.pdf · plan etiketi \"AMFİ-4\"",
+   "confidence": "label_exact"
+  },
+  "AMFI5": {
+   "floor": 2,
+   "x": 0.8298,
+   "y": 0.5361,
+   "source": "2. Kat.pdf · plan etiketi \"AMFİ-5\"",
+   "confidence": "label_exact"
+  }
+ }
+}

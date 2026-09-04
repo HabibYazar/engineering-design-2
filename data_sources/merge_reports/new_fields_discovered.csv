@@ -1,0 +1,44 @@
+﻿source_file,sheet,source_column,semantic_meaning,canonical_destination,action
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,erkek,Yerleşen erkek öğrenci sayısı,yok_atlas_benchmark_metrics.metric='placed_male',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,kiz,Yerleşen kız öğrenci sayısı,yok_atlas_benchmark_metrics.metric='placed_female',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,liseli,Yerleşenlerin lise öğrencisi olanları,yok_atlas_benchmark_metrics.metric='placed_high_school',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,maxpuan,Yerleşenlerin en yüksek puanı,yok_atlas_benchmark_metrics.metric='highest_score',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,mezun,Yerleşenlerin mezun olanları,yok_atlas_benchmark_metrics.metric='placed_graduate',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,tercihbirinci,Programı 1. sırada yazan aday,yok_atlas_benchmark_metrics.metric='preference_first',merged
+2021-2022/ankara_yks_2021.xlsx,Ankara_2021,tercihtoplam,Programı tercih eden toplam aday,yok_atlas_benchmark_metrics.metric='preference_total',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,erkek,Yerleşen erkek öğrenci sayısı,yok_atlas_benchmark_metrics.metric='placed_male',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,kiz,Yerleşen kız öğrenci sayısı,yok_atlas_benchmark_metrics.metric='placed_female',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,liseli,Yerleşenlerin lise öğrencisi olanları,yok_atlas_benchmark_metrics.metric='placed_high_school',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,maxpuan,Yerleşenlerin en yüksek puanı,yok_atlas_benchmark_metrics.metric='highest_score',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,mezun,Yerleşenlerin mezun olanları,yok_atlas_benchmark_metrics.metric='placed_graduate',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,tercihbirinci,Programı 1. sırada yazan aday,yok_atlas_benchmark_metrics.metric='preference_first',merged
+2021-2022/ankara_yks_2022.xlsx,Ankara_2022,tercihtoplam,Programı tercih eden toplam aday,yok_atlas_benchmark_metrics.metric='preference_total',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,Kadro_2020_2026,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,Kadro_2020_2026,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,ABU_Zaman_Serisi,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2020_2026.xlsx,ABU_Zaman_Serisi,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Kadro_2026,prof,Programa bağlı profesör sayısı,yok_atlas_benchmark_metrics.metric='staff_prof',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Kadro_2026,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Kadro_2026,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Kadro_2026,ars_gor,Programa bağlı araştırma görevlisi sayısı,yok_atlas_benchmark_metrics.metric='staff_ars_gor',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Universite_Ozet,prof,Programa bağlı profesör sayısı,yok_atlas_benchmark_metrics.metric='staff_prof',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Universite_Ozet,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Universite_Ozet,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+akademik-kadro/ankara_universiteleri_akademik_kadro_2026.xlsx,Universite_Ozet,ars_gor,Programa bağlı araştırma görevlisi sayısı,yok_atlas_benchmark_metrics.metric='staff_ars_gor',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,min_rank_requirement,Programın taban sıralama koşulu,yok_atlas_benchmark_metrics.metric='min_rank_requirement',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,annual_fee_try,Programın yıllık tam öğrenim ücreti (TL),yok_atlas_benchmark_metrics.metric='annual_fee_try',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,prof,Programa bağlı profesör sayısı,yok_atlas_benchmark_metrics.metric='staff_prof',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+ankara_bilim_yks_2026_yokatlas.xlsx,YKS_2026,ars_gor,Programa bağlı araştırma görevlisi sayısı,yok_atlas_benchmark_metrics.metric='staff_ars_gor',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,min_rank_requirement,Programın taban sıralama koşulu,yok_atlas_benchmark_metrics.metric='min_rank_requirement',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,annual_fee_try,Programın yıllık tam öğrenim ücreti (TL),yok_atlas_benchmark_metrics.metric='annual_fee_try',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,prof,Programa bağlı profesör sayısı,yok_atlas_benchmark_metrics.metric='staff_prof',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,docent,Programa bağlı doçent sayısı,yok_atlas_benchmark_metrics.metric='staff_docent',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,dr_ogr_uyesi,Programa bağlı Dr. Öğr. Üyesi sayısı,yok_atlas_benchmark_metrics.metric='staff_dr_ogr_uyesi',merged
+ankara_universiteleri_yks_2026_yokatlas.xlsx,YKS_2026_Ankara,ars_gor,Programa bağlı araştırma görevlisi sayısı,yok_atlas_benchmark_metrics.metric='staff_ars_gor',merged
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Ucretler_2026_2027,annual_fee_try,Programın yıllık tam öğrenim ücreti (TL),yok_atlas_benchmark_metrics.metric='annual_fee_try',merged
+finans/ankara_universiteleri_egitim_ucretleri_2026.xlsx,Tahmini_Gelir_TURETILMIS,annual_fee_try,Programın yıllık tam öğrenim ücreti (TL),yok_atlas_benchmark_metrics.metric='annual_fee_try',merged
+kpi/ankara_bilim_stratejik_hedefler_kidr2024.xlsx,Stratejik_Amac_Hedef,gosterge,Stratejik plan performans göstergesi,strategic_kpis.name,merged
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,Yeni_Yillar_Detay,education_mode,Öğretim türü (birinci/ikinci/uzaktan),university_student_headcounts.education_mode,merged
+öğrenci-sayıları/ankara_universiteleri_ogrenci_sayilari_2020_2026.xlsx,Yeni_Yillar_Detay,onlisans_E,Önlisans erkek öğrenci,university_student_headcounts (gender='E'),merged
