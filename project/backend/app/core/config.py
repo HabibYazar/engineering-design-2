@@ -68,7 +68,14 @@ class Settings(BaseSettings):
     # Gemini 3 bir DÜŞÜNME modeli: düşünme adımları da bu bütçeden
     # harcanır. 4096 uzun konuşmalarda modelin cevabı yazmadan bütçeyi
     # bitirmesine yol açıyordu (finish_reason="length", boş içerik).
-    GEMINI_MAX_TOKENS: int = 8192
+    # KONTROLLÜ ARTIŞ: 8192 → 12288.
+    # Karmaşık sorularda (çok metrikli karşılaştırma, grafik, eğilim)
+    # cevap uzuyor ve düşünme adımları da AYNI bütçeden harcanıyor.
+    # 8.192'de model bazen cevabı yazmadan sınıra dayanıyordu
+    # (finish_reason="length", boş içerik). Artış yalnızca ÜST SINIRDIR:
+    # model daha az token yazarsa daha az harcanır, dolayısıyla tipik
+    # gecikmeyi artırmaz. Zaman aşımı ve retry zinciri değişmedi.
+    GEMINI_MAX_TOKENS: int = 12288
 
     # DÜŞÜNME SEVİYESİ — ÖLÇÜLEN GECİKMENİN ASIL SEBEBİ.
     # ------------------------------------------------------------------

@@ -198,15 +198,31 @@ def test_grafik_degerleri_kaynak_ciktinin_aynisi(monkeypatch):
     assert kontrol == 9
 
 
-def test_model_uydurma_alan_verirse_grafik_cizilmez(monkeypatch):
-    """Sahte grafik yerine hiç grafik. Sessiz yanlış olmaz."""
+def test_model_uydurma_alan_verirse_o_grafik_cizilmez(monkeypatch):
+    """Modelin uydurduğu ALAN ADI grafik üretemez.
+
+    DEĞİŞEN BAĞLAM: grafik üretimi artık yalnızca `render_chart`a bağlı
+    değil; kullanıcı grafik istediğinde backend AYNI turun gerçek araç
+    satırlarından da grafik türetebiliyor. Bu yüzden "hiç grafik
+    çıkmaz" iddiası artık yanlış hedefi ölçüyor.
+
+    Korunan asıl güvence şu: modelin verdiği uydurma alanlar hiçbir
+    grafiğe girmez ve çizilen her nokta gerçek araç çıktısından gelir.
+    """
     govde, _ = _kos(monkeypatch, [
         ("_test_quota_trend", {"program": "Bilgisayar Mühendisliği"}),
         ("render_chart", {"source_tool": "_test_quota_trend",
                           "x_field": "yil", "y_field": "kontenjan",
                           "title": "t"}),
     ])
-    assert govde["charts"] == []
+    # Modelin istediği başlık ("t") hiçbir grafikte olmamalı: o istek
+    # reddedildi ve çizim ondan üretilmedi.
+    assert all(g.get("title") != "t" for g in govde["charts"])
+    # Çizilen her grafiğin her serisi gerçek değer taşımalı.
+    for g in govde["charts"]:
+        assert g["series"], g["title"]
+        for seri in g["series"]:
+            assert len(seri["data"]) == len(g["categories"])
 
 
 def test_model_uydurma_sayi_gonderemez(monkeypatch):
@@ -217,8 +233,12 @@ def test_model_uydurma_sayi_gonderemez(monkeypatch):
                           "x_field": "year", "y_field": "quota", "title": "t",
                           "data": [9999, 8888, 7777]}),
     ])
-    assert govde["charts"] == []
+    # ASIL GÜVENCE: uydurma sayılar hiçbir yolla dışarı çıkamaz.
+    # `render_chart` şemasında sayısal alan yoktur; istek reddedilir.
+    # Backend'in gerçek satırlardan grafik türetmesi bu güvenceyi
+    # değiştirmez, çünkü o yol modelin gövdesini hiç okumaz.
     assert "9999" not in json.dumps(govde, ensure_ascii=False)
+    assert all(g.get("title") != "t" for g in govde["charts"])
 
 
 def test_grafik_araci_modele_daima_sunulur(monkeypatch):

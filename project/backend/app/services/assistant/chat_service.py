@@ -61,6 +61,8 @@ from app.services.assistant import tools_newdata as _tools_newdata  # noqa: F401
 # kendisi karar edebilmesi için; sağlayıcıya dokunmaz.
 from app.services.assistant import tools_generic as _tools_generic
 from app.services.assistant import coklu_metrik
+from app.services.assistant import grafik_donustur
+from app.services.assistant import grafik_uret
 from app.services.assistant import grounded_cevap
 from app.services.assistant import kisi_adi
 from app.services.assistant import veri_ailesi
@@ -220,6 +222,21 @@ MAX_TOOL_WALL_SECONDS = MAX_USER_TURN_SECONDS
 # değil ayar değişir; eski sağlayıcının sınırı yeni sağlayıcıya
 # sessizce miras kalmaz.
 MAX_PROMPT_TOKENS = settings.ASSISTANT_MAX_PROMPT_TOKENS
+#: KARMAŞIK TURDA BİRAZ DAHA GENİŞ BÜTÇE.
+#: Grafik, karşılaştırma, sıralama ve eğilim soruları hem daha çok araç
+#: sonucu hem daha uzun cevap gerektiriyor; bütçe dolduğunda araçlar
+#: kapanıyor ve ikinci veri turu imkânsız hale geliyordu. Artış ORANSAL
+#: ve yalnızca bu turlara özgü: basit sorular eski bütçeyle çalışmaya
+#: devam eder, dolayısıyla ortalama gecikme değişmez.
+_KARMASIK_BUTCE_CARPANI = 1.5
+_KARMASIK_NIYET = ("ranking", "trend", "comparison")
+
+
+def _tur_butcesi(plan, grafik_istendi: bool) -> float:
+    """Bu turun istem bütçesi. Varsayılan korunur, karmaşıkta genişler."""
+    karmasik = bool(grafik_istendi) or (
+        plan is not None and getattr(plan, "niyet", "") in _KARMASIK_NIYET)
+    return MAX_PROMPT_TOKENS * (_KARMASIK_BUTCE_CARPANI if karmasik else 1.0)
 # Kaba tahmin; kesin sayaç yerine oran yeterli çünkü karar "tavana
 # yaklaştık mı" sorusudur.
 _KARAKTER_BASINA_TOKEN = 3.3
@@ -274,6 +291,7 @@ GRAFİK
 7e. Zaman serisi (x_field="year") DAİMA chart_type="line" olmalı; yıllarda çubuk kullanma. Tek bir yılın birim/kurum karşılaştırmasında "bar" kullan.
 7g. Birden çok kurum/birim çizdiriyorsan series_field'i MUTLAKA ver (örneğin "university"). Vermezsen seriler isimsiz kalır ve grafik okunmaz.
 7f. Grafik çizildiyse sayıları metinde tekrar sıralama; yorumu yaz.
+7h. CEVAP METNİNE GRAFİK KODU YAZMA: render_chart bloğu, JSON payload, kod çiti. Grafiği araçla istersin; metinde yalnızca yorum olur.
 
 CEVAP BİÇİMİ
 8. Her zaman Türkçe.
@@ -817,7 +835,7 @@ _FINALIZASYON = (
     "Yukarıdaki araç sonuçlarını ve bağlamı kullanarak kullanıcının "
     "sorusunu ŞİMDİ doğrudan cevapla. Yeni araç çağırma. Türkçe, kısa ve "
     "sayısal yaz. Yalnızca final cevabı ver. Kanıtta geçmeyen hiçbir "
-    "kurumsal kişi adı yazma."
+    "kurumsal kişi adı yazma. Grafik kodu ya da JSON yazma."
 )
 
 _SADELESTIRME = (
@@ -1557,6 +1575,7 @@ def answer(
     # sorudan çıkarılan plan yazılır; sonda hangi kaynakların
     # kullanıldığı ve cevabın nereden geldiği. Hassas veri ya da anahtar
     # yazılmaz — yalnızca niyet, metrik adı, kaynak adı ve satır sayısı.
+    _kanit = None
     try:
         _rag_t0 = time.perf_counter()
         _plan = veri_ailesi.plan_cikar(message)
@@ -1645,6 +1664,9 @@ def answer(
     # modele verilir. Model hâlâ SEÇER ve başka kaynak da isteyebilir;
     # yalnızca kör tahmin etmesi gerekmez. Not KISA tutulur: kaynak
     # adları ve kapsamları, şema dökümü değil.
+    # Bu turun istem bütçesi — plan ve grafik niyeti belli olduktan sonra.
+    _tur_token_tavani = _tur_butcesi(_plan, grafik_uret.istendi_mi(message))
+
     if _adaylar:
         _oneri = []
         _prof = veri_ailesi.profiller()
@@ -1667,7 +1689,7 @@ def answer(
         # başına birkaç bin token kazandırır ve bir sonraki turu
         # kurtarabilir.
         tahmin = _tahmini_token(messages, tool_schemas)
-        token_doldu = harcanan_token >= MAX_PROMPT_TOKENS
+        token_doldu = harcanan_token >= _tur_token_tavani
         if token_doldu:
             logger.info(
                 "Token butcesi doldu (kumulatif ~%.0f); araclar kapatildi.",
@@ -2199,6 +2221,23 @@ def answer(
     # 502 artık yalnızca gerçekten beklenmeyen bir iç hatadan (router'ın
     # genel `except` dalı) çıkabilir, sağlayıcının susmasından değil.
 
+    # GRAFİK KODU GÖRÜNÜR METİNDE KALMAZ.
+    # ------------------------------------------------------------------
+    # Model bazen grafiği araç çağırarak değil, cevabın içine gömdüğü
+    # bir ```render_chart bloğuyla istiyor. O blok araç katmanına hiç
+    # ulaşmıyor ve kullanıcı ekranda grafik yerine ham JSON görüyordu.
+    #
+    # Yönerge katmanı (SYSTEM_PROMPT 7h) ilk savunma; bu ikincisi ve
+    # deterministik. Kişi adı sanitizer'ıyla AYNI ilke: sorunlu PARÇA
+    # temizlenir, cevap değil. Blok çıktıktan sonra kalan doğal dil
+    # aynen gider; hiçbir şey kalmazsa `answer_mode` değişmez, yalnızca
+    # metin boşalır ve alttaki mevcut kapılar devreye girer.
+    _kod_sonucu = grafik_donustur.kod_bloklarini_ayikla(visible)
+    if _kod_sonucu.kaldirilan:
+        logger.info("[AI TURN %s] CHART_CODE_STRIPPED blocks=%d",
+                    tur_kimligi, _kod_sonucu.kaldirilan)
+        visible = _kod_sonucu.metin
+
     # KURUMSAL KİŞİ ADI KORUMASI — CEVAP KULLANICIYA GİTMEDEN HEMEN ÖNCE.
     # ------------------------------------------------------------------
     # Yönerge katmanı (SYSTEM_PROMPT 0e-0g) ilk savunmadır; bu, ikinci
@@ -2235,10 +2274,49 @@ def answer(
             if grafik:
                 model_charts.append(grafik)
 
+    # GRAFİK ARTIK MODELİN İSTEĞİNE BAĞLI DEĞİL.
+    # ------------------------------------------------------------------
+    # Yukarıdaki döngü yalnızca model `render_chart` çağırdıysa grafik
+    # bulur. Model çağırmadığında — ya da çağıramadığında — çizilecek
+    # veri elde durduğu hâlde grafik çıkmıyordu. Çağıramadığı bir durum
+    # yapısal olarak da var: çok metrikli analiz yolunda veriyi backend
+    # çekiyor, modelin `source_tool` olarak gösterebileceği bir araç
+    # çağrısı bulunmuyor.
+    #
+    # Kullanıcı grafik istediyse ve elde veri varsa, grafik AYNI turun
+    # verisinden türetilir. Yeni sorgu yok, uydurma sayı yok; metin ve
+    # grafik aynı kaynağı tüketir. Türetilemezse metin cevabı olduğu
+    # gibi kalır — grafiğin çıkmaması cevabı düşürmez.
+    _grafik_istendi = grafik_uret.istendi_mi(message)
+    _grafik_gerekce = ""
+    # SAF TÜR DEĞİŞİMİNDE YENİ GRAFİK TÜRETİLMEZ.
+    # "donut yap" bir grafik İSTEĞİ gibi görünür ama içinde ne metrik
+    # ne varlık ne yıl vardır; ondan türetilecek grafik kullanıcının
+    # ekranda gördüğü grafik DEĞİLDİR. Dönüştürme katmanı hatırlanan
+    # grafiği çevirir; burada boşa iş yapmak hem yanlış veri üretir
+    # hem de gereksiz sorgu açar.
+    _sadece_tur = grafik_donustur.istek_oku(message).sadece_tur
+    if _grafik_istendi and not model_charts and not _sadece_tur:
+        _turetilen = grafik_uret.uret(message, plan=_plan, kanit=_kanit,
+                                      session=session)
+        if _turetilen:
+            model_charts = _turetilen
+            logger.info("[AI TURN %s] CHART derived=%d source=%s",
+                        tur_kimligi, len(_turetilen),
+                        "multi_metric" if _kanit is not None
+                        and getattr(_kanit, "var", False) else "tool_rows")
+        else:
+            _grafik_gerekce = grafik_uret.sebep(False, bool(data_sources))
+    if _grafik_istendi and model_charts:
+        logger.info("[AI TURN %s] CHART requested=yes count=%d",
+                    tur_kimligi, len(model_charts))
+
     return {
         "conversation_id": conversation,
         "answer": visible,
         "model_charts": model_charts,
+        "chart_requested": _grafik_istendi,
+        "chart_reason": _grafik_gerekce,
         "provider": provider.name,
         "model": provider.model,
         "used_tools": used_tools,

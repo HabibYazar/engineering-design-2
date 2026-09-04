@@ -14,6 +14,7 @@ söyler; sayı uydurması engellenir.
 
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Iterator, List, Optional
 
@@ -25,7 +26,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AcademicProgram, Department, Faculty
 from app.services.scope import resolve
-from app.services.assistant import chart_builder, chat_service, context_builder
+from app.services.assistant import (chart_builder, chat_service,
+                                    context_builder, grafik_donustur,
+                                    query_policy, tablo_oku)
 from app.services.assistant.provider_shared import AssistantProviderError
 from app.services.assistant.schemas import (
     ArchitectureComponent,
@@ -161,6 +164,119 @@ def grafik_yok_sebebi(*, veri_geldi: bool, zaman_asimi: bool) -> str:
     return "Bu sonuç için grafik üretilemedi."
 
 
+def _grafik_turu_degistir(payload: ChatRequest, istek
+                          ) -> Optional[ChatResponse]:
+    """Saf tür değişimini modele ve veritabanına gitmeden karşılar.
+
+    ÜÇ ŞEY BİRDEN YAPILMAZ: Gemini çağrısı yok, RAG planı yok, SQL yok.
+    Cevap için gereken her şey bir önceki turda hesaplanmıştı; burada
+    yalnızca aynı sayılar başka bir görselleştirmeyle yeniden
+    paketlenir.
+
+    Grafik iki kaynaktan aranır ve İKİSİ DE aynı konuşmaya aittir:
+
+      1. İSTEMCİNİN GÖNDERDİĞİ `previous_charts` — kullanıcının ekranda
+         GÖRDÜĞÜ grafik tam olarak budur; en güvenilir kaynak odur.
+      2. Sunucunun konuşma belleği — istemci alanı göndermiyorsa
+         (eski arayüz) devreye girer.
+
+    Hiçbiri yoksa `None` DÖNMEZ bir analiz üretilmesin diye kısa ve
+    dürüst bir cevap verilir: yeni bir konu araştırmak, kullanıcının
+    sormadığı bir soruya cevap vermek olurdu.
+    """
+    kaynak = [g for g in (payload.previous_charts or [])
+              if isinstance(g, dict) and g.get("series")]
+    nereden = "request_charts"
+    satir = len(kaynak)
+    if not kaynak:
+        kaynak = grafik_donustur.son_grafikler(payload.conversation_id)
+        nereden, satir = "session_charts", len(kaynak)
+
+    # ÖNCEKİ CEVAPTA GRAFİK OLMASI ŞART DEĞİL.
+    # ------------------------------------------------------------------
+    # ÖLÇÜLEN ARIZA: kullanıcı beş satırlık bir taban puan TABLOSU aldı,
+    # "line yap" dedi ve "önceki grafiğin verisi bulunamadı" cevabını
+    # gördü. Aranan şey yanlıştı: ortada grafik yoktu ama ÇİZİLEBİLİR
+    # VERİ vardı. Elindeki veriyi görmezden gelip kullanıcıyı geri
+    # çevirmek, cevabı olan bir soruyu cevapsız bırakmaktır.
+    #
+    # Zincir: yapılandırılmış sonuç → görünür metindeki tablo. Metin
+    # ayrıştırma EN SONDA, çünkü en kırılgan olan odur.
+    if not kaynak:
+        _cikti = grafik_donustur.son_cikti(payload.conversation_id)
+        _tablo = tablo_oku.grafiklenebilir(
+            istek.tur,
+            yapisal=payload.previous_data or _cikti.get("yapisal"),
+            metin=payload.previous_answer or _cikti.get("metin") or "")
+        if _tablo.grafikler:
+            konusma = payload.conversation_id or str(uuid.uuid4())
+            grafik_donustur.hatirla(konusma, _tablo.grafikler)
+            logger.info("chart_followup=yes conversation_id=%s "
+                        "previous_chart_count=0 previous_tabular_rows=%d "
+                        "requested_type=%s source=%s gemini_called=no "
+                        "db_queries=0", konusma, _tablo.satir, istek.tur,
+                        _tablo.kaynak)
+            return ChatResponse(
+                conversation_id=konusma,
+                answer=grafik_donustur.celiski_temizle("", istek.tur),
+                provider=chat_service.get_provider().name,
+                model=chat_service.get_provider().model,
+                calculated_at=datetime.now(), charts=_tablo.grafikler,
+                used_tools=[], data_sources=[], scope={},
+                data_source=query_policy.SOURCE_INSTITUTIONAL,
+                chart_requested=True, chart_reason="")
+
+    if not kaynak:
+        logger.info("chart_followup=yes conversation_id=%s "
+                    "previous_chart_count=0 requested_type=%s "
+                    "gemini_called=no result=no_previous_chart",
+                    payload.conversation_id or "-", istek.tur)
+        return ChatResponse(
+            conversation_id=payload.conversation_id or str(uuid.uuid4()),
+            answer=("Önceki cevapta grafiklenebilir veri bulunamadı. "
+                    "Önce sayısal bir sonuç isteyin, sonra onu "
+                    "istediğiniz grafiğe çevirebilirim."),
+            provider=chat_service.get_provider().name,
+            model=chat_service.get_provider().model,
+            calculated_at=datetime.now(), charts=[],
+            used_tools=[], data_sources=[], scope={},
+            data_source=query_policy.SOURCE_UNAVAILABLE,
+            chart_requested=True,
+            chart_reason="Dönüştürülecek grafiklenebilir veri yok.",
+        )
+
+    grafikler, notlar = grafik_donustur.donustur_hepsi(kaynak, istek.tur)
+    if not grafikler:
+        return None            # dönüştürülemedi → normal akış denesin
+
+    konusma = payload.conversation_id or str(uuid.uuid4())
+    grafik_donustur.hatirla(konusma, grafikler)
+    # METİN DE DETERMİNİSTİK: bu cümle için model çağırmak, bir
+    # kelimeyi ağ üzerinden satın almak olurdu.
+    metin = grafik_donustur.celiski_temizle("", istek.tur)
+    if notlar:
+        metin += "\n\n" + " ".join(notlar)
+
+    logger.info("chart_followup=yes conversation_id=%s "
+                "previous_chart_count=%d requested_type=%s source=%s "
+                "gemini_called=no db_queries=0",
+                konusma, satir, istek.tur, nereden)
+    return ChatResponse(
+        conversation_id=konusma, answer=metin,
+        provider=chat_service.get_provider().name,
+        model=chat_service.get_provider().model,
+        calculated_at=datetime.now(), charts=grafikler,
+        # KAYNAK İDDİASI ÖNCEKİ TURDAN GELİR.
+        # Bu turda hiçbir sorgu çalışmadı; grafikler bir önceki turun
+        # kurumsal verisidir ve o tur kaynağını zaten bildirdi. Burada
+        # yeniden kurumsal kaynak iddia etmek, yapılmamış bir sorguyu
+        # yapılmış göstermek olurdu.
+        used_tools=[], data_sources=[], scope={},
+        data_source=query_policy.SOURCE_INSTITUTIONAL,
+        chart_requested=True, chart_reason="",
+    )
+
+
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -173,6 +289,25 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     değil veya zaman aşımı varsa kullanıcıya anlaşılır bir hata döner —
     uydurma cevap ÜRETİLMEZ.
     """
+    # ======================================================================
+    # SAF GRAFİK TÜRÜ DEĞİŞİMİ — MODELE VE VERİTABANINA HİÇ GİDİLMEZ.
+    # ======================================================================
+    # ÖLÇÜLEN ARIZA: "line yap" mesajı normal bir soru gibi işleniyordu.
+    # `chat_service.answer` çalışıyor, RAG planı çıkarılıyor, Gemini
+    # çağrılıyor ve YENİ BİR ANALİZ METNİ üretiliyordu. Dönüştürme
+    # kancası bu işin ARDINDAN geldiği için grafiği düzeltiyor ama
+    # boşuna yapılan model turunu ve yeni metni engellemiyordu.
+    #
+    # Kök neden kancanın YERİYDİ. "line yap" bir soru değil, bir
+    # görüntüleme komutudur: içinde ne metrik, ne varlık, ne yıl var.
+    # Cevabı üretmek için gereken her şey bir önceki cevapta hazır.
+    # Bu yüzden karar, servis çağrılmadan ÖNCE verilir.
+    _tur_istegi = grafik_donustur.istek_oku(payload.message or "")
+    if _tur_istegi.sadece_tur:
+        _erken = _grafik_turu_degistir(payload, _tur_istegi)
+        if _erken is not None:
+            return _erken
+
     try:
         # Yetki listesi şimdilik geçilmiyor: oturum bilgisi sohbet uç noktasına
         # taşınana kadar bütün araçlar açıktır. Yetki KONTROLÜ hazır
@@ -209,6 +344,7 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     # yine backend'den gelir: araç yalnızca ALAN ADI kabul eder, sayı
     # kabul etmez.
     grafikler: list = list(result.pop("model_charts", None) or [])
+
     try:
         # Katalog yolu: `data_catalog` bir veri kümesi çözdüyse grafik
         # ONUN satırlarından çizilir. Bu yol kalıba değil çözülmüş
@@ -268,6 +404,18 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     # `timed_out` yalnızca yukarıdaki grafik-sebebi ayrımı içindi;
     # yanıt şemasının alanı değil, bu yüzden burada çıkarılır.
     result.pop("timed_out", None)
+
+    # Grafik gerçekten üretildiyse "istendi ama çıkmadı" gerekçesi
+    # anlamını yitirir; çelişkili iki alan göndermemek için temizlenir.
+    if grafikler:
+        result["chart_reason"] = ""
+
+    # Bu turun ÇİZİLEBİLİR İZLERİ bir sonraki "bunu line yap" için
+    # hatırlanır: grafikler, yapılandırılmış sonuç ve görünür metin.
+    # Grafik üretilmemiş bir tur bile tablosuyla dönüştürülebilir.
+    grafik_donustur.hatirla(konusma_id, grafikler,
+                            metin=result.get("answer"),
+                            yapisal=result.get("structured_result"))
     return ChatResponse(calculated_at=datetime.now(), charts=grafikler, **result)
 
 

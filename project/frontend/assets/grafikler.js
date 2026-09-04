@@ -334,7 +334,14 @@ function dagilimHalkasi(parcalar, opt = {}) {
     return bekleniyorGovde(opt.bos || "Dağılım için ölçülen değer yok.");
   }
   const toplam = gecerli.reduce((t, p) => t + Number(p.deger), 0);
-  const G = 250, cx = G / 2, cy = G / 2, R = 96, ic = 62;
+  /* İÇ YARIÇAP SEÇENEKLİ: 0 = pasta (dolu daire), >0 = halka (donut).
+     Pasta ile halka aynı veriyi gösterir; farkları yalnızca ortadaki
+     boşluktur. İki ayrı çizim fonksiyonu yazmak, aynı geometriyi iki
+     yerde bakımı zor biçimde tekrarlamak olurdu. `ic = 0` olduğunda
+     iç yay dejenere olur ve SVG onu düz çizgi sayar — sonuç tam bir
+     pasta dilimidir. */
+  const G = 250, cx = G / 2, cy = G / 2, R = 96;
+  const ic = Number.isFinite(opt.icYaricap) ? Math.max(0, opt.icYaricap) : 62;
   const yb = opt.yb || (v => fmt.int(Math.round(v)));
 
   const nokta = (aci, yaricap) => {
@@ -1073,8 +1080,19 @@ function cizgiKarsilastirma(kategoriler, seriler, opt = {}) {
   const taban = Y - ALT;
   const n = kategoriler.length;
   const x = i => (n === 1 ? SOL + alan / 2 : SOL + i * alan / (n - 1));
-  const maks = gecerli.map(s =>
-    Math.max(...s.veri.filter(_sayiVar).map(Number), 1));
+  /* İKİ ÖLÇEK MODU.
+     GÖRELİ (varsayılan): her seri kendi en yüksek değerinin yüzdesi
+     olarak çizilir. Birimleri farklı metrikleri tek eksende
+     kıyaslamanın tek dürüst yolu budur ve mevcut çağıranlar bunu
+     kullanır.
+     MUTLAK (`opt.mutlak`): tek birimli tek/az serili bir grafikte
+     yüzde ekseni yanıltıcıdır — kullanıcı gerçek sayıyı görmek ister.
+     Asistanın "line yap" dönüşümü bu modu kullanır. */
+  const _mutlak = !!opt.mutlak;
+  const _ortakMaks = Math.max(...gecerli.map(s =>
+    Math.max(...s.veri.filter(_sayiVar).map(Number), 1)), 1);
+  const maks = gecerli.map(s => (_mutlak ? _ortakMaks
+    : Math.max(...s.veri.filter(_sayiVar).map(Number), 1)));
   const y = (v, si) => taban - (Number(v) / maks[si]) * (taban - UST);
 
   let s = "";
@@ -1087,7 +1105,9 @@ function cizgiKarsilastirma(kategoriler, seriler, opt = {}) {
     s += `<line x1="${SOL}" y1="${yy}" x2="${G - SAG}" y2="${yy}"
       stroke="var(--cizgi)"/>
       <text x="${SOL - 6}" y="${yy + 3}" text-anchor="end" fill="var(--sonuk)"
-        font-size="9">${Math.round(oran * 100)}%</text>`;
+        font-size="9">${_mutlak
+          ? formatChartValue(oran * _ortakMaks, opt)
+          : Math.round(oran * 100) + "%"}</text>`;
   }
 
   /* Kendi kurumumuz dikey şeritle işaretlenir — on kurum arasında
@@ -1151,10 +1171,13 @@ function cizgiKarsilastirma(kategoriler, seriler, opt = {}) {
     + `<svg viewBox="0 0 ${G} ${Y}" style="width:100%;height:auto"
         role="img" aria-label="Kurumlar arası çoklu metrik karşılaştırması"
         >${s}</svg>`
-    + `<div class="eksen-not">Y ekseni GÖRELİDİR: her çizgi kendi en yüksek
+    + (_mutlak
+      ? `<div class="eksen-not">Değerler gerçek ölçekte çizilmiştir; kesin
+          sayı noktanın üzerine gelince görünür.</div>`
+      : `<div class="eksen-not">Y ekseni GÖRELİDİR: her çizgi kendi en yüksek
         değerinin yüzdesi olarak çizilir (metriklerin birimleri farklı).
         Gerçek sayı noktanın üzerine gelince görünür. Kurumlar ilk metriğe
-        göre büyükten küçüğe sıralıdır.</div>`;
+        göre büyükten küçüğe sıralıdır.</div>`);
 }
 
 function yiginCubuk(kategoriler, seriler, opt = {}) {

@@ -41,6 +41,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from app.services.assistant import abu_kds_store as store
 from app.services.assistant import entity_katalogu
+from app.services.assistant import kapsam as kapsam_katmani
 
 import logging
 
@@ -324,6 +325,10 @@ class SorguPlani:
     #: İki aday çok yakınsa işaretlenir; kaynak seçimi buna göre daha
     #: geniş davranır ve cevap kapsamı açıkça söylenir.
     varlik_belirsiz: bool = False
+    #: Kullanıcı TEK bir varlık değil bir KÜME istiyor mu ("tüm
+    #: üniversiteler", "bölümlere göre"). Kararı `kapsam` modülü verir;
+    #: burada yalnızca taşınır.
+    toplu_kapsam: bool = False
 
     @property
     def metrik_bilinmiyor(self) -> bool:
@@ -344,7 +349,8 @@ class SorguPlani:
                                          else "-")
         e = (self.varlik or ("?" if self.varlik_belirsiz else "-"))
         return (f"intent={self.niyet} metric={m}"
-                f" entity={e} group={self.varlik_grubu or '-'}"
+                f" entity={e} collective={'yes' if self.toplu_kapsam else 'no'}"
+                f" group={self.varlik_grubu or '-'}"
                 f" scope={self.kapsam_varligi or '-'}"
                 f" level={'program' if self.program_seviyesi else ''}"
                 f"{'+uni' if self.universite_seviyesi else ''}")
@@ -463,6 +469,24 @@ def plan_cikar(soru: str, *, bugun_yil: int = 2026) -> SorguPlani:
             plan.universite_seviyesi = True
     except Exception:  # noqa: BLE001
         logger.debug("varlık çözümlemesi atlandı", exc_info=True)
+
+    # TEKİL Mİ, KÜME Mİ — ÇÖZÜMLEMEDEN SONRA SORULUR.
+    # ------------------------------------------------------------------
+    # Varlık çözümleyici Türkçe eklere bilerek toleranslı; "üniversite",
+    # "üniversitesi" ve "üniversiteler" aynı kavrama düşer. Kavram
+    # eşleştirmesi için doğru, KAPSAM için yanlış: "Ankara'daki
+    # üniversiteler" ifadesi bitişik iki sözcük olduğu için
+    # ANKARA ÜNİVERSİTESİ'ne kilitleniyordu.
+    #
+    # `kapsam` modülü tekil/çoğul ayrımını yapar ve çözümün sonucunu
+    # yerine koyar. Çözümleyicinin puanlaması, ters indeksi ve
+    # eşikleri DEĞİŞMEZ; yalnızca sonucun nasıl kullanılacağı belirlenir.
+    try:
+        _kapsam = kapsam_katmani.coz(soru)
+        plan.toplu_kapsam = _kapsam.toplu
+        kapsam_katmani.uygula(plan, _kapsam)
+    except Exception:  # noqa: BLE001
+        logger.debug("kapsam katmanı atlandı", exc_info=True)
     return plan
 
 

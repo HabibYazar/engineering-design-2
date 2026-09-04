@@ -46,7 +46,15 @@ logger = logging.getLogger(__name__)
 
 #: Desteklenen grafik türleri — KAPALI liste. Bunun dışındaki bir değer
 #: arayüze GİTMEZ.
-CHART_TYPES = ("bar", "hbar", "line", "grouped", "donut", "scatter", "bubble", "stacked", "stacked_bar")
+# CANONICAL GRAFİK TÜRLERİ — BACKEND VE FRONTEND AYNI LİSTEYİ KULLANIR.
+# `pie` ile `donut` AYRI türlerdir: ikisi de aynı veriyi gösterir ama
+# biri dolu daire, diğeri halkadır. Eskiden `pie` bu listede yoktu ve
+# kullanıcı "pasta grafik" istediğinde sessizce `donut` çiziliyordu;
+# arayüzde ise `donut` dalı yatay çubuğa gidiyordu, yani ne pasta ne
+# halka görünüyordu. Türü ADIYLA taşımak, iki katmanın ayrışmasını
+# yapısal olarak engeller.
+CHART_TYPES = ("bar", "hbar", "line", "grouped", "pie", "donut",
+               "scatter", "bubble", "stacked", "stacked_bar")
 
 
 #: Kaynak sınıfı. Arayüz bunu etikete çevirir.
@@ -76,7 +84,8 @@ _TAKIP_ISTEGI = re.compile(
     re.IGNORECASE)
 
 _TUR_ISTEGI = (
-    (re.compile(r"pasta|donut|pay dağılımı", re.I), "donut"),
+    (re.compile(r"\bdonut\b|halka", re.I), "donut"),
+    (re.compile(r"pasta|\bpie\b|pay dağılımı", re.I), "pie"),
     (re.compile(r"çizgi|cizgi|trend|yıllara göre|zaman", re.I), "line"),
     (re.compile(r"yatay|sırala|siralama|ranking|ilk \d+", re.I), "hbar"),
     (re.compile(r"sütun|sutun|dikey|bar", re.I), "bar"),

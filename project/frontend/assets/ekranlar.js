@@ -3404,7 +3404,25 @@ function aiGrafikCiz(g) {
           ...chartOpt,
         })
       : gruplandirilmisCubuk(kategoriler, seriler, { eksenY: g.y_label || "", yukseklik: 250, ...chartOpt });
-  } else if (g.chart_type === "hbar" || g.chart_type === "donut") {
+  } else if (g.chart_type === "pie" || g.chart_type === "donut") {
+    /* PASTA VE HALKA GERÇEKTEN ÇİZİLİR.
+       ÖLÇÜLEN ARIZA: `donut` bu satırda `hbar` ile aynı dalda duruyordu
+       ve YATAY ÇUBUK çiziliyordu. Kullanıcı "donut yap" dediğinde
+       backend türü doğru gönderiyor, arayüz onu çubuğa çeviriyordu.
+       İkisi aynı geometriyi paylaşır; tek fark ortadaki boşluktur
+       (pasta = 0 iç yarıçap). */
+    const sPay = seriler[0] || { veri: [] };
+    govde = typeof dagilimHalkasi === "function"
+      ? dagilimHalkasi(kategoriler.map((k, i) => ({
+          ad: k, deger: sPay.veri[i],
+        })), {
+          icYaricap: g.chart_type === "pie" ? 0 : 62,
+          yb: v => (typeof formatChartValue === "function"
+            ? formatChartValue(v, chartOpt) : fmt.int(v)),
+          ...chartOpt,
+        })
+      : bekleniyorGovde("Grafik çizilemiyor.");
+  } else if (g.chart_type === "hbar") {
     const s0 = seriler[0] || { veri: [] };
     govde = yatayCubuk(kategoriler.map((k, i) => {
       const val = s0.veri[i];
@@ -3421,9 +3439,20 @@ function aiGrafikCiz(g) {
       ...chartOpt,
     });
   } else if (g.chart_type === "line") {
-    govde = gruplandirilmisCubuk(kategoriler, seriler,
-      { eksenY: g.y_label || "", yukseklik: 240, ...chartOpt });
+    /* ÇİZGİ GERÇEKTEN ÇİZGİ.
+       ÖLÇÜLEN ARIZA: bu dal `gruplandirilmisCubuk` çağırıyordu — yani
+       backend "line" gönderdiğinde ekranda ÇUBUK görünüyordu. Projede
+       hazır bir çizgi grafiği zaten var (`cizgiKarsilastirma`); eksik
+       olan tek şey ona bağlanmaktı. `mutlak: true`, tek birimli bir
+       seride yüzde ekseni yerine gerçek değerleri gösterir. */
+    govde = typeof cizgiKarsilastirma === "function"
+      ? cizgiKarsilastirma(kategoriler, seriler,
+          { eksenY: g.y_label || "", yukseklik: 240, mutlak: true,
+            ...chartOpt })
+      : gruplandirilmisCubuk(kategoriler, seriler,
+          { eksenY: g.y_label || "", yukseklik: 240, ...chartOpt });
   } else {
+    /* bar / grouped / bilinmeyen → dikey sütun. */
     govde = gruplandirilmisCubuk(kategoriler, seriler,
       { eksenY: g.y_label || "", yukseklik: 250, ...chartOpt });
   }
@@ -3501,12 +3530,28 @@ async function asistanGonder() {
      üniversite kapsamında hiçbir kimlik gönderilmez. Her istek o anki
      seçimi taşır, bu yüzden kapsam değişince BİR SONRAKİ yanıt değişir. */
   const k = agac.kapsam(K.birimId) || {};
+  /* ÖNCEKİ GRAFİKLER İSTEKLE BİRLİKTE GİDER.
+     "bunu line yap" gibi bir takip mesajında dönüştürülecek veri, son
+     asistan cevabının grafikleridir. Sunucu bunu kendi belleğinde de
+     tutuyor ama o bellek süreç ömrüyle sınırlı; arayüz zaten elinde
+     tuttuğu payload'ı gönderirse takip mesajı her koşulda çalışır.
+     DOM'dan yeniden ayrıştırma YAPILMAZ — yapısal state kullanılır. */
+  const sonAsistan = [...ASISTAN.mesajlar].reverse()
+    .find(m => m.rol === "assistant" && (m.grafikler || []).length);
+  /* ÖNCEKİ CEVAPTA GRAFİK OLMAYABİLİR AMA TABLO OLABİLİR.
+     "line yap" dendiğinde dönüştürülecek veri, son asistan cevabının
+     grafiği YOKSA metnindeki tablodur. Son asistan mesajı ayrıca
+     gönderilir; sunucu önce yapısal veriyi, olmazsa tabloyu okur. */
+  const sonCevap = [...ASISTAN.mesajlar].reverse()
+    .find(m => m.rol === "assistant" && (m.metin || "").trim());
   const govde = {
     message: soru,
     conversation_id: ASISTAN.konusmaId,
     stream: false,
     academic_year: K.donem || null,
   };
+  if (sonAsistan) govde.previous_charts = sonAsistan.grafikler;
+  if (sonCevap) govde.previous_answer = (sonCevap.metin || "").slice(0, 20000);
   const kapsamAlani = {};
   if (k.faculty_id) kapsamAlani.faculty_id = k.faculty_id;
   if (k.department_id) kapsamAlani.department_id = k.department_id;

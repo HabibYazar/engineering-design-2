@@ -97,6 +97,40 @@ class ChatRequest(BaseModel):
         description="Bu alan uyumluluk içindir; akış için /chat/stream kullanılır.",
         examples=[False],
     )
+    # ÖNCEKİ GRAFİKLER — "bunu line yap" için ikinci kaynak.
+    # ------------------------------------------------------------------
+    # Sunucu, konuşma başına son grafikleri süreç belleğinde tutuyor. Bu
+    # tek başına KIRILGAN: süreç yeniden başlarsa, birden çok işçi
+    # varsa ya da kullanıcı sekme değiştirirse hafıza kaybolur ve
+    # dönüştürme yapılacak grafik bulunamaz.
+    #
+    # Arayüz o grafikleri ZATEN elinde tutuyor (son asistan mesajının
+    # `charts` alanı). Onu isteğe eklemek yeni bir state sistemi
+    # kurmadan takip mesajını güvenceye alır. Alan İSTEĞE BAĞLIDIR:
+    # göndermeyen istemciler eskisi gibi çalışır.
+    previous_charts: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description=("Son asistan cevabındaki grafikler. Yalnızca grafik "
+                     "türü değiştirme takip mesajlarında kullanılır."),
+        examples=[None],
+    )
+    # ÖNCEKİ CEVAPTA GRAFİK OLMAYABİLİR AMA VERİ VARDIR.
+    # Kullanıcı tablo içeren bir cevap alıp "line yap" dediğinde
+    # dönüştürülecek şey o tablodur. Yapılandırılmış sonuç birinci,
+    # görünür metin son çare kaynaktır; ikisi de İSTEĞE BAĞLIDIR.
+    previous_data: Optional[Any] = Field(
+        default=None,
+        description=("Son asistan cevabının yapılandırılmış sonucu. "
+                     "Grafik yoksa buradan grafik üretilebilir."),
+        examples=[None],
+    )
+    previous_answer: Optional[str] = Field(
+        default=None,
+        max_length=20000,
+        description=("Son asistan cevabının görünür metni. Yalnızca "
+                     "içindeki tablo grafiğe çevrilecekse kullanılır."),
+        examples=[None],
+    )
     scope: Optional[ScopeSelection] = Field(
         default=None,
         description=(
@@ -218,6 +252,20 @@ class ChatResponse(BaseModel):
         default_factory=dict,
         description="Araç sonuçlarından derlenen kapsam (fakülte/bölüm/program).",
         examples=[{"program": "Bilgisayar Mühendisliği Lisans Programı"}],
+    )
+    # GRAFİK NİYETİ — EKLENEN ALANLAR, DEĞİŞEN ALAN YOK.
+    # Arayüz grafikleri `charts` alanından okumaya devam eder; bu iki
+    # alan yalnızca "kullanıcı grafik istedi mi, istediyse neden
+    # çıkmadı" sorusunu cevaplar. Varsayılanları olduğu için eski
+    # istemciler ve grafik üretmeyen dönüş yolları etkilenmez.
+    chart_requested: bool = Field(
+        default=False,
+        description="Kullanıcı görselleştirme istedi mi.",
+    )
+    chart_reason: str = Field(
+        default="",
+        description=("Grafik istendi ama üretilemediyse kısa gerekçe. "
+                     "Teknik ayrıntı içermez."),
     )
     calculated_at: datetime = Field(
         description="Cevabın üretildiği an.",

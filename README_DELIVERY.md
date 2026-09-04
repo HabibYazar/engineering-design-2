@@ -95,6 +95,40 @@ Veritabanının kendi belgesi `project/data/abu_kds/README.md`
 dosyasındadır: 59 tablonun kataloğu, dönüşüm kuralları ve doğrulama
 sonuçları orada.
 
+### Soru anlama ve cevap güvenceleri
+
+Asistan katmanı, sessizce yanlış sayı üretmeyi *yapısal olarak*
+imkânsız kılmak üzere kuruldu. Öne çıkan davranışlar:
+
+| Davranış | Nerede |
+|---|---|
+| Türkçe varlık çözümleme — ek toleransı, benzer adları karıştırmama | `entity_katalogu.py` |
+| "tüm / hepsi / genel / üniversitelere göre" → tek kuruma kilitlenmez | `kapsam.py` |
+| Ölçü belirtilmemiş sorularda ilgili TÜM ölçüleri ayrı ayrı hesaplama | `coklu_metrik.py` |
+| Kurumsal kişi adı uydurmayı önleme; uydurulursa yalnız adı temizleme | `kisi_adi.py` |
+| Grafik verisini mevcut sorgu sonucundan türetme (yeni sorgu yok) | `grafik_uret.py` |
+| "line yap / pie yap / donut yap" — modele gitmeden tür dönüştürme | `grafik_donustur.py` |
+| Grafik olmayan ama tablo içeren cevabı grafiğe çevirme | `tablo_oku.py` |
+
+Bu davranışların hepsi:
+
+* **Deterministik ve hızlıdır** — grafik türü değiştirme, "tüm/hepsi"
+  çözümlemesi ve kişi adı denetimi için ikinci bir model çağrısı
+  yapılmaz; ölçülen maliyet milisaniye düzeyindedir.
+* **Cevabı asla tümden reddetmez** — sorunlu parça temizlenir, cevabın
+  geri kalanı kullanıcıya gider.
+* **Sağlayıcı arızasına dayanıklıdır** — kota, zaman aşımı ve boş cevap
+  durumlarında eldeki veriden deterministik cevap üretilir. Yerel
+  model YOKTUR ve kullanılmaz.
+* **Grafik kodunu kullanıcıya göstermez** — modelin ürettiği
+  `render_chart` / JSON blokları görünür metinden ayıklanır.
+
+Desteklenen grafik türleri: `line`, `bar`, `hbar` (yatay sütun),
+`pie` (pasta), `donut` (halka), `scatter`, `grouped`, `stacked`.
+Kullanıcı "çizgi grafik yap", "pasta yap", "yatay bar" gibi doğal
+ifadelerle tür değiştirebilir; veri değişmez, yalnızca görselleştirme
+değişir.
+
 Anahtar tanımlamak için:
 
 ```powershell
@@ -129,3 +163,20 @@ ile yeniden üretilir.
 
 Dosya listesi ve rolleri: `docs/DATA_MANIFEST.csv`
 Kod yerleşimi: `docs/PROJECT_STRUCTURE.md`
+
+## Teslim doğrulaması
+
+Bu paket teslim edilmeden önce şunlar çalıştırıldı:
+
+```
+project/backend> python -m pytest tests -q
+1455 passed, 6 failed
+```
+
+Kalan 6 hata, bu teslim döngüsünden **önce** de var olan ve iş
+mantığıyla ilgili bilinen açık kalemlerdir (akademik personel
+performans skoru, hiyerarşi kapsamı, program eşleştirme modu, rakip
+ücret kapsamı, YÖK Atlas 2025 penceresi). Yeni bir kırılma eklenmedi.
+
+Pakette bulunmayanlar: gerçek API anahtarı, `__pycache__`, `.pyc`,
+`.pytest_cache`, yedek (`.bak`) dosyaları, geliştirme arşivleri.
